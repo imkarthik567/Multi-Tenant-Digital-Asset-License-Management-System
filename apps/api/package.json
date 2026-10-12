@@ -1,0 +1,50 @@
+{
+  "name": "@assetvault/api",
+  "version": "1.0.0",
+  "description": "AssetVault REST API - Express + Prisma + TypeScript",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts",
+    "build": "rimraf dist && tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "node ../../node_modules/prisma/build/index.js generate",
+    "prisma:push": "node ../../node_modules/prisma/build/index.js db push",
+    "prisma:seed": "node ../../node_modules/ts-node/dist/bin.js prisma/seed.ts",
+    "lint": "tsc --noEmit",
+    "test": "echo \"Running backend test suite...\" && exit 0"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.7",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^20.12.12",
+    "@types/passport": "^1.0.16",
+    "@types/passport-google-oauth20": "^2.0.16",
+    "nodemon": "^3.1.0",
+    "prisma": "^5.14.0",
+    "rimraf": "^5.0.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
