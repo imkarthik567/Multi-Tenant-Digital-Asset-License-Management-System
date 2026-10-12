@@ -1,17 +1,21 @@
+// ==============================================================================
+// AssetVault HTTP Server Entry Point
+// Course: VIT, BCSE307L Database Systems (Fall 2026-27)
+// ==============================================================================
+
 import app from './app';
 import { env } from './config/env';
-import { prisma } from './config/database';
+import { prisma } from './config/prisma';
 
 const startServer = async () => {
   try {
     // Verify database connectivity
     await prisma.$connect();
-    console.log('✅ Connected to PostgreSQL 16 database successfully.');
+    console.log('✅ Connected to PostgreSQL database successfully.');
 
     const server = app.listen(env.PORT, () => {
       console.log(`🚀 AssetVault API server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
-      console.log(`🔗 Health check available at http://localhost:${env.PORT}/health`);
-      console.log(`🔗 API Base: http://localhost:${env.PORT}/api/v1`);
+      console.log(`🔗 Health check available at http://localhost:${env.PORT}/api/health`);
     });
 
     const shutdown = async (signal: string) => {

@@ -19,6 +19,10 @@ export const tenantScope = async (req: Request, _res: Response, next: NextFuncti
       throw new ForbiddenError('Tenant isolation violation: Access across tenant boundaries is strictly forbidden');
     }
 
+    if (!requestedTenantId) {
+      throw new ForbiddenError('Tenant context could not be determined');
+    }
+
     // Fetch tenant details to attach context
     const tenant = await prisma.tenant.findUnique({
       where: { id: requestedTenantId },
@@ -29,7 +33,7 @@ export const tenantScope = async (req: Request, _res: Response, next: NextFuncti
       throw new ForbiddenError('Target tenant organization does not exist');
     }
 
-    if (tenant.status === 'suspended') {
+    if (tenant.status === 'SUSPENDED') {
       throw new ForbiddenError('Tenant organization account is currently suspended');
     }
 

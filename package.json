@@ -12,10 +12,17 @@
     "dev:web": "npm run dev --workspace=@assetvault/web",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
-    "test": "npm run test --workspaces"
+    "test": "npm run test --workspaces",
+    "db:migrate": "npm run prisma:migrate --workspace=@assetvault/api",
+    "db:seed": "npm run prisma:seed --workspace=@assetvault/api",
+    "db:studio": "npm run prisma:studio --workspace=@assetvault/api"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@typescript-eslint/eslint-plugin": "^7.10.0",
+    "@typescript-eslint/parser": "^7.10.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5"
   },
   "author": "Karthikeyan S",
   "license": "UNLICENSED"

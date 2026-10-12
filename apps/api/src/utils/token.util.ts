@@ -8,7 +8,7 @@ export interface AccessTokenPayload {
   sub: string;
   email: string;
   fullName: string;
-  tenantId: string;
+  tenantId: string | null;
   roleId: number;
   role: string;
   isSuperAdmin: boolean;

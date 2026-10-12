@@ -6,19 +6,33 @@ services:
     container_name: assetvault-postgres
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: assetvault_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-assetvault_db}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./database/scripts/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d assetvault_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-assetvault_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: assetvault-pgadmin
+    restart: unless-stopped
+    profiles:
+      - pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@assetvault.internal
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+    ports:
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
 
   api:
     build:
@@ -32,12 +46,12 @@ services:
     environment:
       PORT: 5000
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:postgrespassword@db:5432/assetvault_db?schema=public
-      JWT_ACCESS_SECRET: default_docker_jwt_access_secret_min_32_characters
-      JWT_REFRESH_SECRET: default_docker_jwt_refresh_secret_min_32_characters
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@db:5432/${POSTGRES_DB:-assetvault_db}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
-      COOKIE_SECRET: default_docker_cookie_signing_secret_min_32_chars
+      COOKIE_SECRET: ${COOKIE_SECRET}
       CORS_ORIGIN: http://localhost:5173
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX: 100
