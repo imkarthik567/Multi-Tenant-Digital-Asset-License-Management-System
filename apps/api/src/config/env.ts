@@ -23,7 +23,9 @@ const envSchema = z.object({
   GOOGLE_CALLBACK_URL: z.string().default('http://localhost:5000/api/v1/auth/google/callback'),
 
   // CORS and Security Limits
+  CLIENT_URL: z.string().default('http://localhost:5173'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  DIRECT_URL: z.string().optional(),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform((val) => parseInt(val, 10)),
   RATE_LIMIT_MAX: z.string().default('100').transform((val) => parseInt(val, 10)),
 });

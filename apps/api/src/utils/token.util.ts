@@ -1,6 +1,13 @@
+// ==============================================================================
+// AssetVault: JWT & Refresh Token Utilities
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Enforces short-lived access tokens (15m) and secure httpOnly cookie storage
+// ==============================================================================
+
 import jwt from 'jsonwebtoken';
+import { Response } from 'express';
 import { env } from '../config/env';
-import { AuthUser } from '../@types/express';
+import { RoleName } from '../config/permissions';
 import { generateSecureRandomString, hashToken } from './hash.util';
 import { UnauthorizedError } from '../errors/AppError';
 
@@ -10,11 +17,19 @@ export interface AccessTokenPayload {
   fullName: string;
   tenantId: string | null;
   roleId: number;
-  role: string;
+  role: RoleName;
   isSuperAdmin: boolean;
 }
 
-export const generateAccessToken = (user: AuthUser): string => {
+export const generateAccessToken = (user: {
+  id: string;
+  email: string;
+  fullName: string;
+  tenantId: string | null;
+  roleId: number;
+  role: RoleName;
+  isSuperAdmin: boolean;
+}): string => {
   const payload: AccessTokenPayload = {
     sub: user.id,
     email: user.email,
@@ -30,18 +45,10 @@ export const generateAccessToken = (user: AuthUser): string => {
   });
 };
 
-export const verifyAccessToken = (token: string): AuthUser => {
+export const verifyAccessToken = (token: string): AccessTokenPayload => {
   try {
     const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as AccessTokenPayload;
-    return {
-      id: decoded.sub,
-      email: decoded.email,
-      fullName: decoded.fullName,
-      tenantId: decoded.tenantId,
-      roleId: decoded.roleId,
-      role: decoded.role,
-      isSuperAdmin: decoded.isSuperAdmin,
-    };
+    return decoded;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       throw new UnauthorizedError('Access token has expired', { expired: true });
@@ -61,4 +68,23 @@ export const generateRefreshTokenData = () => {
     tokenHash,
     expiresAt,
   };
+};
+
+export const setRefreshTokenCookie = (res: Response, rawToken: string): void => {
+  res.cookie('refreshToken', rawToken, {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+    path: '/api/auth',
+  });
+};
+
+export const clearRefreshTokenCookie = (res: Response): void => {
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+  });
 };

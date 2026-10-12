@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { AppError } from './AppError';
-import { Prisma } from '@prisma/client';
 
 export const errorHandler = (
   err: Error,
@@ -34,10 +33,11 @@ export const errorHandler = (
   }
 
   // 3. Prisma Known Request Errors
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+  const prismaErr = err as any;
+  if (err.name === 'PrismaClientKnownRequestError' || prismaErr.code?.startsWith?.('P')) {
     // Unique constraint violation
-    if (err.code === 'P2002') {
-      const target = (err.meta?.target as string[]) || [];
+    if (prismaErr.code === 'P2002') {
+      const target = (prismaErr.meta?.target as string[]) || [];
       res.status(409).json({
         error: {
           code: 'UNIQUE_CONSTRAINT_VIOLATION',
@@ -49,7 +49,7 @@ export const errorHandler = (
     }
 
     // Record not found
-    if (err.code === 'P2025') {
+    if (prismaErr.code === 'P2025') {
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
@@ -60,7 +60,7 @@ export const errorHandler = (
     }
 
     // Foreign key violation
-    if (err.code === 'P2003') {
+    if (prismaErr.code === 'P2003') {
       res.status(400).json({
         error: {
           code: 'FOREIGN_KEY_VIOLATION',

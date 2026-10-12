@@ -15,7 +15,9 @@
     "test": "npm run test --workspaces",
     "db:migrate": "npm run prisma:migrate --workspace=@assetvault/api",
     "db:seed": "npm run prisma:seed --workspace=@assetvault/api",
-    "db:studio": "npm run prisma:studio --workspace=@assetvault/api"
+    "db:studio": "npm run prisma:studio --workspace=@assetvault/api",
+    "check:sqli": "node scripts/check-sqli.js",
+    "check:secrets": "node scripts/scan-secrets.js"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.6.0",

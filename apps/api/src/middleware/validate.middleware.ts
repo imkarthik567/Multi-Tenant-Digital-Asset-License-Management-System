@@ -1,23 +1,35 @@
+// ==============================================================================
+// AssetVault: Request Payload Validation & Mass-Assignment Defense Middleware
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Parses with Zod, strips unknown fields (blocks role_id/tenant_id injection), and returns 422
+// ==============================================================================
+
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { ZodTypeAny, ZodError } from 'zod';
 
 export interface RequestValidationSchema {
-  body?: AnyZodObject;
-  query?: AnyZodObject;
-  params?: AnyZodObject;
+  body?: ZodTypeAny;
+  query?: ZodTypeAny;
+  params?: ZodTypeAny;
 }
 
-export const validate = (schema: RequestValidationSchema) => {
+export const validate = (schema: RequestValidationSchema | ZodTypeAny) => {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (schema.body) {
-        req.body = await schema.body.parseAsync(req.body);
-      }
-      if (schema.query) {
-        req.query = (await schema.query.parseAsync(req.query)) as Request['query'];
-      }
-      if (schema.params) {
-        req.params = (await schema.params.parseAsync(req.params)) as Request['params'];
+      if ('safeParseAsync' in schema && typeof (schema as any).safeParseAsync === 'function') {
+        // Direct body schema passed
+        req.body = await (schema as ZodTypeAny).parseAsync(req.body);
+      } else {
+        const compositeSchema = schema as RequestValidationSchema;
+        if (compositeSchema.body) {
+          req.body = await compositeSchema.body.parseAsync(req.body);
+        }
+        if (compositeSchema.query) {
+          req.query = (await compositeSchema.query.parseAsync(req.query)) as Request['query'];
+        }
+        if (compositeSchema.params) {
+          req.params = (await compositeSchema.params.parseAsync(req.params)) as Request['params'];
+        }
       }
       next();
     } catch (error) {

@@ -3,7 +3,7 @@ import { env } from '../config/env';
 
 export const globalRateLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.RATE_LIMIT_MAX,
+  max: env.NODE_ENV === 'test' ? 10000 : env.NODE_ENV === 'development' ? 1000 : env.RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -16,7 +16,7 @@ export const globalRateLimiter = rateLimit({
 
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // stricter for auth
+  max: env.NODE_ENV === 'test' ? 1000 : 10, // strict 10 attempts per 15m in production/development
   standardHeaders: true,
   legacyHeaders: false,
   message: {
