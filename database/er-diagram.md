@@ -1,254 +1,291 @@
-# Entity-Relationship (ER) Diagram & Relational Schema Architecture
+# AssetVault: Entity-Relationship (ER) Architecture
 
-**Course:** VIT, BCSE307L Database Systems (Fall 2026-27)  
+**Course:** BCSE307L – Database Systems (Fall Semester 2026–27)  
+**Institution:** School of Computer Science and Engineering (SCOPE), Vellore Institute of Technology (VIT), Vellore  
 **System:** AssetVault (Multi-Tenant Digital Asset & License Management System)  
 **Database Engine:** PostgreSQL 16  
 
 ---
 
-## 1. Entity-Relationship Diagram (Mermaid)
+## 1. Executive Summary & Primary Entities
+
+AssetVault is structured around five primary business pillars that govern tenant operations, identity lifecycle, digital asset versioning, and compliance enforcement:
+
+1. **`tenants`:** The root organizational boundary for the multi-tenant SaaS. Every tenant is associated with a subscription plan (`plans`) and logically owns users, vendors, categories, tags, assets, licenses, audit logs, and notifications.
+2. **`users`:** Unified identity repository across all organizations and administrative tiers. Accommodates Super Administrators (global scope, `tenant_id` is `NULL`) and tenant-scoped actors (Tenant Admin, Asset Manager, Member). Supports both Google OAuth 2.0 federation and bcrypt-hashed local credentials.
+3. **`assets`:** Core digital asset repository cataloging proprietary fonts, datasets, design media, and software binaries. Carries categorized taxonomies, version history (`asset_versions`), and tag associations (`asset_tags`).
+4. **`licenses`:** Enterprise software and digital rights agreements issued by commercial vendors. Manages seat capacity constraints, contractual validity horizons, renewal history (`license_renewals`), and multi-asset coverage associations (`asset_licenses`).
+5. **`vendors`:** Software publishers and content providers (e.g., Adobe, JetBrains, Microsoft) holding supply contracts with individual tenants.
+
+### Key Relationships Overview
+- **Tenancy Scoping (1:N):** `tenants` strictly scopes top-level tables (`users`, `vendors`, `categories`, `assets`, `tags`, `licenses`, `audit_logs`, `notifications`). All child entities (`asset_versions`, `asset_tags`, `asset_licenses`, `license_allocations`, `asset_access_logs`, `license_renewals`) inherit tenancy through their parent relationships without redundant foreign keys, eliminating transitive dependencies and strictly maintaining 3NF.
+- **Many-to-Many Resolvers (M:N):**
+  - `asset_tags`: Associates digital assets with dynamic metadata tags (`assets` M:N `tags`).
+  - `asset_licenses`: Resolves asset coverage where one asset can require multiple licenses and a site license covers multiple assets (`assets` M:N `licenses`).
+  - `license_allocations`: Resolves seat entitlement where one license allocates seats to multiple users, and one user can hold multiple license seats (`licenses` M:N `users`), enriched with allocation timestamps and status tracking.
+- **Hierarchical Self-Reference (1:N):** `categories.parent_id` references `categories.id` allowing arbitrary tree taxonomies for asset classification within each tenant.
+
+---
+
+## 2. Mermaid ER Diagram (Crow's-Foot Notation)
 
 ```mermaid
 erDiagram
-    TENANTS ||--o{ USERS : "employs / scopes"
+    PLANS ||--o{ TENANTS : "subscribes"
+    ROLES ||--o{ USERS : "authorizes"
+    TENANTS ||--o{ USERS : "employs"
+    USERS ||--o{ REFRESH_TOKENS : "authenticates"
+
     TENANTS ||--o{ VENDORS : "contracts"
     TENANTS ||--o{ CATEGORIES : "defines"
+    CATEGORIES ||--o{ CATEGORIES : "parent_of"
+
     TENANTS ||--o{ TAGS : "creates"
     TENANTS ||--o{ ASSETS : "owns"
-    TENANTS ||--o{ LICENSES : "procures"
-    TENANTS ||--o{ AUDIT_LOGS : "logs"
-    TENANTS ||--o{ NOTIFICATIONS : "delivers"
-
-    ROLES ||--o{ USERS : "assigned_to"
-
-    USERS ||--o{ REFRESH_TOKENS : "issues"
-    USERS ||--o{ ASSETS : "creates"
-    USERS ||--o{ LICENSE_ALLOCATIONS : "receives_seat"
-    USERS ||--o{ ASSET_ACCESS_LOGS : "performs_action"
-    USERS ||--o{ AUDIT_LOGS : "triggers_mutation"
-    USERS ||--o{ NOTIFICATIONS : "receives"
-
-    CATEGORIES ||--o{ CATEGORIES : "sub_category_of"
     CATEGORIES ||--o{ ASSETS : "classifies"
+    USERS ||--o{ ASSETS : "manages"
 
-    VENDORS ||--o{ LICENSES : "supplies"
+    ASSETS ||--o{ ASSET_VERSIONS : "versions"
+    USERS ||--o{ ASSET_VERSIONS : "uploads"
 
     ASSETS ||--o{ ASSET_TAGS : "tagged_with"
-    TAGS ||--o{ ASSET_TAGS : "applied_to"
+    TAGS ||--o{ ASSET_TAGS : "assigned_to"
 
-    ASSETS ||--o{ ASSET_LICENSES : "covered_by"
-    LICENSES ||--o{ ASSET_LICENSES : "protects"
+    LICENSE_TYPES ||--o{ LICENSES : "classifies"
+    TENANTS ||--o{ LICENSES : "procures"
+    VENDORS ||--o{ LICENSES : "supplies"
 
-    LICENSES ||--o{ LICENSE_ALLOCATIONS : "allocates_seats"
+    ASSETS ||--o{ ASSET_LICENSES : "associated_with"
+    LICENSES ||--o{ ASSET_LICENSES : "covers"
+    USERS ||--o{ ASSET_LICENSES : "assigns"
 
-    ASSETS ||--o{ ASSET_ACCESS_LOGS : "access_recorded_in"
+    LICENSES ||--o{ LICENSE_ALLOCATIONS : "allocates_seat"
+    USERS ||--o{ LICENSE_ALLOCATIONS : "holds_seat"
+    USERS ||--o{ LICENSE_ALLOCATIONS : "allocated_by"
+
+    LICENSES ||--o{ LICENSE_RENEWALS : "extends"
+    USERS ||--o{ LICENSE_RENEWALS : "authorizes_renewal"
+
+    ASSETS ||--o{ ASSET_ACCESS_LOGS : "logs_access"
+    USERS ||--o{ ASSET_ACCESS_LOGS : "performs_access"
+    LICENSES ||--o{ ASSET_ACCESS_LOGS : "authorizes_access"
+
+    TENANTS ||--o{ AUDIT_LOGS : "scopes_audit"
+    USERS ||--o{ AUDIT_LOGS : "initiates_audit"
+
+    TENANTS ||--o{ NOTIFICATIONS : "delivers"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    LICENSES ||--o{ NOTIFICATIONS : "triggers_alert"
+
+    PLANS {
+        int id PK
+        varchar name UK
+        int max_users
+        int max_assets
+        numeric monthly_price
+        boolean is_active
+    }
 
     TENANTS {
-        uuid id PK "gen_random_uuid()"
-        varchar name "NOT NULL"
-        varchar slug "NOT NULL UNIQUE"
-        varchar status "CHECK: active, suspended, trial"
-        varchar subscription_tier "CHECK: free, standard, enterprise"
-        timestamptz created_at "DEFAULT now()"
-        timestamptz updated_at "DEFAULT now()"
+        uuid id PK
+        int plan_id FK
+        varchar name
+        varchar slug UK
+        varchar status
+        varchar contact_email
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     ROLES {
-        serial id PK "SERIAL lookup"
-        varchar name "NOT NULL UNIQUE"
+        int id PK
+        varchar name UK
         text description
-        timestamptz created_at "DEFAULT now()"
     }
 
     USERS {
-        uuid id PK "gen_random_uuid()"
-        uuid tenant_id FK "REFERENCES tenants(id) ON DELETE CASCADE"
-        int role_id FK "REFERENCES roles(id)"
-        varchar email "NOT NULL"
-        varchar password_hash "Nullable for OAuth"
-        varchar full_name "NOT NULL"
+        uuid id PK
+        uuid tenant_id FK
+        int role_id FK
+        varchar email UK
+        varchar full_name
+        varchar password_hash
+        varchar google_id UK
         text avatar_url
-        varchar google_id "UNIQUE"
-        boolean is_active "DEFAULT true"
-        timestamptz created_at "DEFAULT now()"
-        timestamptz updated_at "DEFAULT now()"
+        boolean is_active
+        timestamptz last_login_at
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     REFRESH_TOKENS {
-        uuid id PK "gen_random_uuid()"
-        uuid user_id FK "REFERENCES users(id) ON DELETE CASCADE"
-        varchar token_hash "SHA-256 hash NOT NULL"
-        timestamptz expires_at "NOT NULL"
+        uuid id PK
+        uuid user_id FK
+        varchar token_hash UK
+        timestamptz expires_at
         timestamptz revoked_at
-        varchar ip_address
         text user_agent
-        timestamptz created_at "DEFAULT now()"
+        varchar ip_address
+        timestamptz created_at
     }
 
     VENDORS {
-        uuid id PK "gen_random_uuid()"
-        uuid tenant_id FK "REFERENCES tenants(id) ON DELETE CASCADE"
-        varchar name "NOT NULL"
+        uuid id PK
+        uuid tenant_id FK
+        varchar name
         varchar contact_email
-        varchar contact_phone
-        text website_url
-        text address
-        timestamptz created_at "DEFAULT now()"
-        timestamptz updated_at "DEFAULT now()"
+        varchar website
+        varchar support_phone
     }
 
     CATEGORIES {
-        uuid id PK "gen_random_uuid()"
-        uuid tenant_id FK "REFERENCES tenants(id) ON DELETE CASCADE"
-        varchar name "NOT NULL"
+        uuid id PK
+        uuid tenant_id FK
+        uuid parent_id FK
+        varchar name
         text description
-        uuid parent_category_id FK "REFERENCES categories(id)"
-        timestamptz created_at "DEFAULT now()"
-        timestamptz updated_at "DEFAULT now()"
-    }
-
-    TAGS {
-        uuid id PK "gen_random_uuid()"
-        uuid tenant_id FK "REFERENCES tenants(id) ON DELETE CASCADE"
-        varchar name "NOT NULL"
-        varchar color_hex "DEFAULT #6B7280"
-        timestamptz created_at "DEFAULT now()"
     }
 
     ASSETS {
-        uuid id PK "gen_random_uuid()"
-        uuid tenant_id FK "REFERENCES tenants(id) ON DELETE CASCADE"
-        uuid category_id FK "REFERENCES categories(id)"
-        varchar name "NOT NULL"
-        varchar asset_type "CHECK: font, image, software, dataset, video, document, other"
+        uuid id PK
+        uuid tenant_id FK
+        uuid category_id FK
+        uuid owner_id FK
+        varchar asset_code
+        varchar name
         text description
+        varchar asset_type
+        varchar status
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    ASSET_VERSIONS {
+        uuid id PK
+        uuid asset_id FK
+        int version_no
         text file_url
         bigint file_size_bytes
-        varchar mime_type
-        varchar version "DEFAULT 1.0.0"
-        jsonb metadata "DEFAULT {}"
-        timestamptz deleted_at "Soft delete"
-        uuid created_by_user_id FK "REFERENCES users(id) ON DELETE SET NULL"
-        timestamptz created_at "DEFAULT now()"
-        timestamptz updated_at "DEFAULT now()"
+        char checksum_sha256
+        text change_notes
+        uuid uploaded_by FK
+        timestamptz created_at
+    }
+
+    TAGS {
+        uuid id PK
+        uuid tenant_id FK
+        varchar name
+        varchar color
     }
 
     ASSET_TAGS {
-        uuid id PK "gen_random_uuid()"
-        uuid asset_id FK "REFERENCES assets(id) ON DELETE CASCADE"
-        uuid tag_id FK "REFERENCES tags(id) ON DELETE CASCADE"
-        timestamptz created_at "DEFAULT now()"
+        uuid asset_id PK,FK
+        uuid tag_id PK,FK
+    }
+
+    LICENSE_TYPES {
+        int id PK
+        varchar name UK
+        boolean is_seat_based
+        boolean is_expirable
+        text description
     }
 
     LICENSES {
-        uuid id PK "gen_random_uuid()"
-        uuid tenant_id FK "REFERENCES tenants(id) ON DELETE CASCADE"
-        uuid vendor_id FK "REFERENCES vendors(id) ON DELETE RESTRICT"
-        varchar name "NOT NULL"
-        text license_key
-        varchar license_type "CHECK: per_seat, site, subscription, perpetual, open_source"
-        int total_seats "CHECK: total_seats >= 0"
-        numeric cost "numeric(12,2) CHECK: cost >= 0"
-        varchar currency "DEFAULT USD"
-        timestamptz starts_at "NOT NULL"
-        timestamptz expires_at
-        boolean is_auto_renew "DEFAULT false"
-        int renewal_reminder_days "DEFAULT 30"
-        varchar status "CHECK: active, expired, suspended, pending_renewal"
-        timestamptz deleted_at "Soft delete"
-        timestamptz created_at "DEFAULT now()"
-        timestamptz updated_at "DEFAULT now()"
+        uuid id PK
+        uuid tenant_id FK
+        uuid vendor_id FK
+        int license_type_id FK
+        varchar name
+        varchar license_key
+        int total_seats
+        date start_date
+        date end_date
+        numeric cost
+        char currency
+        boolean auto_renew
+        varchar status
+        text terms
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
     }
 
     ASSET_LICENSES {
-        uuid id PK "gen_random_uuid()"
-        uuid asset_id FK "REFERENCES assets(id) ON DELETE CASCADE"
-        uuid license_id FK "REFERENCES licenses(id) ON DELETE CASCADE"
-        text notes
-        timestamptz created_at "DEFAULT now()"
+        uuid asset_id PK,FK
+        uuid license_id PK,FK
+        uuid assigned_by FK
+        timestamptz assigned_at
     }
 
     LICENSE_ALLOCATIONS {
-        uuid id PK "gen_random_uuid()"
-        uuid license_id FK "REFERENCES licenses(id) ON DELETE CASCADE"
-        uuid user_id FK "REFERENCES users(id) ON DELETE CASCADE"
-        timestamptz allocated_at "DEFAULT now()"
-        timestamptz revoked_at
+        uuid id PK
+        uuid license_id FK
+        uuid user_id FK
+        uuid allocated_by FK
+        timestamptz allocated_at
+        timestamptz released_at
+        varchar status
+    }
+
+    LICENSE_RENEWALS {
+        uuid id PK
+        uuid license_id FK
+        uuid renewed_by FK
+        date old_end_date
+        date new_end_date
+        numeric cost
         text notes
+        timestamptz renewed_at
     }
 
     ASSET_ACCESS_LOGS {
-        uuid id PK "gen_random_uuid()"
-        uuid asset_id FK "REFERENCES assets(id) ON DELETE CASCADE"
-        uuid user_id FK "REFERENCES users(id) ON DELETE SET NULL"
-        varchar action "CHECK: view, download, checkout, checkin"
+        bigint id PK
+        uuid asset_id FK
+        uuid user_id FK
+        uuid license_id FK
+        varchar action
         varchar ip_address
-        text user_agent
-        timestamptz created_at "DEFAULT now()"
+        timestamptz accessed_at
     }
 
     AUDIT_LOGS {
-        uuid id PK "gen_random_uuid()"
-        uuid tenant_id FK "REFERENCES tenants(id) ON DELETE CASCADE"
-        uuid user_id FK "REFERENCES users(id) ON DELETE SET NULL"
-        varchar entity_type "NOT NULL"
-        uuid entity_id "NOT NULL"
-        varchar action "CHECK: CREATE, UPDATE, DELETE, ALLOCATE, REVOKE, LOGIN, LOGOUT"
-        jsonb old_values
-        jsonb new_values
-        varchar ip_address
-        timestamptz created_at "DEFAULT now()"
+        bigint id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        varchar table_name
+        uuid record_id
+        varchar action
+        jsonb old_data
+        jsonb new_data
+        timestamptz performed_at
     }
 
     NOTIFICATIONS {
-        uuid id PK "gen_random_uuid()"
-        uuid tenant_id FK "REFERENCES tenants(id) ON DELETE CASCADE"
-        uuid user_id FK "REFERENCES users(id) ON DELETE CASCADE"
-        varchar title "NOT NULL"
-        text message "NOT NULL"
-        varchar type "CHECK: license_expiry, renewal_due, seat_exhaustion, system"
-        boolean is_read "DEFAULT false"
-        timestamptz read_at
-        timestamptz created_at "DEFAULT now()"
+        uuid id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        uuid license_id FK
+        varchar type
+        text message
+        boolean is_read
+        timestamptz created_at
     }
 ```
 
 ---
 
-## 2. Cardinality & Relationship Breakdown
+## 3. Diagram Notation & Legend
 
-| Primary Entity | Foreign Entity | Cardinality | Business Meaning & Constraint Rationale |
-| :--- | :--- | :---: | :--- |
-| `tenants` | `users` | 1 : N | An organization employs multiple users. Enforces tenant scope. `ON DELETE CASCADE`. |
-| `tenants` | `vendors` | 1 : N | A tenant manages multiple vendors with whom they hold commercial accounts. |
-| `tenants` | `categories` | 1 : N | Categorization taxonomy is tenant-customizable. |
-| `tenants` | `tags` | 1 : N | Tagging vocabulary is tenant-customizable. |
-| `tenants` | `assets` | 1 : N | All digital assets belong directly to a tenant organization. |
-| `tenants` | `licenses` | 1 : N | Software and digital licenses are purchased and owned by the tenant. |
-| `tenants` | `audit_logs` | 1 : N | Immutable compliance logs scoped to the tenant organization. |
-| `tenants` | `notifications` | 1 : N | Operational alerts delivered within tenant boundaries. |
-| `roles` | `users` | 1 : N | Fixed RBAC roles (`super_admin`, `tenant_admin`, `asset_manager`, `member`, `auditor`). |
-| `users` | `refresh_tokens`| 1 : N | A user can have active sessions across multiple devices. SHA-256 tokens. |
-| `users` | `assets` | 1 : N | Tracks original uploader/author of an asset via `created_by_user_id`. |
-| `vendors` | `licenses` | 1 : N | A software vendor issues multiple software/seat licenses. `ON DELETE RESTRICT`. |
-| `categories` | `categories` | 1 : N | Self-referencing hierarchical taxonomy (e.g., "Fonts" -> "Serif Fonts"). |
-| `categories` | `assets` | 1 : N | An asset belongs to exactly one category for clear organization. |
-| `assets` | `tags` | M : N | Implemented via `asset_tags` join table. |
-| `assets` | `licenses` | M : N | Implemented via `asset_licenses` join table (e.g., font family covered by multiple licenses). |
-| `licenses` | `users` | M : N | Seat allocations tracked in `license_allocations`. Partial unique index on active seats. |
-| `assets` | `asset_access_logs` | 1 : N | Every view or download creates an immutable access log. |
+| Symbol | Notation Meaning | Cardinality Semantics |
+| :---: | :--- | :--- |
+| `||--o{` | One to Zero-or-Many | The parent entity must exist; the child entity can have 0, 1, or many rows. |
+| `||--|{` | One to One-or-Many | Mandatory parent relationship with at least one corresponding child record. |
+| `PK` | Primary Key | Unique, non-null identifier for the relation. Uses UUIDv4 or SERIAL integer. |
+| `FK` | Foreign Key | Referential constraint enforcing referential integrity back to parent relation. |
+| `UK` | Unique Key | Unique constraint enforcing column or composite business exclusivity. |
 
----
-
-## 3. Strict 3NF Tenancy Inheritance Architecture
-
-In accordance with database design Rule 3 and Rule 6:
-* **Top-Level Tenant Tables** (`users`, `vendors`, `categories`, `assets`, `tags`, `licenses`, `audit_logs`, `notifications`) include an explicit `tenant_id` foreign key.
-* **Child Tables** (`refresh_tokens`, `asset_tags`, `asset_licenses`, `license_allocations`, `asset_access_logs`) **DO NOT** duplicate `tenant_id`. 
-  - `refresh_tokens` inherits tenancy through `user_id -> users.tenant_id`.
-  - `asset_tags` inherits tenancy through `asset_id -> assets.tenant_id`.
-  - `asset_licenses` inherits tenancy through `license_id -> licenses.tenant_id`.
-  - `license_allocations` inherits tenancy through `license_id -> licenses.tenant_id`.
-  - `asset_access_logs` inherits tenancy through `asset_id -> assets.tenant_id`.
-
-Duplicating `tenant_id` into these child tables would introduce **transitive dependencies** (`license_allocations.id -> license_id -> tenant_id` AND `license_allocations.id -> tenant_id`), violating Third Normal Form (3NF) and opening the possibility of update anomalies (where a child record might incorrectly point to Tenant B while its parent points to Tenant A).
+### Visual Diagram File
+The rendered vector architecture diagram is exported and maintained as [`/database/er-diagram.svg`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/er-diagram.svg).

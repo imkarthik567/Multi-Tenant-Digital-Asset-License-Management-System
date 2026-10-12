@@ -1,366 +1,359 @@
-# Comprehensive Data Dictionary & Indexing Rationale
+# AssetVault: Comprehensive Data Dictionary & Index Catalog
 
-**Course:** VIT, BCSE307L Database Systems (Fall 2026-27)  
+**Course:** BCSE307L – Database Systems (Fall Semester 2026–27)  
+**Institution:** School of Computer Science and Engineering (SCOPE), Vellore Institute of Technology (VIT), Vellore  
 **System:** AssetVault (Multi-Tenant Digital Asset & License Management System)  
 **Database Engine:** PostgreSQL 16  
 
 ---
 
-## Table of Contents
-1. [tenants](#1-tenants)
-2. [roles](#2-roles)
-3. [users](#3-users)
-4. [refresh_tokens](#4-refresh_tokens)
-5. [vendors](#5-vendors)
-6. [categories](#6-categories)
-7. [tags](#7-tags)
-8. [assets](#8-assets)
-9. [asset_tags](#9-asset_tags)
-10. [licenses](#10-licenses)
-11. [asset_licenses](#11-asset_licenses)
-12. [license_allocations](#12-license_allocations)
-13. [asset_access_logs](#13-asset_access_logs)
-14. [audit_logs](#14-audit_logs)
-15. [notifications](#15-notifications)
-16. [Comprehensive Index Strategy Summary](#16-comprehensive-index-strategy-summary)
+## 1. Table Specifications
+
+### 1.1 `plans`
+*Subscription tier specifications that govern tenant resource quotas and billing terms.*
+
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `INT` | NO | SERIAL | PK | None | Unique sequential identifier for the plan tier. |
+| `name` | `VARCHAR(50)` | NO | None | UK | `UNIQUE` | Tier commercial label (e.g., 'Free Trial', 'Standard', 'Enterprise'). |
+| `max_users` | `INT` | NO | None | None | `CHECK (max_users > 0)` | Maximum active user accounts permitted per tenant on this plan. |
+| `max_assets` | `INT` | NO | None | None | `CHECK (max_assets > 0)` | Maximum cataloged digital asset entities permitted for the tenant. |
+| `monthly_price` | `NUMERIC(10,2)` | NO | `0.00` | None | `CHECK (monthly_price >= 0)` | Recurring monthly charge in standard currency units. |
+| `is_active` | `BOOLEAN` | NO | `true` | None | None | Flags whether this tier is currently open for new tenant subscriptions. |
 
 ---
 
-### 1. `tenants`
-Stores independent customer organizations. Top-level scoping entity.
+### 1.2 `tenants`
+*Root organizational customer accounts sharing the multi-tenant PostgreSQL database.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Unique tenant identifier. |
-| `name` | `VARCHAR(100)` | No | — | Organization name. |
-| `slug` | `VARCHAR(50)` | No | `UNIQUE` | URL-safe slug for tenant identification. |
-| `status` | `VARCHAR(20)` | No | `DEFAULT 'active'`, `CHECK (status IN ('active', 'suspended', 'trial'))` | Tenant lifecycle status. |
-| `subscription_tier` | `VARCHAR(20)` | No | `DEFAULT 'standard'`, `CHECK (subscription_tier IN ('free', 'standard', 'enterprise'))` | Tenant billing/feature tier. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Record creation timestamp. |
-| `updated_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Last update timestamp. |
-
-**Indexes & Rationale:**
-- `idx_tenants_slug` (`slug` UNIQUE B-tree): Rapid $O(\log N)$ lookup during tenant resolution via subdomain/slug.
-- `idx_tenants_status` (`status` B-tree): Filtering active vs suspended tenants during administrative audits.
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Immutable UUID primary key scoping all tenant-owned data. |
+| `plan_id` | `INT` | NO | None | FK | `FK -> plans.id` | Reference to the current subscription plan tier. |
+| `name` | `VARCHAR(100)` | NO | None | None | None | Full legal or corporate name of the tenant organization. |
+| `slug` | `VARCHAR(100)` | NO | None | UK | `UNIQUE` | URL-safe identifier for tenant subdomains and multi-tenant routing. |
+| `status` | `VARCHAR(20)` | NO | `'TRIAL'` | None | `CHECK (status IN ('TRIAL','ACTIVE','SUSPENDED'))` | Operational lifecycle status of the customer organization. |
+| `contact_email` | `VARCHAR(255)` | NO | None | None | None | Primary billing and administrative contact email address. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Timestamp when the tenant organization was registered. |
+| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Timestamp of the most recent tenant profile modification. |
 
 ---
 
-### 2. `roles`
-System-wide lookup table defining access roles.
+### 1.3 `roles`
+*System-wide Role-Based Access Control (RBAC) privilege tiers.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `SERIAL` | No | PK | Small integer sequence identifier. |
-| `name` | `VARCHAR(50)` | No | `UNIQUE` | Unique role name (`super_admin`, `tenant_admin`, `asset_manager`, `member`, `auditor`). |
-| `description` | `TEXT` | Yes | — | Human-readable role description. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Record creation timestamp. |
-
-**Indexes & Rationale:**
-- `idx_roles_name` (`name` UNIQUE B-tree): Fast verification during role assignment and authorization checks.
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `INT` | NO | SERIAL | PK | None | Unique sequential role identifier. |
+| `name` | `VARCHAR(50)` | NO | None | UK | `UNIQUE, CHECK (name IN ('SUPER_ADMIN','TENANT_ADMIN','ASSET_MANAGER','MEMBER'))` | System role classification governing authorization boundaries. |
+| `description` | `TEXT` | YES | None | None | None | Human-readable explanation of privileges associated with this role. |
 
 ---
 
-### 3. `users`
-Unified table for all user accounts across all roles. Top-level tenant table.
+### 1.4 `users`
+*Unified user account repository across all tenants and global platform administrators.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Unique user identifier. |
-| `tenant_id` | `UUID` | No | FK `tenants(id) ON DELETE CASCADE` | Scoping organization identifier. |
-| `role_id` | `INT` | No | FK `roles(id)` | User permission role. |
-| `email` | `VARCHAR(255)` | No | — | User email address. |
-| `password_hash` | `VARCHAR(255)` | Yes | — | BCrypt cost 12 hash. Nullable for OAuth-only users. |
-| `full_name` | `VARCHAR(100)` | No | — | Full display name. |
-| `avatar_url` | `TEXT` | Yes | — | Profile picture URL. |
-| `google_id` | `VARCHAR(255)` | Yes | `UNIQUE` | Google OAuth subject identifier. |
-| `is_active` | `BOOLEAN` | No | `DEFAULT true` | Account active status. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Account creation timestamp. |
-| `updated_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Profile last updated. |
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique user identifier. |
+| `tenant_id` | `UUID` | YES | None | FK | `FK -> tenants.id` | Scoping organization (`NULL` strictly for global `SUPER_ADMIN`). |
+| `role_id` | `INT` | NO | None | FK | `FK -> roles.id` | Assigned security clearance tier. |
+| `email` | `VARCHAR(255)` | NO | None | UK | `UNIQUE` | Unique user email address used for system authentication. |
+| `full_name` | `VARCHAR(100)` | NO | None | None | None | User's full display name. |
+| `password_hash` | `VARCHAR(255)` | YES | None | None | None | Blowfish bcrypt hash (cost factor 12); nullable for OAuth-only users. |
+| `google_id` | `VARCHAR(100)` | YES | None | UK | `UNIQUE` | Unique Google OAuth 2.0 sub-identifier; nullable for local password users. |
+| `avatar_url` | `TEXT` | YES | None | None | None | Secure external URL to profile image avatar. |
+| `is_active` | `BOOLEAN` | NO | `true` | None | None | Flag indicating whether the account can authenticate and access assets. |
+| `last_login_at` | `TIMESTAMPTZ` | YES | None | None | None | Timestamp of user's most recent successful authentication. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Timestamp when account was provisioned. |
+| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Timestamp of last account modification. |
 
-**Constraints:**
-- Composite Unique: `UNIQUE (tenant_id, email)` guarantees email uniqueness per tenant.
-
-**Indexes & Rationale:**
-- `idx_users_tenant_id` (`tenant_id` B-tree): Critical foreign key index for tenant isolation filtering.
-- `idx_users_tenant_email` (`tenant_id, email` UNIQUE B-tree): Accelerated credential login query.
-- `idx_users_role_id` (`role_id` B-tree): Filter users by role in tenant admin member listings.
-- `idx_users_google_id` (`google_id` B-tree): Fast $O(\log N)$ lookup during Google OAuth callback.
+*Table Constraint:* `CHECK (password_hash IS NOT NULL OR google_id IS NOT NULL)` ensures every user has at least one valid authentication provider.
 
 ---
 
-### 4. `refresh_tokens`
-Hashed refresh tokens for JWT session rotation. Child of `users`.
+### 1.5 `refresh_tokens`
+*Cryptographic refresh token state for secure session lifecycle management.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Session token identifier. |
-| `user_id` | `UUID` | No | FK `users(id) ON DELETE CASCADE` | Associated user. Inherits tenancy. |
-| `token_hash` | `VARCHAR(64)` | No | — | SHA-256 cryptographic hash of refresh token. |
-| `expires_at` | `TIMESTAMPTZ` | No | — | Expiration timestamp. |
-| `revoked_at` | `TIMESTAMPTZ` | Yes | — | Timestamp if manually invalidated/logged out. |
-| `ip_address` | `VARCHAR(45)` | Yes | — | Client IPv4 / IPv6 address. |
-| `user_agent` | `TEXT` | Yes | — | Client browser / device user agent. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Token creation timestamp. |
-
-**Indexes & Rationale:**
-- `idx_refresh_tokens_hash` (`token_hash` B-tree): Instant verification during `/auth/refresh` API calls.
-- `idx_refresh_tokens_user_id` (`user_id` B-tree): Facilitates revoking all sessions for a specific user on logout/password reset.
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique session token record identifier. |
+| `user_id` | `UUID` | NO | None | FK | `FK -> users.id` | Authenticated user owning this session. |
+| `token_hash` | `VARCHAR(64)` | NO | None | UK | `UNIQUE` | SHA-256 digest of the refresh token secret; plaintext never stored. |
+| `expires_at` | `TIMESTAMPTZ` | NO | None | None | None | Absolute expiration horizon for token renewal. |
+| `revoked_at` | `TIMESTAMPTZ` | YES | None | None | None | Revocation timestamp if session was terminated early or rotated. |
+| `user_agent` | `TEXT` | YES | None | None | None | Client browser/device user agent string for security audit. |
+| `ip_address` | `VARCHAR(45)` | YES | None | None | None | IPv4 or IPv6 originating client address. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Timestamp when token was granted. |
 
 ---
 
-### 5. `vendors`
-Commercial software & asset vendors. Top-level tenant table.
+### 1.6 `vendors`
+*External software and content vendors contracted by individual tenant organizations.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Unique vendor identifier. |
-| `tenant_id` | `UUID` | No | FK `tenants(id) ON DELETE CASCADE` | Owning tenant identifier. |
-| `name` | `VARCHAR(150)` | No | — | Vendor company name. |
-| `contact_email` | `VARCHAR(255)` | Yes | — | Account representative email. |
-| `contact_phone` | `VARCHAR(50)` | Yes | — | Vendor phone contact. |
-| `website_url` | `TEXT` | Yes | — | Vendor home website. |
-| `address` | `TEXT` | Yes | — | Physical / billing address. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Vendor record creation. |
-| `updated_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Last update timestamp. |
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique vendor identifier. |
+| `tenant_id` | `UUID` | NO | None | FK | `FK -> tenants.id` | Tenant organization contracting this vendor. |
+| `name` | `VARCHAR(100)` | NO | None | None | None | Commercial name of software vendor (e.g., 'Adobe Inc.'). |
+| `contact_email` | `VARCHAR(255)` | YES | None | None | None | Vendor sales or support contact email. |
+| `website` | `VARCHAR(255)` | YES | None | None | None | Official vendor corporate portal or customer URL. |
+| `support_phone` | `VARCHAR(50)` | YES | None | None | None | Customer service hotline phone number. |
 
-**Constraints:**
-- Composite Unique: `UNIQUE (tenant_id, name)` prevents duplicate vendor names within a tenant.
-
-**Indexes & Rationale:**
-- `idx_vendors_tenant_id` (`tenant_id` B-tree): Fast tenant-scoped filtering on vendor directory.
-- `idx_vendors_tenant_name` (`tenant_id, name` B-tree): Alphabetical sorting and prefix search on vendor lists.
+*Table Constraint:* `UNIQUE (tenant_id, name)` guarantees no duplicate vendor entries within a single tenant.
 
 ---
 
-### 6. `categories`
-Hierarchical asset classification taxonomy. Top-level tenant table.
+### 1.7 `categories`
+*Hierarchical taxonomy trees for classifying tenant digital assets.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Unique category identifier. |
-| `tenant_id` | `UUID` | No | FK `tenants(id) ON DELETE CASCADE` | Owning tenant identifier. |
-| `name` | `VARCHAR(100)` | No | — | Category name (e.g., "Fonts", "Datasets"). |
-| `description` | `TEXT` | Yes | — | Category details. |
-| `parent_category_id` | `UUID` | Yes | FK `categories(id) ON DELETE SET NULL` | Self-referencing FK for sub-categories. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Creation timestamp. |
-| `updated_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Last update timestamp. |
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique category node identifier. |
+| `tenant_id` | `UUID` | NO | None | FK | `FK -> tenants.id` | Tenant organization owning this taxonomy. |
+| `parent_id` | `UUID` | YES | None | FK | `FK -> categories.id` | Self-referencing link to parent category node (`NULL` indicates root). |
+| `name` | `VARCHAR(100)` | NO | None | None | None | Category classification label (e.g., 'Proprietary Typefaces'). |
+| `description` | `TEXT` | YES | None | None | None | Extended notes regarding classification usage. |
 
-**Constraints:**
-- Composite Unique: `UNIQUE (tenant_id, name)` avoids duplicate categories per tenant.
-
-**Indexes & Rationale:**
-- `idx_categories_tenant_id` (`tenant_id` B-tree): Scope categories to active tenant.
-- `idx_categories_parent_id` (`parent_category_id` B-tree): Recursive tree traversal when querying subcategories.
+*Table Constraint:* `UNIQUE (tenant_id, name)` guarantees unique category names per tenant namespace.
 
 ---
 
-### 7. `tags`
-Flexible labeling taxonomy for assets. Top-level tenant table.
+### 1.8 `assets`
+*Enterprise catalog of managed digital assets, metadata, and lifecycle statuses.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Unique tag identifier. |
-| `tenant_id` | `UUID` | No | FK `tenants(id) ON DELETE CASCADE` | Owning tenant identifier. |
-| `name` | `VARCHAR(50)` | No | — | Tag label (e.g., "production", "ai-model"). |
-| `color_hex` | `VARCHAR(7)` | No | `DEFAULT '#6B7280'` | Hexadecimal display color code. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Tag creation timestamp. |
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique digital asset identifier. |
+| `tenant_id` | `UUID` | NO | None | FK | `FK -> tenants.id` | Tenant organization owning this asset. |
+| `category_id` | `UUID` | YES | None | FK | `FK -> categories.id` | Taxonomic classification link. |
+| `owner_id` | `UUID` | NO | None | FK | `FK -> users.id` | Primary user custodian responsible for the asset. |
+| `asset_code` | `VARCHAR(50)` | NO | None | None | None | Human-readable asset inventory SKU/code (e.g., 'AST-FNT-001'). |
+| `name` | `VARCHAR(200)` | NO | None | None | None | Descriptive name of the asset. |
+| `description` | `TEXT` | YES | None | None | None | Detailed specifications, usage guidelines, or summary. |
+| `asset_type` | `VARCHAR(20)` | NO | None | None | `CHECK (asset_type IN ('FONT','IMAGE','VIDEO','AUDIO','SOFTWARE','DATASET','DOCUMENT','OTHER'))` | Domain asset classification type. |
+| `status` | `VARCHAR(20)` | NO | `'DRAFT'` | None | `CHECK (status IN ('DRAFT','ACTIVE','ARCHIVED'))` | Operational lifecycle status. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Ingestion timestamp. |
+| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Modification timestamp. |
+| `deleted_at` | `TIMESTAMPTZ` | YES | None | None | None | Soft-delete timestamp (`NULL` indicates active non-deleted asset). |
 
-**Constraints:**
-- Composite Unique: `UNIQUE (tenant_id, name)` ensures tag label uniqueness within each tenant.
-
-**Indexes & Rationale:**
-- `idx_tags_tenant_id` (`tenant_id` B-tree): Fast retrieval of tenant tag vocabulary.
-
----
-
-### 8. `assets`
-Digital assets (fonts, datasets, software, videos, etc.). Top-level tenant table.
-
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Unique asset identifier. |
-| `tenant_id` | `UUID` | No | FK `tenants(id) ON DELETE CASCADE` | Owning tenant identifier. |
-| `category_id` | `UUID` | No | FK `categories(id)` | Classification category. |
-| `name` | `VARCHAR(200)` | No | — | Asset title. |
-| `asset_type` | `VARCHAR(30)` | No | `CHECK (asset_type IN ('font', 'image', 'software', 'dataset', 'video', 'document', 'other'))` | Digital asset category type. |
-| `description` | `TEXT` | Yes | — | Asset technical or usage description. |
-| `file_url` | `TEXT` | Yes | — | Cloud or local storage URI. |
-| `file_size_bytes` | `BIGINT` | Yes | `CHECK (file_size_bytes >= 0)` | File payload size in bytes. |
-| `mime_type` | `VARCHAR(100)` | Yes | — | Standard IANA media type. |
-| `version` | `VARCHAR(50)` | No | `DEFAULT '1.0.0'` | Semantic or release version string. |
-| `metadata` | `JSONB` | No | `DEFAULT '{}'` | Flexible JSON attributes (resolution, dimensions, etc.). |
-| `deleted_at` | `TIMESTAMPTZ` | Yes | — | Soft-delete timestamp. |
-| `created_by_user_id`| `UUID` | Yes | FK `users(id) ON DELETE SET NULL` | Creator / uploader user. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Asset creation timestamp. |
-| `updated_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Last modified timestamp. |
-
-**Indexes & Rationale:**
-- `idx_assets_tenant_id` (`tenant_id` B-tree): Tenant isolation filter.
-- `idx_assets_category_id` (`category_id` B-tree): Filter catalog by category.
-- `idx_assets_asset_type` (`tenant_id, asset_type` B-tree): Filter assets by type within tenant.
-- `idx_assets_deleted_at` (`tenant_id, deleted_at` B-tree): Soft-delete exclusion filter (`WHERE deleted_at IS NULL`).
-- `idx_assets_name_trgm` (`name gin_trgm_ops` GIN Index): Enables lightning-fast ILIKE text search (`?q=query`).
-- `idx_assets_created_at` (`tenant_id, created_at DESC` B-tree): Catalog pagination and chronological sorting.
+*Table Constraint:* `UNIQUE (tenant_id, asset_code)` guarantees unique asset inventory codes per tenant.
 
 ---
 
-### 9. `asset_tags`
-Many-to-many associative join table linking assets to tags. Child table.
+### 1.9 `asset_versions`
+*Version iteration history, cryptographic hashes, and storage pointers for digital assets.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Association identifier. |
-| `asset_id` | `UUID` | No | FK `assets(id) ON DELETE CASCADE` | Linked asset. Inherits tenancy. |
-| `tag_id` | `UUID` | No | FK `tags(id) ON DELETE CASCADE` | Linked tag. Inherits tenancy. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Association creation timestamp. |
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique version iteration identifier. |
+| `asset_id` | `UUID` | NO | None | FK | `FK -> assets.id` | Parent digital asset entity. |
+| `version_no` | `INT` | NO | None | None | `CHECK (version_no >= 1)` | Sequential iteration number (1, 2, 3...). |
+| `file_url` | `TEXT` | NO | None | None | None | External secure URI or storage bucket pointer. |
+| `file_size_bytes`| `BIGINT` | NO | None | None | `CHECK (file_size_bytes >= 0)` | File payload size in bytes. |
+| `checksum_sha256`| `CHAR(64)` | NO | None | None | None | Cryptographic SHA-256 fingerprint validating binary file integrity. |
+| `change_notes` | `TEXT` | YES | None | None | None | Release notes describing changes in this version. |
+| `uploaded_by` | `UUID` | YES | None | FK | `FK -> users.id` | User account who published this revision. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Publication timestamp. |
 
-**Constraints:**
-- Composite Unique: `UNIQUE (asset_id, tag_id)` prevents assigning duplicate tags to the same asset.
-
-**Indexes & Rationale:**
-- `idx_asset_tags_asset_id` (`asset_id` B-tree): Rapid retrieval of all tags on an asset detail card.
-- `idx_asset_tags_tag_id` (`tag_id` B-tree): Rapid retrieval of all assets bearing a given tag.
-
----
-
-### 10. `licenses`
-Commercial and open-source licenses covering assets. Top-level tenant table.
-
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Unique license identifier. |
-| `tenant_id` | `UUID` | No | FK `tenants(id) ON DELETE CASCADE` | Owning tenant identifier. |
-| `vendor_id` | `UUID` | No | FK `vendors(id) ON DELETE RESTRICT`| Commercial vendor. |
-| `name` | `VARCHAR(200)` | No | — | License name (e.g., "JetBrains All Products Pack"). |
-| `license_key` | `TEXT` | Yes | — | Software activation key / credential. |
-| `license_type` | `VARCHAR(30)` | No | `CHECK (license_type IN ('per_seat', 'site', 'subscription', 'perpetual', 'open_source'))` | License licensing model. |
-| `total_seats` | `INT` | No | `DEFAULT 1, CHECK (total_seats >= 0)` | Maximum allowed simultaneous seats. |
-| `cost` | `NUMERIC(12,2)` | No | `DEFAULT 0.00, CHECK (cost >= 0)` | Financial cost. |
-| `currency` | `VARCHAR(3)` | No | `DEFAULT 'USD'` | ISO 4217 currency code. |
-| `starts_at` | `TIMESTAMPTZ` | No | — | License validity start date. |
-| `expires_at` | `TIMESTAMPTZ` | Yes | — | License expiration date. Null for perpetual. |
-| `is_auto_renew` | `BOOLEAN` | No | `DEFAULT false` | Flag if auto-renewal contract is active. |
-| `renewal_reminder_days` | `INT` | No | `DEFAULT 30, CHECK (renewal_reminder_days >= 0)` | Alert threshold before expiry. |
-| `status` | `VARCHAR(20)` | No | `DEFAULT 'active', CHECK (status IN ('active', 'expired', 'suspended', 'pending_renewal'))` | License validity status. |
-| `deleted_at` | `TIMESTAMPTZ` | Yes | — | Soft delete timestamp. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | License record creation. |
-| `updated_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Last update timestamp. |
-
-**Indexes & Rationale:**
-- `idx_licenses_tenant_id` (`tenant_id` B-tree): Tenant scope filter.
-- `idx_licenses_vendor_id` (`vendor_id` B-tree): Filter licenses by vendor.
-- `idx_licenses_status` (`tenant_id, status` B-tree): Filter active vs expired licenses.
-- `idx_licenses_expires_at` (`tenant_id, expires_at` B-tree): Optimizes cron jobs and views identifying impending expirations.
-- `idx_licenses_deleted_at` (`tenant_id, deleted_at` B-tree): Exclude soft-deleted licenses.
+*Table Constraint:* `UNIQUE (asset_id, version_no)` enforces unique iteration numbering per parent asset.
 
 ---
 
-### 11. `asset_licenses`
-Associative join table mapping assets to licenses. Child table.
+### 1.10 `tags`
+*Dynamic vocabulary of metadata labeling tags scoped per tenant.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Association identifier. |
-| `asset_id` | `UUID` | No | FK `assets(id) ON DELETE CASCADE` | Covered asset. Inherits tenancy. |
-| `license_id` | `UUID` | No | FK `licenses(id) ON DELETE CASCADE` | Covering license. Inherits tenancy. |
-| `notes` | `TEXT` | Yes | — | Terms or usage notes. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Association creation timestamp. |
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique tag identifier. |
+| `tenant_id` | `UUID` | NO | None | FK | `FK -> tenants.id` | Tenant organization owning this tag. |
+| `name` | `VARCHAR(50)` | NO | None | None | None | Tag word/phrase label (e.g., 'Commercial', 'Vector', 'Q4-Marketing'). |
+| `color` | `VARCHAR(7)` | NO | `'#6366f1'` | None | None | Hexadecimal color code for frontend badge rendering. |
 
-**Constraints:**
-- Composite Unique: `UNIQUE (asset_id, license_id)` ensures an asset is linked to a license at most once.
-
-**Indexes & Rationale:**
-- `idx_asset_licenses_asset_id` (`asset_id` B-tree): Find licenses protecting an asset.
-- `idx_asset_licenses_license_id` (`license_id` B-tree): Find all assets covered by a license.
+*Table Constraint:* `UNIQUE (tenant_id, name)` prevents duplicate tag labels within an organization.
 
 ---
 
-### 12. `license_allocations`
-Tracks assignment of license seats to specific users. Child table.
+### 1.11 `asset_tags`
+*Many-to-Many associative table linking assets to descriptive tags.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Allocation record identifier. |
-| `license_id` | `UUID` | No | FK `licenses(id) ON DELETE CASCADE` | Allocated license. Inherits tenancy. |
-| `user_id` | `UUID` | No | FK `users(id) ON DELETE CASCADE` | Assigned user. Inherits tenancy. |
-| `allocated_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Assignment timestamp. |
-| `revoked_at` | `TIMESTAMPTZ` | Yes | — | Revocation timestamp if reclaimed. |
-| `notes` | `TEXT` | Yes | — | Assignment reasoning or workstation ID. |
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `asset_id` | `UUID` | NO | None | PK, FK | `FK -> assets.id` | Referenced digital asset. |
+| `tag_id` | `UUID` | NO | None | PK, FK | `FK -> tags.id` | Referenced tag label. |
 
-**Indexes & Rationale:**
-- `idx_allocations_active_unique` (`license_id, user_id` Partial Unique B-tree `WHERE revoked_at IS NULL`): Enforces that a user cannot occupy two simultaneous active seats of the exact same license.
-- `idx_allocations_license_id` (`license_id` B-tree): Computes active seat counts (`COUNT(*) WHERE revoked_at IS NULL`).
-- `idx_allocations_user_id` (`user_id` B-tree): Shows all software licenses assigned to an employee.
+*Composite Primary Key:* `PRIMARY KEY (asset_id, tag_id)` resolves the M:N relationship without surrogate keys.
 
 ---
 
-### 13. `asset_access_logs`
-High-throughput audit log of asset views, downloads, checkouts. Child table of `assets`.
+### 1.12 `license_types`
+*System lookup categorizing software license agreements and their operational rules.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Access log identifier. |
-| `asset_id` | `UUID` | No | FK `assets(id) ON DELETE CASCADE` | Accessed asset. Inherits tenancy. |
-| `user_id` | `UUID` | Yes | FK `users(id) ON DELETE SET NULL` | Performing user (null for public download). |
-| `action` | `VARCHAR(50)` | No | `CHECK (action IN ('view', 'download', 'checkout', 'checkin'))` | Operation performed. |
-| `ip_address` | `VARCHAR(45)` | Yes | — | Client IP address. |
-| `user_agent` | `TEXT` | Yes | — | Client user-agent. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Access event timestamp. |
-
-**Indexes & Rationale:**
-- `idx_access_logs_asset_id` (`asset_id, created_at DESC` B-tree): Fast asset download history timeline.
-- `idx_access_logs_user_id` (`user_id, created_at DESC` B-tree): Employee usage audit trail.
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `INT` | NO | SERIAL | PK | None | Unique license type lookup identifier. |
+| `name` | `VARCHAR(50)` | NO | None | UK | `UNIQUE, CHECK (name IN ('PERPETUAL','SUBSCRIPTION','SEAT_BASED','USAGE_BASED','OPEN_SOURCE'))` | Commercial licensing archetype. |
+| `is_seat_based` | `BOOLEAN` | NO | `true` | None | None | Flags whether this model enforces finite user seat allocation bounds. |
+| `is_expirable` | `BOOLEAN` | NO | `true` | None | None | Flags whether this model requires expiration tracking and renewal alerts. |
+| `description` | `TEXT` | YES | None | None | None | Detailed description of the license model. |
 
 ---
 
-### 14. `audit_logs`
-Immutable compliance log recording all system entity mutations. Top-level tenant table.
+### 1.13 `licenses`
+*Commercial software license contracts, seat quotas, and validity terms.*
 
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Audit record identifier. |
-| `tenant_id` | `UUID` | No | FK `tenants(id) ON DELETE CASCADE` | Scoping tenant identifier. |
-| `user_id` | `UUID` | Yes | FK `users(id) ON DELETE SET NULL` | Actor user identifier. |
-| `entity_type` | `VARCHAR(50)` | No | — | Mutated entity name (e.g., `Asset`, `License`). |
-| `entity_id` | `UUID` | No | — | Mutated record primary key. |
-| `action` | `VARCHAR(30)` | No | `CHECK (action IN ('CREATE', 'UPDATE', 'DELETE', 'ALLOCATE', 'REVOKE', 'LOGIN', 'LOGOUT'))` | Action type. |
-| `old_values` | `JSONB` | Yes | — | Pre-mutation JSON snapshot. |
-| `new_values` | `JSONB` | Yes | — | Post-mutation JSON snapshot. |
-| `ip_address` | `VARCHAR(45)` | Yes | — | Actor IP address. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Immutable audit timestamp. |
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique license contract identifier. |
+| `tenant_id` | `UUID` | NO | None | FK | `FK -> tenants.id` | Tenant organization procuring the license. |
+| `vendor_id` | `UUID` | NO | None | FK | `FK -> vendors.id` | Commercial vendor issuing the license. |
+| `license_type_id`| `INT` | NO | None | FK | `FK -> license_types.id`| Categorized licensing archetype. |
+| `name` | `VARCHAR(200)` | NO | None | None | None | Commercial product title (e.g., 'JetBrains All Products Pack'). |
+| `license_key` | `VARCHAR(255)` | NO | None | None | None | Serial key, activation token, or license agreement credential. |
+| `total_seats` | `INT` | NO | None | None | `CHECK (total_seats >= 1)` | Contracted maximum concurrent user seats purchased. |
+| `start_date` | `DATE` | NO | None | None | None | Effective date of agreement commencement. |
+| `end_date` | `DATE` | YES | None | None | None | Termination horizon (`NULL` for perpetual agreements). |
+| `cost` | `NUMERIC(12,2)` | NO | `0.00` | None | `CHECK (cost >= 0)` | Commercial procurement or recurring cost. |
+| `currency` | `CHAR(3)` | NO | `'USD'` | None | None | ISO 4217 three-letter currency symbol. |
+| `auto_renew` | `BOOLEAN` | NO | `false` | None | None | Flag indicating automated contract rollover. |
+| `status` | `VARCHAR(20)` | NO | `'ACTIVE'` | None | `CHECK (status IN ('ACTIVE','EXPIRED','SUSPENDED','CANCELLED'))` | Contractual state. |
+| `terms` | `TEXT` | YES | None | None | None | Legal terms, usage restrictions, and territory clauses. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Registration timestamp. |
+| `updated_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Modification timestamp. |
+| `deleted_at` | `TIMESTAMPTZ` | YES | None | None | None | Soft-delete timestamp (`NULL` indicates active contract). |
 
-**Indexes & Rationale:**
-- `idx_audit_logs_tenant_created` (`tenant_id, created_at DESC` B-tree): Compliance log viewer chronological pagination.
-- `idx_audit_logs_entity` (`tenant_id, entity_type, entity_id` B-tree): Deep history trace for an individual asset or license.
-- `idx_audit_logs_action` (`tenant_id, action` B-tree): Filter audit logs by security action (e.g., all `DELETE` events).
-
----
-
-### 15. `notifications`
-Alerts and reminders for license expiry, renewals, and system warnings. Top-level tenant table.
-
-| Column Name | PostgreSQL Data Type | Nullable | Constraints & Defaults | Description |
-| :--- | :--- | :---: | :--- | :--- |
-| `id` | `UUID` | No | PK, `DEFAULT gen_random_uuid()` | Notification identifier. |
-| `tenant_id` | `UUID` | No | FK `tenants(id) ON DELETE CASCADE` | Scoping tenant identifier. |
-| `user_id` | `UUID` | No | FK `users(id) ON DELETE CASCADE` | Recipient user identifier. |
-| `title` | `VARCHAR(150)` | No | — | Short alert headline. |
-| `message` | `TEXT` | No | — | Full alert text. |
-| `type` | `VARCHAR(30)` | No | `CHECK (type IN ('license_expiry', 'renewal_due', 'seat_exhaustion', 'system'))` | Alert classification. |
-| `is_read` | `BOOLEAN` | No | `DEFAULT false` | Read status flag. |
-| `read_at` | `TIMESTAMPTZ` | Yes | — | Read acknowledgement timestamp. |
-| `created_at` | `TIMESTAMPTZ` | No | `DEFAULT now()` | Notification creation timestamp. |
-
-**Indexes & Rationale:**
-- `idx_notifications_user_unread` (`user_id, is_read, created_at DESC` B-tree): Powers top navigation unread alert badge and dropdown queries with minimal I/O.
+*Table Constraints:*
+- `CHECK (end_date IS NULL OR end_date > start_date)` guarantees temporal validity.
+- `UNIQUE (tenant_id, license_key)` guarantees no duplicate license keys within a tenant.
 
 ---
 
-## 16. Comprehensive Index Strategy Summary
+### 1.14 `asset_licenses`
+*Many-to-Many associative table linking assets to authorizing software licenses.*
 
-All indexes are designed based on the following relational query access patterns:
-1. **Foreign Key Performance:** Every FK column is indexed with B-tree to eliminate full table scans during joins and cascade deletions.
-2. **Multi-Tenant Filter Efficiency:** Leading columns in composite indexes are set to `tenant_id` to enforce partition-like index filtering.
-3. **Text Search Acceleration:** `pg_trgm` GIN indexes are deployed on `assets.name` for fast partial substring match (`ILIKE '%word%'`) queries.
-4. **Soft Delete Filtering:** Partial indexes or composite keys with `deleted_at` prevent scanning deleted rows.
-5. **Partial Uniqueness:** `idx_allocations_active_unique` enforces business invariants at the database level without requiring heavy locking logic in application code.
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `asset_id` | `UUID` | NO | None | PK, FK | `FK -> assets.id` | Covered digital asset entity. |
+| `license_id` | `UUID` | NO | None | PK, FK | `FK -> licenses.id` | Authorizing software license agreement. |
+| `assigned_by` | `UUID` | YES | None | FK | `FK -> users.id` | Administrator who linked the asset to the license. |
+| `assigned_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Timestamp when association was mapped. |
+
+*Composite Primary Key:* `PRIMARY KEY (asset_id, license_id)` resolves the M:N relationship cleanly.
+
+---
+
+### 1.15 `license_allocations`
+*User seat assignments under a commercial license with strict state tracking.*
+
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique seat allocation record identifier. |
+| `license_id` | `UUID` | NO | None | FK | `FK -> licenses.id` | Parent license agreement whose seat is granted. |
+| `user_id` | `UUID` | NO | None | FK | `FK -> users.id` | Beneficiary employee holding the seat. |
+| `allocated_by` | `UUID` | YES | None | FK | `FK -> users.id` | Administrator authorizing the seat grant. |
+| `allocated_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Timestamp of seat entitlement grant. |
+| `released_at` | `TIMESTAMPTZ` | YES | None | None | None | Timestamp when seat was revoked or relinquished. |
+| `status` | `VARCHAR(20)` | NO | `'ACTIVE'` | None | `CHECK (status IN ('ACTIVE','RELEASED','REVOKED'))` | Allocation lifecycle status. |
+
+*Business Rule & Partial Unique Index:* A partial unique index `UNIQUE (license_id, user_id) WHERE status = 'ACTIVE'` guarantees that a user cannot hold duplicate active seats simultaneously for the same license, while permitting historical release/revocation audit records.
+
+---
+
+### 1.16 `asset_access_logs`
+*Immutable security audit record of digital asset views, checkouts, and downloads.*
+
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `BIGINT` | NO | IDENTITY | PK | None | High-throughput sequential primary key. |
+| `asset_id` | `UUID` | NO | None | FK | `FK -> assets.id` | Accessed digital asset. |
+| `user_id` | `UUID` | YES | None | FK | `FK -> users.id` | User performing access (nullable for public/guest links). |
+| `license_id` | `UUID` | YES | None | FK | `FK -> licenses.id` | Authorizing license covering the access event. |
+| `action` | `VARCHAR(20)` | NO | None | None | `CHECK (action IN ('VIEW','DOWNLOAD','CHECKOUT','CHECKIN'))` | Recorded access action type. |
+| `ip_address` | `VARCHAR(45)` | YES | None | None | None | Originating client IP address (IPv4 or IPv6). |
+| `accessed_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Exact timestamp when access occurred. |
+
+---
+
+### 1.17 `license_renewals`
+*Contractual renewal history and cost records for software license agreements.*
+
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique renewal record identifier. |
+| `license_id` | `UUID` | NO | None | FK | `FK -> licenses.id` | License agreement being renewed. |
+| `renewed_by` | `UUID` | YES | None | FK | `FK -> users.id` | Manager authorizing the renewal transaction. |
+| `old_end_date` | `DATE` | NO | None | None | None | Prior contractual termination date. |
+| `new_end_date` | `DATE` | NO | None | None | None | Extended expiration date. |
+| `cost` | `NUMERIC(12,2)` | NO | `0.00` | None | `CHECK (cost >= 0)` | Contract renewal fee charged by vendor. |
+| `notes` | `TEXT` | YES | None | None | None | Transaction reference numbers, PO notes, or terms. |
+| `renewed_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Timestamp when renewal transaction was recorded. |
+
+*Table Constraint:* `CHECK (new_end_date > old_end_date)` enforces that a renewal must strictly advance the termination date.
+
+---
+
+### 1.18 `audit_logs`
+*Immutable, tamper-evident audit ledger capturing granular database row mutations.*
+
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `BIGINT` | NO | IDENTITY | PK | None | High-throughput sequential audit sequence number. |
+| `tenant_id` | `UUID` | YES | None | FK | `FK -> tenants.id` | Tenant organization boundary (`NULL` for global changes). |
+| `user_id` | `UUID` | YES | None | FK | `FK -> users.id` | Actor who triggered the mutation (`NULL` for system automated tasks). |
+| `table_name` | `VARCHAR(100)` | NO | None | None | None | Name of the mutated relational table (e.g., 'assets', 'licenses'). |
+| `record_id` | `UUID` | NO | None | None | None | Primary key of the mutated entity record. |
+| `action` | `VARCHAR(20)` | NO | None | None | `CHECK (action IN ('INSERT','UPDATE','DELETE'))` | DML mutation action type. |
+| `old_data` | `JSONB` | YES | None | None | None | Pre-mutation row state (`NULL` on INSERT). |
+| `new_data` | `JSONB` | YES | None | None | None | Post-mutation row state (`NULL` on DELETE). |
+| `performed_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Exact timestamp when mutation occurred. |
+
+---
+
+### 1.19 `notifications`
+*System notifications and license expiration alerts delivered to tenant users.*
+
+| Column Name | Data Type | Nullable | Default | Key | Constraints | Description |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| `id` | `UUID` | NO | `gen_random_uuid()` | PK | None | Unique notification message identifier. |
+| `tenant_id` | `UUID` | NO | None | FK | `FK -> tenants.id` | Scoping tenant organization. |
+| `user_id` | `UUID` | NO | None | FK | `FK -> users.id` | Recipient user account. |
+| `license_id` | `UUID` | YES | None | FK | `FK -> licenses.id` | Associated license agreement triggering the alert. |
+| `type` | `VARCHAR(30)` | NO | None | None | `CHECK (type IN ('EXPIRY_30','EXPIRY_15','EXPIRY_7','EXPIRED','OVER_ALLOCATION','SYSTEM'))` | Notification classification category. |
+| `message` | `TEXT` | NO | None | None | None | Full notification body text. |
+| `is_read` | `BOOLEAN` | NO | `false` | None | None | Flag indicating user acknowledgment of notification. |
+| `created_at` | `TIMESTAMPTZ` | NO | `now()` | None | None | Notification generation timestamp. |
+
+---
+
+## 2. Comprehensive Index Catalog
+
+The table below catalogs every index defined in AssetVault, its storage type, column set, and the exact query patterns it accelerates:
+
+| # | Index Name | Table | Columns | Index Type | Query Acceleration Rationale |
+| :-: | :--- | :--- | :--- | :---: | :--- |
+| 1 | `idx_tenants_plan_id` | `tenants` | `(plan_id)` | B-tree | Speeds up JOINs between tenants and subscription plans. |
+| 2 | `idx_users_tenant_id` | `users` | `(tenant_id)` | B-tree | Accelerates tenant-scoped user directory queries (`WHERE tenant_id = ?`). |
+| 3 | `idx_users_role_id` | `users` | `(role_id)` | B-tree | Optimizes RBAC privilege lookups during authorization middleware checks. |
+| 4 | `idx_refresh_tokens_user_id` | `refresh_tokens` | `(user_id)` | B-tree | Accelerates session lookup and user logout cleanup routines. |
+| 5 | `idx_vendors_tenant_id` | `vendors` | `(tenant_id)` | B-tree | Scopes vendor queries to the active tenant session. |
+| 6 | `idx_categories_tenant_id` | `categories` | `(tenant_id)` | B-tree | Speeds up category tree retrieval for tenant catalog rendering. |
+| 7 | `idx_categories_parent_id` | `categories` | `(parent_id)` | B-tree | Optimizes recursive parent-child category tree traversals (`CONNECT BY` / CTE). |
+| 8 | `idx_assets_tenant_status` | `assets` | `(tenant_id, status)` | Composite B-tree | Speeds up filtered asset catalog listing (`WHERE tenant_id = ? AND status = 'ACTIVE'`). |
+| 9 | `idx_assets_category_id` | `assets` | `(category_id)` | B-tree | Accelerates asset catalog navigation filtered by taxonomic category. |
+| 10 | `idx_assets_owner_id` | `assets` | `(owner_id)` | B-tree | Speeds up personal dashboard queries ("Assets Owned by Me"). |
+| 11 | `idx_assets_deleted_at` | `assets` | `(deleted_at)` | Partial B-tree | Filters out soft-deleted records (`WHERE deleted_at IS NULL`) with minimal index overhead. |
+| 12 | `idx_assets_name_trgm` | `assets` | `(name gin_trgm_ops)` | GIN Trigram | High-speed fuzzy text search (`WHERE name ILIKE '%query%'`) across asset titles. |
+| 13 | `idx_asset_versions_asset_id` | `asset_versions` | `(asset_id, version_no DESC)` | Composite B-tree | Instantly retrieves the latest file version for a given digital asset. |
+| 14 | `idx_tags_tenant_id` | `tags` | `(tenant_id)` | B-tree | Speeds up retrieval of the tenant's tag vocabulary. |
+| 15 | `idx_asset_tags_tag_id` | `asset_tags` | `(tag_id)` | B-tree | Speeds up reverse search ("Find all assets tagged with #Marketing"). |
+| 16 | `idx_licenses_tenant_status` | `licenses` | `(tenant_id, status)` | Composite B-tree | Accelerates tenant license dashboard queries (`WHERE tenant_id = ? AND status = 'ACTIVE'`). |
+| 17 | `idx_licenses_vendor_id` | `licenses` | `(vendor_id)` | B-tree | Speeds up vendor portal queries showing all licenses supplied by a vendor. |
+| 18 | `idx_licenses_end_date` | `licenses` | `(end_date)` | Partial B-tree | Speeds up automated expiration scans (`WHERE end_date BETWEEN ? AND ? AND status = 'ACTIVE'`). |
+| 19 | `idx_asset_licenses_license_id`| `asset_licenses`| `(license_id)` | B-tree | Speeds up reverse lookups ("Which assets are covered by License X?"). |
+| 20 | `idx_license_alloc_active` | `license_allocations` | `(license_id, user_id)` | Partial Unique B-tree | Enforces at most one active seat per user per license (`WHERE status = 'ACTIVE'`) and accelerates capacity checks. |
+| 21 | `idx_license_alloc_user_id` | `license_allocations` | `(user_id)` | B-tree | Accelerates employee profile view ("Which software tools do I have access to?"). |
+| 22 | `idx_access_logs_asset_time` | `asset_access_logs` | `(asset_id, accessed_at DESC)`| Composite B-tree | Speeds up chronological access audit history for individual digital assets. |
+| 23 | `idx_license_renewals_lic_id` | `license_renewals` | `(license_id, renewed_at DESC)`| Composite B-tree | Speeds up chronological renewal ledger retrieval for contract renegotiations. |
+| 24 | `idx_audit_logs_tenant_time` | `audit_logs` | `(tenant_id, performed_at DESC)`| Composite B-tree | Accelerates tenant-scoped administrative audit log viewing and compliance exports. |
+| 25 | `idx_audit_logs_record_id` | `audit_logs` | `(table_name, record_id)` | Composite B-tree | Accelerates point-in-time diff inspections for any specific entity record. |
+| 26 | `idx_notifications_user_unread`| `notifications` | `(user_id, is_read)` | Composite B-tree | Rapidly loads unread notifications badge count on web user interface header (`WHERE user_id = ? AND is_read = false`). |
