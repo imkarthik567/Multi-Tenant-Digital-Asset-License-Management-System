@@ -26,6 +26,8 @@ const envSchema = z.object({
   CLIENT_URL: z.string().default('http://localhost:5173'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   DIRECT_URL: z.string().optional(),
+  COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).optional(),
+  COOKIE_DOMAIN: z.string().optional(),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform((val) => parseInt(val, 10)),
   RATE_LIMIT_MAX: z.string().default('100').transform((val) => parseInt(val, 10)),
 
@@ -42,6 +44,7 @@ const envSchema = z.object({
 
   // Background Worker Execution
   RUN_WORKER_IN_API: z.string().default('true').transform((val) => val === 'true'),
+  ENABLE_IN_PROCESS_WORKER: z.string().default('true').transform((val) => val === 'true'),
 });
 
 const parseEnv = () => {

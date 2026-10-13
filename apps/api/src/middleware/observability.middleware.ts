@@ -39,6 +39,37 @@ export const licenseAllocationFailuresTotal = new client.Counter({
   registers: [register],
 });
 
+// SSE Active Connections Gauge
+export const sseActiveConnectionsGauge = new client.Gauge({
+  name: 'assetvault_sse_active_connections',
+  help: 'Number of active Server-Sent Events notification stream connections',
+  registers: [register],
+});
+
+// DB Pool Active Connections Gauge
+export const dbPoolConnectionsGauge = new client.Gauge({
+  name: 'assetvault_db_pool_active_connections',
+  help: 'Active database connection pool utilization gauge',
+  registers: [register],
+});
+
+// Scheduled Job Execution Duration Metric
+export const scheduledJobDurationSeconds = new client.Histogram({
+  name: 'assetvault_scheduled_job_duration_seconds',
+  help: 'Execution duration of scheduled background jobs in seconds',
+  labelNames: ['job_name'],
+  buckets: [0.1, 0.5, 1, 2.5, 5, 10, 30, 60],
+  registers: [register],
+});
+
+// Scheduled Job Failures Metric
+export const scheduledJobFailuresTotal = new client.Counter({
+  name: 'assetvault_scheduled_job_failures_total',
+  help: 'Total count of scheduled job failures',
+  labelNames: ['job_name'],
+  registers: [register],
+});
+
 // ------------------------------------------------------------------------------
 // 2. Request ID & Tracing Middleware (X-Request-Id)
 // ------------------------------------------------------------------------------

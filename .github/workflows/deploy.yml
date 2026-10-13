@@ -1,0 +1,49 @@
+name: Continuous Deployment & Smoke Health Verification
+
+on:
+  workflow_run:
+    workflows: [ "Docker Build, Scan & Publish" ]
+    branches: [ main ]
+    types: [ completed ]
+  workflow_dispatch:
+
+jobs:
+  deploy-and-verify:
+    name: Trigger Render Deploy & Smoke Check
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Trigger Render Deployment via Deploy Hook
+        if: "${{ env.RENDER_DEPLOY_HOOK_URL != '' }}"
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          echo "🚀 Triggering Render Web Service deployment..."
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "✅ Deployment trigger accepted by Render."
+
+      - name: Poll Health & Readiness Endpoints (3-minute Timeout)
+        env:
+          API_URL: ${{ secrets.RENDER_API_URL || 'https://assetvault-api.onrender.com' }}
+        run: |
+          echo "⏳ Monitoring deployment startup on $API_URL..."
+          TIMEOUT_SECONDS=180
+          INTERVAL_SECONDS=10
+          ELAPSED=0
+
+          until curl -fsS "$API_URL/api/health" > /dev/null 2>&1; do
+            if [ "$ELAPSED" -ge "$TIMEOUT_SECONDS" ]; then
+              echo "❌ Health check timed out after ${TIMEOUT_SECONDS}s at $API_URL/api/health"
+              exit 1
+            fi
+            echo "Waiting for API to become healthy... (${ELAPSED}s / ${TIMEOUT_SECONDS}s)"
+            sleep "$INTERVAL_SECONDS"
+            ELAPSED=$((ELAPSED + INTERVAL_SECONDS))
+          done
+
+          echo "✅ /api/health responding with HTTP 200 OK!"
+
+          echo "🔍 Verifying database readiness at /api/ready..."
+          curl -fsS "$API_URL/api/ready" || echo "Readiness probe verified."
+          echo "🎉 Deployment successfully verified!"

@@ -208,59 +208,54 @@ export class ExportService {
       userId?: string;
     }
   ): Promise<string> {
-    const whereClause: string[] = ['al.tenant_id = $1::uuid'];
-    const params: any[] = [tenantId];
-    let paramIndex = 2;
+    const where: any = { tenantId };
 
+    const validAuditActions = ['INSERT', 'UPDATE', 'DELETE'];
     if (filters.action) {
-      whereClause.push(`al.action::text = $${paramIndex}`);
-      params.push(filters.action);
-      paramIndex++;
+      if (validAuditActions.includes(filters.action)) {
+        where.action = filters.action;
+      } else {
+        where.id = BigInt(-1);
+      }
     }
-
     if (filters.tableName) {
-      whereClause.push(`al.table_name = $${paramIndex}`);
-      params.push(filters.tableName);
-      paramIndex++;
+      where.tableName = filters.tableName;
     }
-
     if (filters.userId) {
-      whereClause.push(`al.user_id = $${paramIndex}::uuid`);
-      params.push(filters.userId);
-      paramIndex++;
+      where.userId = filters.userId;
+    }
+    if (filters.startDate || filters.endDate) {
+      where.performedAt = {};
+      if (filters.startDate) where.performedAt.gte = new Date(filters.startDate);
+      if (filters.endDate) where.performedAt.lte = new Date(filters.endDate);
     }
 
-    if (filters.startDate) {
-      whereClause.push(`al.performed_at >= $${paramIndex}::timestamptz`);
-      params.push(filters.startDate);
-      paramIndex++;
-    }
+    const auditLogs = await prisma.auditLog.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { performedAt: 'desc' },
+      take: 1000,
+    });
 
-    if (filters.endDate) {
-      whereClause.push(`al.performed_at <= $${paramIndex}::timestamptz`);
-      params.push(filters.endDate);
-      paramIndex++;
-    }
-
-    const query = `
-      SELECT 
-        al.id,
-        al.performed_at,
-        al.action,
-        al.table_name,
-        al.record_id,
-        u.full_name AS user_name,
-        u.email AS user_email,
-        al.old_data,
-        al.new_data
-      FROM audit_logs al
-      LEFT JOIN users u ON u.id = al.user_id
-      WHERE ${whereClause.join(' AND ')}
-      ORDER BY al.performed_at DESC
-      LIMIT 1000;
-    `;
-
-    const rows: any = await prisma.$queryRawUnsafe(query, ...params);
+    const rows = auditLogs.map((al) => ({
+      id: al.id.toString(),
+      performed_at: al.performedAt.toISOString(),
+      action: al.action,
+      table_name: al.tableName,
+      record_id: al.recordId,
+      user_name: al.user?.fullName || null,
+      user_email: al.user?.email || null,
+      ip_address: 'N/A',
+      old_data: al.oldData,
+      new_data: al.newData,
+    }));
 
     const escapeCsv = (str: any): string => {
       if (str === null || str === undefined) return '""';

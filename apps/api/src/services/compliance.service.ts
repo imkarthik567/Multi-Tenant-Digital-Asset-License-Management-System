@@ -4,6 +4,7 @@
 // Calculates 0-100 Compliance Score using v_asset_catalog, v_license_utilization & v_expiring_licenses
 // ==============================================================================
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 
 export interface ComplianceFactor {
@@ -45,15 +46,15 @@ export interface ComplianceReport {
 export class ComplianceService {
   public async getTenantCompliance(tenantId: string): Promise<ComplianceReport> {
     // 1. Query asset catalog compliance distribution
-    const assetStatsResult: any = await prisma.$queryRawUnsafe(`
+    const assetStatsResult: any = await prisma.$queryRaw(Prisma.sql`
       SELECT 
         COUNT(*)::INT AS total_assets,
         COUNT(*) FILTER (WHERE compliance_status = 'COMPLIANT')::INT AS compliant_assets,
         COUNT(*) FILTER (WHERE compliance_status = 'EXPIRED_LICENSE')::INT AS expired_license_assets,
         COUNT(*) FILTER (WHERE compliance_status = 'UNLICENSED')::INT AS unlicensed_assets
       FROM v_asset_catalog
-      WHERE tenant_id = $1::uuid;
-    `, tenantId);
+      WHERE tenant_id = ${tenantId}::uuid;
+    `);
 
     const assetStats = assetStatsResult[0] || {
       total_assets: 0,
@@ -63,14 +64,14 @@ export class ComplianceService {
     };
 
     // 2. Query license capacity and seat health
-    const licenseStatsResult: any = await prisma.$queryRawUnsafe(`
+    const licenseStatsResult: any = await prisma.$queryRaw(Prisma.sql`
       SELECT 
         COUNT(*)::INT AS total_licenses,
         COUNT(*) FILTER (WHERE available_seats <= 0)::INT AS exhausted_licenses,
         COUNT(*) FILTER (WHERE used_seats > total_seats)::INT AS over_allocated_licenses
       FROM v_license_utilization
-      WHERE tenant_id = $1::uuid;
-    `, tenantId);
+      WHERE tenant_id = ${tenantId}::uuid;
+    `);
 
     const licenseStats = licenseStatsResult[0] || {
       total_licenses: 0,
@@ -79,15 +80,15 @@ export class ComplianceService {
     };
 
     // 3. Query expiring licenses horizon (30 days)
-    const expiringStatsResult: any = await prisma.$queryRawUnsafe(`
+    const expiringStatsResult: any = await prisma.$queryRaw(Prisma.sql`
       SELECT 
         COUNT(*)::INT AS total_expiring,
         COUNT(*) FILTER (WHERE urgency_bucket = 'CRITICAL')::INT AS critical_expiring,
         COUNT(*) FILTER (WHERE urgency_bucket = 'WARNING')::INT AS warning_expiring,
         COUNT(*) FILTER (WHERE urgency_bucket = 'NOTICE')::INT AS notice_expiring
       FROM v_expiring_licenses
-      WHERE tenant_id = $1::uuid;
-    `, tenantId);
+      WHERE tenant_id = ${tenantId}::uuid;
+    `);
 
     const expiringStats = expiringStatsResult[0] || {
       total_expiring: 0,
@@ -166,12 +167,12 @@ export class ComplianceService {
 
     // Fetch Unlicensed Assets
     if (unlicensedAssets > 0) {
-      const unlicensedRows: any = await prisma.$queryRawUnsafe(`
+      const unlicensedRows: any = await prisma.$queryRaw(Prisma.sql`
         SELECT asset_id, asset_code, asset_name 
         FROM v_asset_catalog 
-        WHERE tenant_id = $1::uuid AND compliance_status = 'UNLICENSED' 
+        WHERE tenant_id = ${tenantId}::uuid AND compliance_status = 'UNLICENSED' 
         LIMIT 5;
-      `, tenantId);
+      `);
 
       for (const row of unlicensedRows) {
         remediationItems.push({
@@ -189,12 +190,12 @@ export class ComplianceService {
 
     // Fetch Assets with Expired Licenses
     if (expiredLicenseAssets > 0) {
-      const expiredRows: any = await prisma.$queryRawUnsafe(`
+      const expiredRows: any = await prisma.$queryRaw(Prisma.sql`
         SELECT asset_id, asset_code, asset_name 
         FROM v_asset_catalog 
-        WHERE tenant_id = $1::uuid AND compliance_status = 'EXPIRED_LICENSE' 
+        WHERE tenant_id = ${tenantId}::uuid AND compliance_status = 'EXPIRED_LICENSE' 
         LIMIT 5;
-      `, tenantId);
+      `);
 
       for (const row of expiredRows) {
         remediationItems.push({
@@ -212,12 +213,12 @@ export class ComplianceService {
 
     // Fetch Exhausted Licenses
     if (exhaustedLicenses > 0) {
-      const exhaustedRows: any = await prisma.$queryRawUnsafe(`
+      const exhaustedRows: any = await prisma.$queryRaw(Prisma.sql`
         SELECT license_id, license_name, vendor_name, total_seats, used_seats 
         FROM v_license_utilization 
-        WHERE tenant_id = $1::uuid AND available_seats <= 0 
+        WHERE tenant_id = ${tenantId}::uuid AND available_seats <= 0 
         LIMIT 5;
-      `, tenantId);
+      `);
 
       for (const row of exhaustedRows) {
         remediationItems.push({
@@ -235,13 +236,13 @@ export class ComplianceService {
 
     // Fetch Expiring Licenses
     if (Number(expiringStats.total_expiring) > 0) {
-      const expiringRows: any = await prisma.$queryRawUnsafe(`
+      const expiringRows: any = await prisma.$queryRaw(Prisma.sql`
         SELECT license_id, license_name, vendor_name, days_left, urgency_bucket 
         FROM v_expiring_licenses 
-        WHERE tenant_id = $1::uuid 
+        WHERE tenant_id = ${tenantId}::uuid 
         ORDER BY days_left ASC 
         LIMIT 5;
-      `, tenantId);
+      `);
 
       for (const row of expiringRows) {
         remediationItems.push({
