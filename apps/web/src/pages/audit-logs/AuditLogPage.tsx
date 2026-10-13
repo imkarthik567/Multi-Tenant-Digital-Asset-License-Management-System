@@ -104,7 +104,7 @@ export const AuditLogPage: React.FC = () => {
                   <th className="px-6 py-3.5 font-semibold">Actor</th>
                   <th className="px-6 py-3.5 font-semibold">Action</th>
                   <th className="px-6 py-3.5 font-semibold">Entity Mutated</th>
-                  <th className="px-6 py-3.5 font-semibold">Client IP</th>
+                  <th className="px-6 py-3.5 font-semibold">Record ID</th>
                   <th className="px-6 py-3.5 font-semibold text-right">State Diff</th>
                 </tr>
               </thead>
@@ -112,7 +112,7 @@ export const AuditLogPage: React.FC = () => {
                 {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-800/30 transition">
                     <td className="px-6 py-3.5 text-slate-400 text-[11px]">
-                      {new Date(log.performedAt || log.createdAt || Date.now()).toLocaleString()}
+                      {new Date(log.performedAt).toLocaleString()}
                     </td>
 
                     <td className="px-6 py-3.5 font-sans font-medium text-white">
@@ -130,11 +130,11 @@ export const AuditLogPage: React.FC = () => {
                     </td>
 
                     <td className="px-6 py-3.5 text-slate-300 font-sans">
-                      <span className="font-semibold text-white">{log.entityType}</span>
+                      <span className="font-semibold text-white">{log.tableName}</span>
                     </td>
 
-                    <td className="px-6 py-3.5 text-slate-500 text-[11px]">
-                      {log.ipAddress || '127.0.0.1'}
+                    <td className="px-6 py-3.5 text-slate-500 text-[11px] font-mono">
+                      {log.recordId}
                     </td>
 
                     <td className="px-6 py-3.5 text-right font-sans">
@@ -166,11 +166,11 @@ export const AuditLogPage: React.FC = () => {
             </button>
 
             <h3 className="text-sm font-bold text-white">
-              Audit Event Payload: <span className="text-blue-400">{selectedLog.entityType}</span> [
+              Audit Event Payload: <span className="text-blue-400">{selectedLog.tableName}</span> [
               <span className="font-mono text-xs">{selectedLog.action}</span>]
             </h3>
             <p className="text-[11px] text-slate-400 mt-1">
-              Recorded at {new Date(selectedLog.performedAt || selectedLog.createdAt || Date.now()).toUTCString()}
+              Recorded at {new Date(selectedLog.performedAt).toUTCString()}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 font-mono text-[11px]">
@@ -178,8 +178,8 @@ export const AuditLogPage: React.FC = () => {
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl overflow-x-auto">
                 <span className="text-red-400 font-bold block mb-1">◀ Pre-Mutation Snapshot:</span>
                 <pre className="text-slate-400 whitespace-pre-wrap">
-                  {selectedLog.oldValues
-                    ? JSON.stringify(selectedLog.oldValues, null, 2)
+                  {selectedLog.oldData
+                    ? JSON.stringify(selectedLog.oldData, null, 2)
                     : '// NULL (Creation Event)'}
                 </pre>
               </div>
@@ -188,8 +188,8 @@ export const AuditLogPage: React.FC = () => {
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl overflow-x-auto">
                 <span className="text-emerald-400 font-bold block mb-1">▶ Post-Mutation Snapshot:</span>
                 <pre className="text-slate-300 whitespace-pre-wrap">
-                  {selectedLog.newValues
-                    ? JSON.stringify(selectedLog.newValues, null, 2)
+                  {selectedLog.newData
+                    ? JSON.stringify(selectedLog.newData, null, 2)
                     : '// NULL (Deletion Event)'}
                 </pre>
               </div>

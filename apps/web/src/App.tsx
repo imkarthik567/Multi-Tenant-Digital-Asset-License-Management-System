@@ -5,13 +5,22 @@
 // ==============================================================================
 
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
+
+// Global Navigation Bridge for seamless client-side SPA transitions
+const NavigationBridge: React.FC = () => {
+  const navigate = useNavigate();
+  React.useEffect(() => {
+    (window as any).__navigate = navigate;
+  }, [navigate]);
+  return null;
+};
 
 // Loading fallback spinner for lazy components
 const PageLoader: React.FC = () => (
@@ -67,6 +76,7 @@ export const App: React.FC = () => {
       <ThemeProvider>
         <ToastProvider>
           <BrowserRouter>
+            <NavigationBridge />
             <AuthProvider>
               <Suspense fallback={<PageLoader />}>
                 <Routes>

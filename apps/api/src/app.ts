@@ -86,13 +86,16 @@ if (env.NODE_ENV !== 'test') {
 
 // 8. Global API Rate Limiting
 app.use('/api', globalRateLimiter);
+app.use('/api/v1', globalRateLimiter);
 
 // 9. Health Check Endpoints
 app.get('/health', getHealth);
 app.get('/api/health', getHealth);
+app.get('/api/v1/health', getHealth);
 
 // 10. Mount Primary API Router
 app.use('/api', apiRoutes);
+app.use('/api/v1', apiRoutes);
 
 // 11. 404 Route Fallthrough
 app.use((req, _res, next) => {

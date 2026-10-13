@@ -16,7 +16,7 @@ export const globalRateLimiter = rateLimit({
 
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: env.NODE_ENV === 'test' ? 1000 : 10, // strict 10 attempts per 15m in production/development
+  max: env.NODE_ENV === 'test' || env.NODE_ENV === 'development' ? 1000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

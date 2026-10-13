@@ -45,13 +45,16 @@ export const LoginPage: React.FC = () => {
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    console.log('[LoginPage] Submitting credentials for:', data.email);
     try {
       setIsLoading(true);
       setServerError(null);
       const user = await login(data.email, data.password);
+      console.log('[LoginPage] Login success, user:', user.fullName, user.role);
       toast.success(`Welcome back, ${user.fullName}!`, 'Signed in successfully');
       navigate(from, { replace: true });
     } catch (err: any) {
+      console.error('[LoginPage] Login error:', err);
       setServerError(err.message || 'Invalid email or password.');
       toast.error(err.message || 'Authentication failed');
     } finally {

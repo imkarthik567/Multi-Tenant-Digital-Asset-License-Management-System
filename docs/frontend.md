@@ -1,151 +1,244 @@
-# AssetVault: Frontend Architecture & UI Documentation
+# AssetVault — Frontend Architecture & Design Specification
 
-**Course:** BCSE307L Database Systems (Fall 2026-27)  
-**Application:** AssetVault Enterprise Multi-Tenant Digital Asset & License Management System  
-**Framework:** React 18, Vite 5, TypeScript 5 (Strict), Tailwind CSS 3, TanStack Query v5, Recharts 2  
+> **Course:** BCSE307L Database Systems (Fall 2026-27)  
+> **System:** Multi-Tenant Digital Asset & License Management System (AssetVault)  
+> **Package:** `apps/web` (React 18 + TypeScript + Vite + Tailwind CSS)
 
 ---
 
-## 1. Architectural Overview
+## 1. Architecture Overview
 
-The AssetVault web frontend (`apps/web`) is structured around enterprise SaaS best practices:
+AssetVault Frontend is an enterprise multi-tenant Software-as-a-Service (SaaS) client application built to deliver real-time asset tracking, software license capacity analytics, and administrative governance.
+
+```mermaid
+flowchart TD
+    User([User Browser]) --> App[React 18 SPA]
+    App --> ThemeCtx[ThemeContext: Light / Dark]
+    App --> ToastCtx[ToastContext: Notifications]
+    App --> Router[React Router v6]
+    
+    Router --> PublicAuth[Public Auth Routes: /login, /register-tenant]
+    Router --> ProtectedZone[Protected Layout: AppLayout]
+    
+    ProtectedZone --> AuthCtx[AuthContext: In-Memory Access Token]
+    AuthCtx --> Axios[Axios Interceptor]
+    Axios -->|Authorization: Bearer JWT| API[Express REST API /api]
+    Axios -->|Silent 401 Refresh Cookie| RefreshAPI[/api/auth/refresh]
+    
+    ProtectedZone --> TanStackQuery[TanStack Query v5 Server State]
+    TanStackQuery --> Dashboards[Dashboards & Analytics]
+    TanStackQuery --> AssetCatalog[Digital Asset Repository]
+    TanStackQuery --> LicenseMatrix[Software License Matrix]
+    TanStackQuery --> Governance[Tenants, Users, Audit Trails]
+```
+
+### Key Technical Highlights
+- **Framework & Build:** React 18, Vite 5 with code splitting chunks per route.
+- **Language:** TypeScript 5.5+ in strict mode (`tsc --noEmit` exits with 0 errors).
+- **Styling:** Tailwind CSS with dark mode persistence via CSS classes (`dark`).
+- **Icons:** `lucide-react` modern minimalist icon set.
+- **Charts:** `recharts` for responsive SVG KPI bar charts, dual-axis line charts, and donut distributions.
+- **Form Validation:** React Hook Form integrated with Zod validation schemas matching backend contracts.
+
+---
+
+## 2. Token Lifecycle & Authentication Security
+
+AssetVault implements **In-Memory JWT Access Token Storage** to prevent Cross-Site Scripting (XSS) token theft. Tokens are **never** persisted in `localStorage` or `sessionStorage`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Web as React Web App (Memory)
+    participant Interceptor as Axios Interceptor
+    participant API as Express API (:5000)
+
+    User->>Web: Submits Email & Password
+    Web->>API: POST /api/auth/login
+    API-->>Web: 200 OK: { accessToken } + Set-Cookie: refreshToken (httpOnly, Path=/api/auth)
+    Note over Web: inMemoryAccessToken = token (JS Variable)
+    
+    User->>Web: Navigates to /assets
+    Web->>Interceptor: Query assets
+    Interceptor->>API: GET /api/assets (Bearer inMemoryAccessToken)
+    API-->>Web: 200 OK: Assets List
+    
+    Note over API: 15 Minutes Elapse (Access Token Expires)
+    Web->>Interceptor: Query /reports/dashboard
+    Interceptor->>API: GET /api/reports/dashboard (Expired Token)
+    API-->>Interceptor: 401 Unauthorized (Token Expired)
+    
+    Note over Interceptor: Interceptor queues incoming calls
+    Interceptor->>API: POST /api/auth/refresh (Cookie: refreshToken)
+    API-->>Interceptor: 200 OK: { accessToken: newAccessToken }
+    Note over Web: inMemoryAccessToken = newAccessToken
+    Interceptor->>API: Retry GET /api/reports/dashboard (New Token)
+    API-->>Web: 200 OK: Dashboard Data
+```
+
+### Session Lifecycle Rules
+1. **Initial Mount (`initAuth`):** Checks for existing token in memory. If missing, sends a silent `POST /api/auth/refresh` with `withCredentials: true`. If active refresh cookie exists, recovers session seamlessly.
+2. **Token Rotation & Reuse Detection:** Every call to `/api/auth/refresh` revokes the previous refresh token and issues a new hash. If a revoked refresh token is reused, all tokens for the user are immediately revoked.
+3. **Session Expiry Event:** If refresh fails (401/403), fires `window.dispatchEvent('auth:session_expired')`, clearing state and navigating the user back to `/login`.
+
+---
+
+## 3. Role-Based Access Control (RBAC) Matrix
+
+AssetVault enforces multi-tiered access control using `<ProtectedRoute>`, `<RoleGate>`, and the `usePermission()` hook.
+
+| Route / Module | Path | Allowed Roles | Required Permission | View Description |
+|---|---|---|---|---|
+| **Executive Dashboard** | `/` | `TENANT_ADMIN`, `ASSET_MANAGER` | `tenants:read_own` | Operational KPIs, seat capacity bars, monthly spend trend |
+| **Platform Overview** | `/` | `SUPER_ADMIN` | `analytics:platform_read` | Multi-tenant governance, organization subscriptions |
+| **Member Portal** | `/my-licenses` | `MEMBER`, `ASSET_MANAGER`, `TENANT_ADMIN` | `licenses:read_own` | Self-service software key viewing & seat release |
+| **Asset Repository** | `/assets` | All Authenticated | `assets:read` | Catalog grid/table, version controls, tag filters |
+| **Asset Details** | `/assets/:id` | All Authenticated | `assets:read` | File download, checksums, new version upload modal |
+| **Licenses Matrix** | `/licenses` | `SUPER_ADMIN`, `TENANT_ADMIN`, `ASSET_MANAGER` | `licenses:read` | Utilization progress, renewal dates, cost metrics |
+| **License Details** | `/licenses/:id` | `SUPER_ADMIN`, `TENANT_ADMIN`, `ASSET_MANAGER` | `licenses:read` | Seat allocations, manual assignment, renewal ledger |
+| **Analytical Reports** | `/reports` | `SUPER_ADMIN`, `TENANT_ADMIN`, `ASSET_MANAGER` | `licenses:read` | Deep dive into vendor spend, expiring contracts, rankings |
+| **Categories Tree** | `/categories` | `SUPER_ADMIN`, `TENANT_ADMIN`, `ASSET_MANAGER` | `categories:read` | Hierarchical tree with drag/nesting cycle prevention |
+| **Users & Roles** | `/users` | `TENANT_ADMIN`, `SUPER_ADMIN` | `users:read` | Tenant membership, activation/suspension, role changes |
+| **Audit Ledger** | `/audit-logs` | `TENANT_ADMIN`, `SUPER_ADMIN` | `audit:read` | Immutable record of checkout/in, mutations, logins |
+| **Platform Tenants** | `/platform/tenants`| `SUPER_ADMIN` | `tenants:read_platform` | Suspend/activate tenants, assign tier plans |
+| **Subscription Plans**| `/platform/plans` | `SUPER_ADMIN` | `plans:read` | Manage pricing, max user quotas, asset storage limits |
+
+---
+
+## 4. Responsive Design System & Accessibility
+
+The interface is engineered with enterprise ergonomics across all viewport widths:
+
+1. **Desktop ($1280\text{px}+$)**:
+   - Persistent 256px sidebar with collapsible mini-mode (64px).
+   - Multi-column metric grids (4 to 6 columns).
+   - High-density data tables with sortable column headers, pagination controls, and action dropdowns.
+2. **Tablet ($768\text{px}$ – $1023\text{px}$)**:
+   - Sidebar automatically tucks or transitions into a slide-out overlay drawer.
+   - Dual-column KPI cards and charts stacked in single-column layouts.
+3. **Mobile ($375\text{px}$ – $639\text{px}$)**:
+   - Sidebar renders as a full-height touch slide drawer with backdrop blur.
+   - Tables automatically transform into **responsive stacked card components** (`sm:hidden`), preventing horizontal viewport clipping while retaining full data density.
+   - Action modals occupy full viewport width with touch-friendly tap targets ($\ge 44\text{px}$).
+4. **Accessibility (WCAG AA Compliance)**:
+   - All interactive controls provide visible keyboard focus rings (`focus:ring-2 focus:ring-primary-500`).
+   - Contrast ratio exceeds $4.5:1$ on both light and dark themes.
+   - Screen-reader labels (`aria-label`, `aria-hidden`) on all icon buttons and filter dropdowns.
+
+---
+
+## 5. Frontend Directory Structure
 
 ```
 apps/web/
-├── index.html
-├── package.json
-├── tailwind.config.js
-├── vite.config.ts
-└── src/
-    ├── App.tsx                     # Top-level Router, Provider hierarchy & lazy routes
-    ├── main.tsx                    # React 18 createRoot bootstrap
-    ├── index.css                   # Tailwind tokens, dark/light theme variables
-    ├── vite-env.d.ts               # Vite client environment types
-    ├── types/
-    │   └── index.ts                # TypeScript domain models matching backend schema
-    ├── context/
-    │   ├── AuthContext.tsx         # User profile, RBAC permissions & in-memory JWT
-    │   ├── ThemeContext.tsx        # Light/Dark mode state with localStorage persistence
-    │   └── ToastContext.tsx        # Global accessible toast notification queue
-    ├── services/
-    │   └── api.ts                  # Axios client, in-memory token, silent cookie refresh queue
-    ├── components/
-    │   ├── auth/
-    │   │   ├── ProtectedRoute.tsx  # Route guard checking authentication & roles
-    │   │   └── RoleGate.tsx        # Conditional component gate for granular permissions
-    │   ├── common/
-    │   │   ├── ConfirmDialog.tsx   # Accessible confirmation modal for destructive operations
-    │   │   ├── DataTable.tsx       # Responsive table (< 640px stacked cards, >= 640px table)
-    │   │   ├── EmptyState.tsx      # Clean placeholder for empty queries and zero-states
-    │   │   ├── ErrorBoundary.tsx   # React class component error fallback
-    │   │   ├── FormField.tsx       # Label, input container, and inline error renderer
-    │   │   ├── LoadingSkeleton.tsx # Shimmer skeletons (cards, tables, detail views)
-    │   │   ├── Modal.tsx           # Keyboard & backdrop accessible overlay modal
-    │   │   ├── Pagination.tsx      # Page selector with limit dropdown & total count
-    │   │   ├── SearchInput.tsx     # Debounced search bar with clear button
-    │   │   ├── StatCard.tsx        # Metric display with trend badges and icons
-    │   │   ├── StatusBadge.tsx     # Semantic color-coded badge (COMPLIANT, TRIAL, ACTIVE, etc.)
-    │   │   └── TagInput.tsx        # Dynamic metadata chip selector
-    │   └── layout/
-    │       ├── AppLayout.tsx       # Collapsible sidebar, top navbar, responsive mobile drawer
-    │       ├── Navbar.tsx          # Tenant brand, notification center dropdown, user menu
-    │       └── Sidebar.tsx         # Role-tailored collapsible navigation
-    └── pages/
-        ├── auth/
-        │   ├── LoginPage.tsx       # Password & Google OAuth login + quick demo credentials
-        │   └── RegisterPage.tsx    # Tenant self-registration with password strength meter
-        ├── dashboard/
-        │   └── DashboardPage.tsx   # Executive analytics, Recharts donut/bar/line, and superadmin overview
-        ├── assets/
-        │   ├── AssetListPage.tsx   # Asset catalog, filter bar, CSV import preview, soft delete
-        │   └── AssetDetailPage.tsx # Multi-tab asset view (Overview, Versions, Licenses, Access History)
-        ├── licenses/
-        │   ├── LicenseListPage.tsx # License contracts, seat utilization progress, create license
-        │   ├── LicenseDetailPage.tsx # Masked key reveal, seat allocations matrix, renewal contract extension
-        │   └── MyLicensesPage.tsx  # Member self-service portal, self-release seat modal
-        ├── allocations/
-        │   └── AllocationListPage.tsx # Tenant-wide allocation ledger & release modal
-        ├── categories/
-        │   └── CategoryListPage.tsx# Hierarchical taxonomy tree, drag/drop cycle protection
-        ├── tags/
-        │   └── TagListPage.tsx     # Color-coded metadata tag manager
-        ├── vendors/
-        │   └── VendorListPage.tsx  # Software vendor contact directory
-        ├── notifications/
-        │   └── NotificationListPage.tsx # Alert center with manual "Run Expiry Check" trigger
-        ├── reports/
-        │   └── ReportsPage.tsx     # 6-tab analytics suite (Utilization, Vendor Spend, Monthly MV, etc.)
-        ├── platform/
-        │   ├── TenantListPage.tsx  # SuperAdmin tenant governance & plan provisioning
-        │   └── PlanListPage.tsx    # SuperAdmin subscription tiers & quotas
-        ├── users/
-        │   └── UserListPage.tsx    # Tenant user management, invites, role switching
-        ├── audit-logs/
-        │   └── AuditLogPage.tsx    # Immutable compliance ledger with JSON diff inspector
-        ├── settings/
-        │   └── TenantSettingsPage.tsx # Tenant branding, quota consumption, global session logout
-        └── error/
-            ├── ForbiddenPage.tsx   # 403 Access Denied fallback
-            └── NotFoundPage.tsx    # 404 Route not found fallback
+├── index.html                   # HTML entry point with Inter & JetBrains Mono fonts
+├── vite.config.ts               # Vite bundler config with /api reverse proxy
+├── tailwind.config.js           # Design tokens, color system, and animations
+├── src/
+│   ├── main.tsx                 # React DOM root render
+│   ├── App.tsx                  # BrowserRouter, QueryClient, and AppLayout shell
+│   ├── index.css                # Tailwind directives and custom scrollbars
+│   ├── types/
+│   │   └── index.ts             # TypeScript definitions for entities, roles, and API envelopes
+│   ├── services/
+│   │   └── api.ts               # Axios instance, Bearer interceptor, and 401 refresh queue
+│   ├── context/
+│   │   ├── AuthContext.tsx      # In-memory JWT session, profile, and RBAC helpers
+│   │   ├── ThemeContext.tsx     # Light/Dark theme persistence via localStorage
+│   │   └── ToastContext.tsx     # Animated success/error/warning alerts
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── AppLayout.tsx    # Root authenticated dashboard layout
+│   │   │   ├── Sidebar.tsx      # Responsive collapsible sidebar navigation
+│   │   │   └── Navbar.tsx       # Top bar with tenant status, theme toggle, user avatar
+│   │   ├── auth/
+│   │   │   ├── ProtectedRoute.tsx # Route barrier enforcing session & role whitelist
+│   │   │   └── RoleGate.tsx     # Granular inline component permission gates
+│   │   └── common/
+│   │       ├── DataTable.tsx    # Table with auto mobile stacked cards and sorting
+│   │       ├── StatCard.tsx     # KPI metric display card with Lucide icons
+│   │       ├── StatusBadge.tsx  # Color-coded badges (ACTIVE, SUSPENDED, COMPLIANT, etc.)
+│   │       ├── Modal.tsx        # Accessible dialog with escape key and backdrop dismiss
+│   │       ├── FilterBar.tsx    # Search, active filter chips, and dropdown controls
+│   │       ├── SearchInput.tsx  # Debounced text search field
+│   │       ├── Pagination.tsx   # Server-side pagination buttons and page indicator
+│   │       ├── LoadingSkeleton.tsx # Shimmer card, table, and detail skeletons
+│   │       ├── EmptyState.tsx   # Graphic placeholder for empty query results
+│   │       ├── ConfirmDialog.tsx # Destruction safety verification dialog
+│   │       └── ErrorBoundary.tsx # Catch-all error fallback with recovery retry
+│   └── pages/
+│       ├── auth/
+│       │   ├── LoginPage.tsx        # Login form with quick demo persona buttons
+│       │   └── RegisterPage.tsx     # Tenant self-registration form
+│       ├── dashboard/
+│       │   └── DashboardPage.tsx    # Role-aware Executive Dashboard & Super Admin Platform View
+│       ├── assets/
+│       │   ├── AssetListPage.tsx    # Digital asset catalog (grid & table mode)
+│       │   └── AssetDetailPage.tsx  # Version control history, checksums, downloads
+│       ├── licenses/
+│       │   ├── LicenseListPage.tsx  # License contract matrix with seat progress
+│       │   ├── LicenseDetailPage.tsx# Seat allocations, assign modal, renewal tracking
+│       │   └── MyLicensesPage.tsx   # Self-service portal for member key access
+│       ├── reports/
+│       │   └── ReportsPage.tsx      # Recharts visualizations of database views
+│       ├── categories/
+│       │   └── CategoryListPage.tsx # Nested recursive tree with CRUD modals
+│       ├── tags/
+│       │   └── TagListPage.tsx      # Tag color management and asset counts
+│       ├── vendors/
+│       │   └── VendorListPage.tsx   # Software supplier repository
+│       ├── users/
+│       │   └── UserListPage.tsx     # User administration and role delegation
+│       ├── audit-logs/
+│       │   └── AuditLogPage.tsx     # Compliance log ledger table
+│       ├── notifications/
+│       │   └── NotificationListPage.tsx # Contract expiry & seat capacity notifications
+│       ├── settings/
+│       │   └── TenantSettingsPage.tsx # Tenant slug, domain, and contact details
+│       ├── platform/
+│       │   ├── TenantListPage.tsx   # Super Admin cross-tenant governance
+│       │   └── PlanListPage.tsx     # Super Admin tier subscription pricing
+│       └── error/
+│           ├── ForbiddenPage.tsx    # 403 Access Denied view
+│           └── NotFoundPage.tsx     # 404 Route Not Found view
 ```
 
 ---
 
-## 2. Authentication & Token Management
+## 6. Screenshots & Visual Verification
 
-### In-Memory Access Token Architecture
-- **JWT Storage:** In accordance with modern security standards, the short-lived JWT access token is **never** written to `localStorage` or `sessionStorage`. It resides purely in memory within the `api.ts` module closure.
-- **Refresh Token:** Stored in an `httpOnly`, `SameSite=Strict`, `Secure` (production) cookie.
-- **Silent Refresh Interceptor:**
-  - On receiving an HTTP `401 Unauthorized` response from any API endpoint:
-  - If a refresh request is not already in flight, Axios triggers `POST /api/auth/refresh`.
-  - Concurrent requests are placed into a promise queue (`failedQueue`) and replayed once the new access token is received.
-  - If refresh fails (token expired, revoked, or reuse detected), the client triggers the `auth:session_expired` event, clears local state, and redirects the user to `/login`.
+Automated headless verification was conducted using Puppeteer across Desktop ($1280\text{px}$), Tablet ($768\text{px}$), and Mobile ($375\text{px}$) viewports. Captured artifacts are located in `docs/screenshots/`:
 
----
-
-## 3. Role-Based Access Control (RBAC) Routing Table
-
-Every application route is protected by `<ProtectedRoute>` and checked against the user's role:
-
-| Route | Minimum Role | Allowed Roles | Description |
-| :--- | :--- | :--- | :--- |
-| `/login` | Public | All | Email/Password & Google OAuth |
-| `/register` | Public | All | Tenant self-registration (Free tier) |
-| `/` | `MEMBER` | All | Executive dashboard tailored to role |
-| `/assets` | `MEMBER` | All | Asset catalog (actions gated by permissions) |
-| `/assets/:id` | `MEMBER` | All | Multi-tab asset detail & versioning |
-| `/my-licenses` | `MEMBER` | `MEMBER` | Self-service software seats |
-| `/licenses` | `ASSET_MANAGER` | `ASSET_MANAGER`, `TENANT_ADMIN`, `SUPER_ADMIN` | Software license catalog & seats |
-| `/licenses/:id` | `ASSET_MANAGER` | `ASSET_MANAGER`, `TENANT_ADMIN`, `SUPER_ADMIN` | License allocations, renewal, reveal key |
-| `/allocations` | `ASSET_MANAGER` | `ASSET_MANAGER`, `TENANT_ADMIN`, `SUPER_ADMIN` | Tenant seat allocation ledger |
-| `/categories` | `ASSET_MANAGER` | `ASSET_MANAGER`, `TENANT_ADMIN`, `SUPER_ADMIN` | Category hierarchy |
-| `/tags` | `ASSET_MANAGER` | `ASSET_MANAGER`, `TENANT_ADMIN`, `SUPER_ADMIN` | Metadata tags |
-| `/vendors` | `ASSET_MANAGER` | `ASSET_MANAGER`, `TENANT_ADMIN`, `SUPER_ADMIN` | Vendor directory |
-| `/reports` | `ASSET_MANAGER` | `ASSET_MANAGER`, `TENANT_ADMIN`, `SUPER_ADMIN` | Analytics & spend reports |
-| `/users` | `TENANT_ADMIN` | `TENANT_ADMIN`, `SUPER_ADMIN` | User provisioning & role management |
-| `/audit-logs` | `TENANT_ADMIN` | `TENANT_ADMIN`, `SUPER_ADMIN` | Compliance audit trail |
-| `/settings` | `TENANT_ADMIN` | `TENANT_ADMIN`, `SUPER_ADMIN` | Organization settings & quotas |
-| `/platform/tenants` | `SUPER_ADMIN` | `SUPER_ADMIN` | Cross-tenant organization governance |
-| `/platform/plans` | `SUPER_ADMIN` | `SUPER_ADMIN` | Platform subscription tiers |
+| Screen / Feature | Viewport | File Path |
+|---|---|---|
+| **Enterprise Login Screen** | Desktop (1280px) | `docs/screenshots/01_login_desktop_1280px.png` |
+| **Enterprise Login Screen** | Tablet (768px) | `docs/screenshots/01_login_tablet_768px.png` |
+| **Enterprise Login Screen** | Mobile (375px) | `docs/screenshots/01_login_mobile_375px.png` |
+| **Tenant Self-Registration** | Desktop (1280px) | `docs/screenshots/02_register_desktop_1280px.png` |
+| **Tenant Self-Registration** | Mobile (375px) | `docs/screenshots/02_register_mobile_375px.png` |
+| **Executive Dashboard (Dark Theme)** | Desktop (1280px) | `docs/screenshots/03_admin_dashboard_desktop_1280px.png` |
+| **Executive Dashboard (Tablet)** | Tablet (768px) | `docs/screenshots/03_admin_dashboard_tablet_768px.png` |
+| **Executive Dashboard (Mobile)** | Mobile (375px) | `docs/screenshots/03_admin_dashboard_mobile_375px.png` |
+| **Digital Asset Catalog** | Desktop (1280px) | `docs/screenshots/04_assets_catalog_desktop_1280px.png` |
+| **Digital Asset Catalog** | Mobile (375px) | `docs/screenshots/04_assets_catalog_mobile_375px.png` |
+| **Asset Details & Versions** | Desktop (1280px) | `docs/screenshots/05_asset_detail_desktop_1280px.png` |
+| **Software License Matrix** | Desktop (1280px) | `docs/screenshots/06_licenses_catalog_desktop_1280px.png` |
+| **License Seat Allocations** | Desktop (1280px) | `docs/screenshots/07_license_detail_desktop_1280px.png` |
+| **Analytical Spend Reports** | Desktop (1280px) | `docs/screenshots/08_reports_analytics_desktop_1280px.png` |
+| **Nested Categories Tree** | Desktop (1280px) | `docs/screenshots/09_categories_tree_desktop_1280px.png` |
+| **User & Role Administration** | Desktop (1280px) | `docs/screenshots/10_users_table_desktop_1280px.png` |
+| **Notifications Center** | Desktop (1280px) | `docs/screenshots/11_notifications_desktop_1280px.png` |
+| **Compliance Audit Trail** | Desktop (1280px) | `docs/screenshots/12_audit_logs_desktop_1280px.png` |
+| **Member Self-Service Portal** | Desktop (1280px) | `docs/screenshots/13_member_my_licenses_desktop_1280px.png` |
+| **Super Admin Platform View** | Desktop (1280px) | `docs/screenshots/14_superadmin_overview_desktop_1280px.png` |
+| **Platform Tenant Subscriptions** | Desktop (1280px) | `docs/screenshots/15_platform_tenants_desktop_1280px.png` |
+| **Platform Subscription Plans** | Desktop (1280px) | `docs/screenshots/16_platform_plans_desktop_1280px.png` |
 
 ---
 
-## 4. UI Components & Responsive Behavior
+## 7. Verification & Production Build Status
 
-1. **Light & Dark Theme:**
-   - Managed via `ThemeContext.tsx` toggling the `dark` class on `document.documentElement`.
-   - Persisted in `localStorage` under `assetvault_theme`.
-   - High-contrast slate color palette tuned for 4.5:1 WCAG AA contrast.
-2. **Responsive Layouts:**
-   - **Desktop (>= 1024px):** Fixed collapsible sidebar with icon and label modes.
-   - **Tablet (768px - 1023px):** Compact sidebar, responsive grid cards.
-   - **Mobile (< 640px):** Sidebar converts into an animated overlay drawer; data tables gracefully transform into stacked card views (`DataTable.tsx`).
-3. **Advanced Visualizations:**
-   - **Recharts Integration:**
-     - Donut / Pie Charts for category asset distribution.
-     - Stacked Bar Charts for seat capacity vs active allocations (`v_license_utilization`).
-     - Area / Line Charts for historical spend trends (`mv_monthly_access_stats`).
-4. **State Management:**
-   - **Server State:** Handled entirely via TanStack Query v5 with optimistic query invalidations on all CRUD mutations.
-   - **Feedback System:** Unified `ToastContext` providing accessible notifications with success, error, warning, and info variants.
+- **Type Safety:** Verified with `tsc --noEmit` across all modules: **0 errors**.
+- **Production Bundle:** Generated via `vite build`: **0 errors**, minified and code-split chunks in `dist/`.
+- **Runtime Connectivity:** Validated via automated REST health checks (`GET /api/health` $\to$ `200 OK`, PostgreSQL connected).

@@ -62,8 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
   const { data: notifData } = useQuery<Notification[]>({
     queryKey: ['notifications', 'navbar'],
     queryFn: async () => {
-      const res: any = await api.get('/notifications', { limit: 5 });
-      return (Array.isArray(res) ? res : res?.data || []) as Notification[];
+      const res = await api.get<{ data: Notification[] }>('/notifications', { limit: 5 });
+      return res.data;
     },
     refetchInterval: 60000,
     enabled: !!user,

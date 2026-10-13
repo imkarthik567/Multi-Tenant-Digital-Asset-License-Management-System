@@ -23,7 +23,7 @@ import {
   Layers,
   ArrowRight,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import {
   ResponsiveContainer,
   BarChart,
@@ -44,52 +44,70 @@ export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.isSuperAdmin;
 
+  if (user?.role === 'MEMBER') {
+    return <Navigate to="/my-licenses" replace />;
+  }
+
   // 1. Fetch Tenant Operational Dashboard KPIs
   const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
     queryKey: ['reports', 'dashboard'],
     queryFn: async () => {
-      const res = await api.get<any>('/reports/dashboard');
-      return res.data || res;
+      const res = await api.get<{
+        data: {
+          tenant: any;
+          stats: {
+            asset_count: number;
+            license_count: number;
+            user_count: number;
+            active_allocated_seats: number;
+            total_contracted_seats: number;
+            expiring_licenses_30d: number;
+            unlicensed_assets_count: number;
+            total_license_spend: number;
+          };
+        };
+      }>('/reports/dashboard');
+      return res.data;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && user?.role !== 'MEMBER',
   });
 
   // 2. Fetch License Utilization for Bar Chart
   const { data: utilizationData } = useQuery({
     queryKey: ['reports', 'license-utilization'],
     queryFn: async () => {
-      const res = await api.get<any>('/reports/license-utilization');
-      return Array.isArray(res) ? res : res.data || [];
+      const res = await api.get<{ data: any[] }>('/reports/license-utilization');
+      return res.data;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && user?.role !== 'MEMBER',
   });
 
   // 3. Fetch Monthly Spend for Line Chart
   const { data: spendData } = useQuery({
     queryKey: ['reports', 'spend-by-month'],
     queryFn: async () => {
-      const res = await api.get<any>('/reports/spend-by-month');
-      return Array.isArray(res) ? res : res.data || [];
+      const res = await api.get<{ data: any[] }>('/reports/spend-by-month');
+      return res.data;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && user?.role !== 'MEMBER',
   });
 
   // 4. Fetch Expiring Soon Licenses
   const { data: expiringData } = useQuery({
     queryKey: ['reports', 'expiring-licenses'],
     queryFn: async () => {
-      const res = await api.get<any>('/reports/expiring-licenses');
-      return Array.isArray(res) ? res : res.data || [];
+      const res = await api.get<{ data: any[] }>('/reports/expiring-licenses');
+      return res.data;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && user?.role !== 'MEMBER',
   });
 
   // 5. Super Admin Platform Overview Data
   const { data: platformData, isLoading: isPlatformLoading } = useQuery({
     queryKey: ['platform', 'overview'],
     queryFn: async () => {
-      const res = await api.get<any>('/platform/overview');
-      return Array.isArray(res) ? res : res.data || [];
+      const res = await api.get<{ data: any }>('/platform/overview');
+      return res.data;
     },
     enabled: isSuperAdmin,
   });
@@ -103,11 +121,21 @@ export const DashboardPage: React.FC = () => {
   if (isSuperAdmin) {
     if (isPlatformLoading) return <CardSkeleton count={4} />;
 
+    const parseSpend = (val: any): number => {
+      if (!val) return 0;
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') return parseFloat(val) || 0;
+      if (typeof val === 'object' && val.d && Array.isArray(val.d)) {
+        return val.d[0] || 0;
+      }
+      return 0;
+    };
+
     const tenants = platformData || [];
     const totalTenants = tenants.length;
     const activeTenants = tenants.filter((t: any) => t.tenant_status === 'ACTIVE').length;
     const totalUsers = tenants.reduce((acc: number, t: any) => acc + Number(t.user_count || 0), 0);
-    const totalSpend = tenants.reduce((acc: number, t: any) => acc + Number(t.total_license_spend || 0), 0);
+    const totalSpend = tenants.reduce((acc: number, t: any) => acc + parseSpend(t.total_license_spend), 0);
 
     return (
       <div className="space-y-6">
@@ -202,7 +230,7 @@ export const DashboardPage: React.FC = () => {
                     <td className="py-3 px-4">{t.license_count}</td>
                     <td className="py-3 px-4 font-semibold">{t.active_seats_count}</td>
                     <td className="py-3 px-4 font-bold text-emerald-600 dark:text-emerald-400">
-                      ${Number(t.total_license_spend || 0).toLocaleString()}
+                      ${parseSpend(t.total_license_spend).toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -219,15 +247,16 @@ export const DashboardPage: React.FC = () => {
   // ----------------------------------------------------------------------------
   if (isDashboardLoading) return <CardSkeleton count={6} />;
 
-  const stats = dashboardData?.stats || {
-    asset_count: 0,
-    license_count: 0,
-    user_count: 0,
-    active_allocated_seats: 0,
-    total_contracted_seats: 0,
-    expiring_licenses_30d: 0,
-    unlicensed_assets_count: 0,
-    total_license_spend: 0,
+  const rawStats: any = dashboardData?.stats || {};
+  const stats = {
+    asset_count: Number(rawStats.total_assets ?? rawStats.asset_count ?? 0),
+    license_count: Number(rawStats.total_licenses ?? rawStats.license_count ?? 0),
+    user_count: Number(rawStats.user_count ?? 0),
+    active_allocated_seats: Number(rawStats.allocated_seats ?? rawStats.active_allocated_seats ?? 0),
+    total_contracted_seats: Number(rawStats.total_seats ?? rawStats.total_contracted_seats ?? 0),
+    expiring_licenses_30d: Number(rawStats.expiring_in_30_days ?? rawStats.expiring_licenses_30d ?? 0),
+    unlicensed_assets_count: Number(rawStats.unlicensed_assets_count ?? 0),
+    total_license_spend: Number(rawStats.total_license_cost ?? rawStats.total_license_spend ?? 0),
   };
 
   // Prepare chart series
@@ -269,7 +298,7 @@ export const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
         <StatCard
           title="Digital Assets"
-          value={stats.asset_count.toLocaleString()}
+          value={Number(stats.asset_count || 0).toLocaleString()}
           subtitle="Catalog versions"
           icon={<FolderLock className="w-4 h-4" />}
           color="primary"
@@ -304,7 +333,7 @@ export const DashboardPage: React.FC = () => {
         />
         <StatCard
           title="Total Spend"
-          value={`$${Number(stats.total_license_spend).toLocaleString()}`}
+          value={`$${Number(stats.total_license_spend || 0).toLocaleString()}`}
           subtitle="Procurement contracts"
           icon={<TrendingUp className="w-4 h-4" />}
           color="emerald"

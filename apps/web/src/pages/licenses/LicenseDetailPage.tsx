@@ -69,8 +69,8 @@ export const LicenseDetailPage: React.FC = () => {
   } = useQuery<License>({
     queryKey: ['license', id],
     queryFn: async () => {
-      const res: any = await api.get(`/licenses/${id}`);
-      return (res.data || res) as License;
+      const res = await api.get<{ data: License }>(`/licenses/${id}`);
+      return res.data;
     },
     enabled: !!id,
   });
