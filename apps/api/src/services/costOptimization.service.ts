@@ -4,6 +4,7 @@
 // Identifies dormant seat allocations (>30 days inactive) and aggregates vendor spend
 // ==============================================================================
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 
 export interface UnusedSeatCandidate {
@@ -46,7 +47,7 @@ export interface CostOptimizationReport {
 export class CostOptimizationService {
   public async getUnusedSeatsReport(tenantId: string): Promise<CostOptimizationReport> {
     // 1. Query seat allocations with no access log on covered assets in the last 30 days
-    const rows: any = await prisma.$queryRawUnsafe(`
+    const rows: any = await prisma.$queryRaw(Prisma.sql`
       SELECT 
         la.id AS allocation_id,
         la.license_id,
@@ -65,7 +66,7 @@ export class CostOptimizationService {
       JOIN vendors v ON v.id = l.vendor_id
       LEFT JOIN asset_licenses al ON al.license_id = l.id
       LEFT JOIN asset_access_logs aal ON aal.asset_id = al.asset_id AND aal.user_id = u.id
-      WHERE l.tenant_id = $1::uuid
+      WHERE l.tenant_id = ${tenantId}::uuid
         AND la.status = 'ACTIVE'
         AND l.deleted_at IS NULL
         AND la.allocated_at < (NOW() - INTERVAL '7 days') -- Give 7 days grace period post-allocation
@@ -74,7 +75,7 @@ export class CostOptimizationService {
         u.id, u.full_name, u.email, v.name, la.allocated_at
       HAVING MAX(aal.accessed_at) IS NULL OR MAX(aal.accessed_at) < (NOW() - INTERVAL '30 days')
       ORDER BY l.cost DESC, la.allocated_at ASC;
-    `, tenantId);
+    `);
 
     let totalMonthlySavings = 0;
     let totalAnnualSavings = 0;
@@ -117,7 +118,7 @@ export class CostOptimizationService {
       reclaimCandidates.length > 0 ? Math.round((seatCostSum / reclaimCandidates.length) * 100) / 100 : 0;
 
     // 2. Query top expensive vendors directly from the v_vendor_spend view
-    const vendorRows: any = await prisma.$queryRawUnsafe(`
+    const vendorRows: any = await prisma.$queryRaw(Prisma.sql`
       SELECT 
         vendor_id,
         vendor_name,
@@ -126,10 +127,10 @@ export class CostOptimizationService {
         grand_total_spend::FLOAT AS grand_total_spend,
         avg_cost_per_seat::FLOAT AS avg_cost_per_seat
       FROM v_vendor_spend
-      WHERE tenant_id = $1::uuid
+      WHERE tenant_id = ${tenantId}::uuid
       ORDER BY grand_total_spend DESC
       LIMIT 5;
-    `, tenantId);
+    `);
 
     const topExpensiveVendors: ExpensiveVendor[] = vendorRows.map((v: any) => ({
       vendorId: v.vendor_id,

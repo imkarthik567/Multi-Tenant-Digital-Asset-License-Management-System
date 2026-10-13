@@ -13,6 +13,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
+import { Prisma } from '@prisma/client';
 import app from '../app';
 import { prismaForRequest } from '../config/prisma';
 import { env } from '../config/env';
@@ -289,16 +290,14 @@ describe('AssetVault Advanced Enterprise Features Suite', () => {
       const testLockId = 9999;
 
       // 1. Acquire lock
-      const acquired: any = await systemPrisma.$queryRawUnsafe(
-        'SELECT pg_try_advisory_lock($1::int) AS locked;',
-        testLockId
+      const acquired: any = await systemPrisma.$queryRaw(
+        Prisma.sql`SELECT pg_try_advisory_lock(${testLockId}::int) AS locked;`
       );
       expect(acquired[0].locked).toBe(true);
 
       // 2. Release lock
-      const released: any = await systemPrisma.$queryRawUnsafe(
-        'SELECT pg_advisory_unlock($1::int) AS unlocked;',
-        testLockId
+      const released: any = await systemPrisma.$queryRaw(
+        Prisma.sql`SELECT pg_advisory_unlock(${testLockId}::int) AS unlocked;`
       );
       expect(released[0].unlocked).toBe(true);
     });

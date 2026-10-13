@@ -4,6 +4,7 @@
 // Searches Assets, Licenses, Vendors and Tags in tenant using pg_trgm and ILIKE
 // ==============================================================================
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
 
@@ -43,18 +44,18 @@ export class SearchService {
 
     try {
       // 1. Search Assets
-      const assetRows: any = await prisma.$queryRawUnsafe(`
+      const assetRows: any = await prisma.$queryRaw(Prisma.sql`
         SELECT 
           id, asset_code, name, asset_type, status, description
         FROM assets
-        WHERE tenant_id = $1::uuid
+        WHERE tenant_id = ${tenantId}::uuid
           AND deleted_at IS NULL
-          AND (name ILIKE $2 OR asset_code ILIKE $2 OR description ILIKE $2)
+          AND (name ILIKE ${likePattern} OR asset_code ILIKE ${likePattern} OR description ILIKE ${likePattern})
         ORDER BY 
-          CASE WHEN name ILIKE $2 THEN 1 ELSE 2 END,
+          CASE WHEN name ILIKE ${likePattern} THEN 1 ELSE 2 END,
           name ASC
         LIMIT 8;
-      `, tenantId, likePattern);
+      `);
 
       const assets: SearchResultItem[] = assetRows.map((a: any) => ({
         id: a.id,
@@ -66,19 +67,19 @@ export class SearchService {
       }));
 
       // 2. Search Licenses
-      const licenseRows: any = await prisma.$queryRawUnsafe(`
+      const licenseRows: any = await prisma.$queryRaw(Prisma.sql`
         SELECT 
           l.id, l.name, l.license_key, l.status, l.total_seats, v.name AS vendor_name
         FROM licenses l
         JOIN vendors v ON v.id = l.vendor_id
-        WHERE l.tenant_id = $1::uuid
+        WHERE l.tenant_id = ${tenantId}::uuid
           AND l.deleted_at IS NULL
-          AND (l.name ILIKE $2 OR l.license_key ILIKE $2 OR v.name ILIKE $2)
+          AND (l.name ILIKE ${likePattern} OR l.license_key ILIKE ${likePattern} OR v.name ILIKE ${likePattern})
         ORDER BY 
-          CASE WHEN l.name ILIKE $2 THEN 1 ELSE 2 END,
+          CASE WHEN l.name ILIKE ${likePattern} THEN 1 ELSE 2 END,
           l.name ASC
         LIMIT 8;
-      `, tenantId, likePattern);
+      `);
 
       const licenses: SearchResultItem[] = licenseRows.map((l: any) => ({
         id: l.id,
@@ -90,17 +91,17 @@ export class SearchService {
       }));
 
       // 3. Search Vendors
-      const vendorRows: any = await prisma.$queryRawUnsafe(`
+      const vendorRows: any = await prisma.$queryRaw(Prisma.sql`
         SELECT 
           id, name, contact_email
         FROM vendors
-        WHERE tenant_id = $1::uuid
-          AND (name ILIKE $2 OR contact_email ILIKE $2)
+        WHERE tenant_id = ${tenantId}::uuid
+          AND (name ILIKE ${likePattern} OR contact_email ILIKE ${likePattern})
         ORDER BY 
-          CASE WHEN name ILIKE $2 THEN 1 ELSE 2 END,
+          CASE WHEN name ILIKE ${likePattern} THEN 1 ELSE 2 END,
           name ASC
         LIMIT 8;
-      `, tenantId, likePattern);
+      `);
 
       const vendors: SearchResultItem[] = vendorRows.map((v: any) => ({
         id: v.id,
@@ -111,15 +112,15 @@ export class SearchService {
       }));
 
       // 4. Search Tags
-      const tagRows: any = await prisma.$queryRawUnsafe(`
+      const tagRows: any = await prisma.$queryRaw(Prisma.sql`
         SELECT 
           id, name, color
         FROM tags
-        WHERE tenant_id = $1::uuid
-          AND name ILIKE $2
+        WHERE tenant_id = ${tenantId}::uuid
+          AND name ILIKE ${likePattern}
         ORDER BY name ASC
         LIMIT 8;
-      `, tenantId, likePattern);
+      `);
 
       const tags: SearchResultItem[] = tagRows.map((t: any) => ({
         id: t.id,
