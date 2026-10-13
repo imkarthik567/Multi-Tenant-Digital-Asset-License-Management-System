@@ -45,8 +45,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // If no token in memory, attempt silent refresh via httpOnly cookie
       if (!token) {
         try {
-          const refreshRes: any = await api.post('/auth/refresh');
-          token = refreshRes?.data?.accessToken || refreshRes?.accessToken;
+          const refreshRes = await api.post<{ data: { accessToken: string } }>('/auth/refresh');
+          token = refreshRes.data.accessToken;
           setAccessToken(token);
         } catch {
           // No active session in cookies
@@ -60,12 +60,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (token) {
         // Fetch current authenticated user & permissions
-        const meRes = await api.get<any>('/auth/me');
-        const payload = meRes.data || meRes;
-        const currentUser = payload.user;
+        const meRes = await api.get<{ data: any }>('/auth/me');
+        const currentUser = (meRes as any).data?.user || (meRes as any).data || meRes;
         setUser(currentUser);
-        setTenant(payload.tenant || currentUser.tenant || null);
-        setPermissions(currentUser.permissions || []);
+        setTenant((meRes as any).data?.tenant || currentUser?.tenant || null);
+        setPermissions(currentUser?.permissions || []);
       }
     } catch {
       setAccessToken(null);
@@ -93,9 +92,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [initAuth]);
 
   const login = async (email: string, password: string): Promise<User> => {
-    const res = await api.post<any>('/auth/login', { email, password });
-    const payload = res.data || res;
-    const { accessToken, user: loggedInUser, tenant: userTenant } = payload;
+    const res = await api.post<{
+      data: {
+        user: User;
+        accessToken: string;
+        tenant?: Tenant | null;
+      };
+    }>('/auth/login', { email, password });
+
+    const { accessToken, user: loggedInUser, tenant: userTenant } = res.data;
     setAccessToken(accessToken);
     setUser(loggedInUser);
     setTenant(userTenant || loggedInUser.tenant || null);
@@ -110,9 +115,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     email: string;
     password: string;
   }): Promise<User> => {
-    const res = await api.post<any>('/auth/register-tenant', payload);
-    const result = res.data || res;
-    const { accessToken, user: registeredUser, tenant: registeredTenant } = result;
+    const res = await api.post<{
+      data: {
+        user: User;
+        tenant: Tenant;
+        accessToken: string;
+      };
+    }>('/auth/register-tenant', payload);
+
+    const { accessToken, user: registeredUser, tenant: registeredTenant } = res.data;
     setAccessToken(accessToken);
     setUser(registeredUser);
     setTenant(registeredTenant);
@@ -135,11 +146,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshProfile = async () => {
     try {
-      const meRes = await api.get<any>('/auth/me');
-      const payload = meRes.data || meRes;
-      const currentUser = payload.user;
+      const meRes = await api.get<{ data: { user: User; tenant?: Tenant | null } }>('/auth/me');
+      const currentUser = meRes.data.user;
       setUser(currentUser);
-      setTenant(payload.tenant || currentUser.tenant || null);
+      setTenant(meRes.data.tenant || currentUser.tenant || null);
       setPermissions(currentUser.permissions || []);
     } catch {
       // Keep existing profile if re-fetch fails

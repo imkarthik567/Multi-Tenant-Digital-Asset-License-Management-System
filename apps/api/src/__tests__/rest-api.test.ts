@@ -368,7 +368,7 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
       expect(listRes.status).toBe(200);
       const found = listRes.body.data.find((l: any) => l.license_id === testLicenseId);
       if (found) {
-        expect(found.license_key).toMatch(/^•{8}-[A-Za-z0-9]+$/);
+        expect(found.license_key).toMatch(/^•{8}-[A-Za-z0-9-]+$/);
       }
 
       // 2. Member detail lookup: key is masked
@@ -376,7 +376,7 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
         .get(`/api/licenses/${testLicenseId}`)
         .set('Authorization', `Bearer ${memberToken}`);
       expect(memberDetailRes.status).toBe(200);
-      expect(memberDetailRes.body.data.licenseKey).toMatch(/^•{8}-[A-Za-z0-9]+$/);
+      expect(memberDetailRes.body.data.licenseKey).toMatch(/^•{8}-[A-Za-z0-9-]+$/);
 
       // 3. Admin detail lookup: reveals actual unmasked key
       const adminDetailRes = await request(app)

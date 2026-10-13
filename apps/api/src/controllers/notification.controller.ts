@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import { notificationService } from '../services/notification.service';
+import { notificationStreamService } from '../services/notificationStream.service';
 import { getPaginationParams } from '../utils/pagination.util';
 import { sendResponse } from '../utils/response.util';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -45,6 +46,16 @@ export class NotificationController {
     );
     sendResponse(res, 200, result);
   });
+
+  public streamNotifications = (req: Request, res: Response): void => {
+    const clientId = `${req.user!.id}-${Date.now()}`;
+    notificationStreamService.registerClient(
+      clientId,
+      req.user!.id,
+      req.user!.tenantId || null,
+      res
+    );
+  };
 }
 
 export const notificationController = new NotificationController();

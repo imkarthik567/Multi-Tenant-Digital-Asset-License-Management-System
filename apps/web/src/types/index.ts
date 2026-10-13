@@ -216,16 +216,11 @@ export interface AuditLog {
   tenantId?: string | null;
   userId?: string | null;
   tableName: string;
-  entityType?: string;
   recordId: string;
   action: AuditAction;
   oldData?: Record<string, any> | null;
   newData?: Record<string, any> | null;
-  oldValues?: Record<string, any> | null;
-  newValues?: Record<string, any> | null;
   performedAt: string;
-  createdAt?: string;
-  ipAddress?: string | null;
   user?: { id: string; fullName: string; email: string } | null;
 }
 

@@ -211,22 +211,28 @@ export const LicenseListPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {licenses.map((lic) => {
-            const isUnlimited = lic.licenseType?.isSeatBased === false;
-            const allocated =
-              lic.usedSeats ?? (lic.allocations ? lic.allocations.filter((a) => a.status === 'ACTIVE').length : 0);
-            const total = lic.totalSeats || 1;
+          {licenses.map((licItem) => {
+            const lic = licItem as any;
+            const licId = lic.id || lic.license_id;
+            const licName = lic.name || lic.license_name || 'Unnamed License';
+            const vendorName = lic.vendor?.name || lic.vendor_name || 'Unknown Vendor';
+            const licTypeName = lic.licenseType?.name || lic.license_type || 'Standard';
+            const isUnlimited = licTypeName === 'SITE_LICENSE' || lic.licenseType?.isSeatBased === false;
+            const allocated = Number(lic.used_seats ?? lic.usedSeats ?? (lic.allocations ? lic.allocations.filter((a: any) => a.status === 'ACTIVE').length : 0));
+            const total = Number(lic.total_seats ?? lic.totalSeats ?? 1);
             const pct = isUnlimited ? 100 : Math.min(100, Math.round((allocated / total) * 100));
+            const endDateVal = lic.endDate || lic.end_date;
+            const costVal = typeof lic.cost === 'object' && lic.cost?.d ? (lic.cost.d[0] / (lic.cost.s === 1 ? 1 : 1)) : Number(lic.cost || 0);
 
             return (
               <div
-                key={lic.id}
+                key={licId}
                 className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col justify-between shadow-sm hover:shadow-md transition"
               >
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10 px-2 py-0.5 rounded-full border border-primary-200 dark:border-primary-500/20">
-                      {lic.licenseType?.name || 'Standard'}
+                      {licTypeName}
                     </span>
                     <span
                       className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
@@ -240,9 +246,9 @@ export const LicenseListPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-start justify-between mt-3">
-                    <Link to={`/licenses/${lic.id}`} className="group">
+                    <Link to={`/licenses/${licId}`} className="group">
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary-600 transition flex items-center gap-1.5">
-                        {lic.name}
+                        {licName}
                         <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </h3>
                     </Link>
@@ -250,7 +256,7 @@ export const LicenseListPage: React.FC = () => {
 
                   <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
                     <Building className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{lic.vendor?.name || 'Unknown Vendor'}</span>
+                    <span>{vendorName}</span>
                   </div>
 
                   {/* Seat Capacity Progress */}
@@ -279,8 +285,8 @@ export const LicenseListPage: React.FC = () => {
                     <div className="flex items-center space-x-1.5 text-slate-500 dark:text-slate-400">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
                       <span>
-                        {lic.endDate
-                          ? `Expires: ${new Date(lic.endDate).toLocaleDateString()}`
+                        {endDateVal
+                          ? `Expires: ${new Date(endDateVal).toLocaleDateString()}`
                           : 'Perpetual Contract'}
                       </span>
                     </div>
@@ -288,7 +294,7 @@ export const LicenseListPage: React.FC = () => {
                     <div className="flex items-center space-x-1.5 text-slate-500 dark:text-slate-400 justify-end">
                       <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
                       <span className="font-mono text-slate-700 dark:text-slate-200">
-                        ${Number(lic.cost).toFixed(2)} {lic.currency}
+                        ${Number(costVal).toFixed(2)} {lic.currency || 'USD'}
                       </span>
                     </div>
                   </div>
@@ -302,7 +308,7 @@ export const LicenseListPage: React.FC = () => {
 
                   <div className="flex items-center space-x-2">
                     <Link
-                      to={`/licenses/${lic.id}`}
+                      to={`/licenses/${licId}`}
                       className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition"
                     >
                       Details

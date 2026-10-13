@@ -1,0 +1,30 @@
+// ==============================================================================
+// AssetVault: Global Search Controller
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// ==============================================================================
+
+import { Request, Response } from 'express';
+import { searchService } from '../services/search.service';
+import { sendResponse } from '../utils/response.util';
+import { asyncHandler } from '../utils/asyncHandler';
+
+export class SearchController {
+  public search = asyncHandler(async (req: Request, res: Response) => {
+    const q = (req.query.q as string) || '';
+    const tenantId = req.user!.tenantId || (req.query.tenantId as string);
+
+    if (!tenantId) {
+      sendResponse(res, 200, {
+        query: q,
+        results: { assets: [], licenses: [], vendors: [], tags: [] },
+        total: 0,
+      });
+      return;
+    }
+
+    const data = await searchService.searchAll(tenantId, q);
+    sendResponse(res, 200, data);
+  });
+}
+
+export const searchController = new SearchController();

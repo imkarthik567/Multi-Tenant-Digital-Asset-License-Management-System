@@ -6,12 +6,18 @@
 import app from './app';
 import { env } from './config/env';
 import { prisma } from './config/prisma';
+import { jobScheduler } from './jobs/scheduler';
 
 const startServer = async () => {
   try {
     // Verify database connectivity
     await prisma.$connect();
     console.log('✅ Connected to PostgreSQL database successfully.');
+
+    // Start background schedulers in API process during local development
+    if (env.RUN_WORKER_IN_API) {
+      jobScheduler.startScheduler();
+    }
 
     const server = app.listen(env.PORT, () => {
       console.log(`🚀 AssetVault API server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
@@ -20,6 +26,9 @@ const startServer = async () => {
 
     const shutdown = async (signal: string) => {
       console.log(`\n🛑 Received ${signal}. Gracefully shutting down AssetVault API...`);
+      if (env.RUN_WORKER_IN_API) {
+        jobScheduler.stopScheduler();
+      }
       server.close(async () => {
         await prisma.$disconnect();
         console.log('🔌 PostgreSQL disconnected. Process exited.');

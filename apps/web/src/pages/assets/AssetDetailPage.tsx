@@ -88,8 +88,8 @@ export const AssetDetailPage: React.FC = () => {
   } = useQuery<Asset>({
     queryKey: ['asset', id],
     queryFn: async () => {
-      const res: any = await api.get(`/assets/${id}`);
-      return (res.data || res) as Asset;
+      const res = await api.get<{ data: Asset }>(`/assets/${id}`);
+      return res.data;
     },
     enabled: !!id,
   });
@@ -233,12 +233,14 @@ export const AssetDetailPage: React.FC = () => {
   // Download Asset
   const handleDownload = async () => {
     try {
-      const res = await api.get<any>(`/assets/${id}/download`);
+      const res = await api.get<{ data?: { downloadUrl?: string; message?: string }; downloadUrl?: string }>(
+        `/assets/${id}/download`
+      );
       toast({ title: 'Authorized', message: 'Download authorized by license verification', type: 'success' });
       queryClient.invalidateQueries({ queryKey: ['asset', id, 'access-logs'] });
-      const downloadPayload = res?.data || res;
-      if (downloadPayload?.downloadUrl) {
-        window.open(downloadPayload.downloadUrl, '_blank');
+      const downloadUrl = res.data?.downloadUrl || (res as any).downloadUrl;
+      if (downloadUrl) {
+        window.open(downloadUrl, '_blank');
       }
     } catch (err: any) {
       toast({

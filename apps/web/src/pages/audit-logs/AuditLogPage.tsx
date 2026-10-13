@@ -2,12 +2,49 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { AuditLog } from '../../types';
-import { ScrollText, Eye, X } from 'lucide-react';
+import { ScrollText, Eye, X, Download } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 
 export const AuditLogPage: React.FC = () => {
+  const { toast } = useToast();
   const [selectedAction, setSelectedAction] = useState<string>('');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [page, setPage] = useState(1);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+
+  const handleExportCsv = async () => {
+    setIsExportingCsv(true);
+    try {
+      const response = await api.get('/audit-logs/export', {
+        params: {
+          action: selectedAction || undefined,
+        },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response as any], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `audit-logs-${selectedAction || 'all'}-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast({
+        title: 'CSV Exported',
+        message: 'Audit logs exported successfully (RFC 4180 format).',
+        type: 'success',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Export Failed',
+        message: err.message || 'Failed to export audit logs to CSV.',
+        type: 'error',
+      });
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
 
   const { data: logsData, isLoading } = useQuery<{ data: AuditLog[]; meta: any }>({
     queryKey: ['audit-logs', selectedAction, page],
@@ -44,11 +81,21 @@ export const AuditLogPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">System Compliance & Audit Trail</h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Immutable ledger of security events, administrative mutations, and seat allocations.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">System Compliance & Audit Trail</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Immutable ledger of security events, administrative mutations, and seat allocations.
+          </p>
+        </div>
+        <button
+          onClick={handleExportCsv}
+          disabled={isExportingCsv}
+          className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-200 bg-slate-800 border border-slate-700 hover:bg-slate-750 transition-colors shadow-sm disabled:opacity-50 shrink-0 self-start sm:self-auto"
+        >
+          <Download className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
+          {isExportingCsv ? 'Exporting...' : 'Export Filtered CSV'}
+        </button>
       </div>
 
       {/* Action Filter Pills */}
@@ -104,7 +151,7 @@ export const AuditLogPage: React.FC = () => {
                   <th className="px-6 py-3.5 font-semibold">Actor</th>
                   <th className="px-6 py-3.5 font-semibold">Action</th>
                   <th className="px-6 py-3.5 font-semibold">Entity Mutated</th>
-                  <th className="px-6 py-3.5 font-semibold">Client IP</th>
+                  <th className="px-6 py-3.5 font-semibold">Record ID</th>
                   <th className="px-6 py-3.5 font-semibold text-right">State Diff</th>
                 </tr>
               </thead>
@@ -112,7 +159,7 @@ export const AuditLogPage: React.FC = () => {
                 {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-800/30 transition">
                     <td className="px-6 py-3.5 text-slate-400 text-[11px]">
-                      {new Date(log.performedAt || log.createdAt || Date.now()).toLocaleString()}
+                      {new Date(log.performedAt).toLocaleString()}
                     </td>
 
                     <td className="px-6 py-3.5 font-sans font-medium text-white">
@@ -130,11 +177,11 @@ export const AuditLogPage: React.FC = () => {
                     </td>
 
                     <td className="px-6 py-3.5 text-slate-300 font-sans">
-                      <span className="font-semibold text-white">{log.entityType}</span>
+                      <span className="font-semibold text-white">{log.tableName}</span>
                     </td>
 
-                    <td className="px-6 py-3.5 text-slate-500 text-[11px]">
-                      {log.ipAddress || '127.0.0.1'}
+                    <td className="px-6 py-3.5 text-slate-500 text-[11px] font-mono">
+                      {log.recordId}
                     </td>
 
                     <td className="px-6 py-3.5 text-right font-sans">
@@ -166,11 +213,11 @@ export const AuditLogPage: React.FC = () => {
             </button>
 
             <h3 className="text-sm font-bold text-white">
-              Audit Event Payload: <span className="text-blue-400">{selectedLog.entityType}</span> [
+              Audit Event Payload: <span className="text-blue-400">{selectedLog.tableName}</span> [
               <span className="font-mono text-xs">{selectedLog.action}</span>]
             </h3>
             <p className="text-[11px] text-slate-400 mt-1">
-              Recorded at {new Date(selectedLog.performedAt || selectedLog.createdAt || Date.now()).toUTCString()}
+              Recorded at {new Date(selectedLog.performedAt).toUTCString()}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 font-mono text-[11px]">
@@ -178,8 +225,8 @@ export const AuditLogPage: React.FC = () => {
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl overflow-x-auto">
                 <span className="text-red-400 font-bold block mb-1">◀ Pre-Mutation Snapshot:</span>
                 <pre className="text-slate-400 whitespace-pre-wrap">
-                  {selectedLog.oldValues
-                    ? JSON.stringify(selectedLog.oldValues, null, 2)
+                  {selectedLog.oldData
+                    ? JSON.stringify(selectedLog.oldData, null, 2)
                     : '// NULL (Creation Event)'}
                 </pre>
               </div>
@@ -188,8 +235,8 @@ export const AuditLogPage: React.FC = () => {
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl overflow-x-auto">
                 <span className="text-emerald-400 font-bold block mb-1">▶ Post-Mutation Snapshot:</span>
                 <pre className="text-slate-300 whitespace-pre-wrap">
-                  {selectedLog.newValues
-                    ? JSON.stringify(selectedLog.newValues, null, 2)
+                  {selectedLog.newData
+                    ? JSON.stringify(selectedLog.newData, null, 2)
                     : '// NULL (Deletion Event)'}
                 </pre>
               </div>

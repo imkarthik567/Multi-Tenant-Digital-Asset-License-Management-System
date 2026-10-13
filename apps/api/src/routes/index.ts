@@ -22,6 +22,8 @@ import notificationRoutes from './notification.routes';
 import auditRoutes from './audit.routes';
 import reportRoutes from './report.routes';
 import platformRoutes from './platform.routes';
+import searchRoutes from './search.routes';
+import { tenantController } from '../controllers/tenant.controller';
 
 import { authenticate } from '../middleware/auth.middleware';
 import { loadUser } from '../middleware/loadUser.middleware';
@@ -91,5 +93,18 @@ router.use('/reports', reportRoutes);
 
 // 14. Super Admin Platform Analytics
 router.use('/platform', platformRoutes);
+
+// 15. Global Trigram Search (Assets, Licenses, Vendors, Tags)
+router.use('/search', searchRoutes);
+
+// 16. Tenant Data Lifecycle Export Archive
+router.get(
+  '/tenant/export',
+  authenticate,
+  loadUser,
+  authorize('tenants:update_own'),
+  tenantContext,
+  tenantController.exportTenantData
+);
 
 export default router;

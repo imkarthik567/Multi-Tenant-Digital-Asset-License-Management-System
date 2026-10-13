@@ -28,6 +28,20 @@ const envSchema = z.object({
   DIRECT_URL: z.string().optional(),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform((val) => parseInt(val, 10)),
   RATE_LIMIT_MAX: z.string().default('100').transform((val) => parseInt(val, 10)),
+
+  // SMTP Email Settings
+  SMTP_HOST: z.string().default('smtp.ethereal.email'),
+  SMTP_PORT: z.string().default('587').transform((val) => parseInt(val, 10)),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().default('AssetVault <notifications@assetvault.io>'),
+  SMTP_SECURE: z.string().default('false').transform((val) => val === 'true'),
+
+  // Observability & Metrics
+  METRICS_BEARER_TOKEN: z.string().default('assetvault-metrics-token-2026'),
+
+  // Background Worker Execution
+  RUN_WORKER_IN_API: z.string().default('true').transform((val) => val === 'true'),
 });
 
 const parseEnv = () => {
