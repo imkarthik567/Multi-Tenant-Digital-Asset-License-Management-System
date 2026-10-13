@@ -7,6 +7,7 @@
 import { Response } from 'express';
 import { EventEmitter } from 'events';
 import { logger } from '../config/logger';
+import { sseActiveConnectionsGauge } from '../middleware/observability.middleware';
 
 interface SSEClient {
   id: string;
@@ -53,6 +54,7 @@ class NotificationStreamService extends EventEmitter {
     res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', timestamp: new Date().toISOString() })}\n\n`);
 
     this.clients.set(clientId, { id: clientId, userId, tenantId, res });
+    sseActiveConnectionsGauge.set(this.clients.size);
     logger.info({ clientId, userId, tenantId, totalConnected: this.clients.size }, 'SSE client connected to notification stream');
 
     res.on('close', () => {
@@ -66,6 +68,7 @@ class NotificationStreamService extends EventEmitter {
   public removeClient(clientId: string): void {
     if (this.clients.has(clientId)) {
       this.clients.delete(clientId);
+      sseActiveConnectionsGauge.set(this.clients.size);
       logger.info({ clientId, remainingConnected: this.clients.size }, 'SSE client disconnected from notification stream');
     }
   }
