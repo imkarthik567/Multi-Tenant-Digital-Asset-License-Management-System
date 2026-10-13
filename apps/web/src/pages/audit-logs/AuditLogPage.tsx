@@ -2,12 +2,49 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { AuditLog } from '../../types';
-import { ScrollText, Eye, X } from 'lucide-react';
+import { ScrollText, Eye, X, Download } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 
 export const AuditLogPage: React.FC = () => {
+  const { toast } = useToast();
   const [selectedAction, setSelectedAction] = useState<string>('');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [page, setPage] = useState(1);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+
+  const handleExportCsv = async () => {
+    setIsExportingCsv(true);
+    try {
+      const response = await api.get('/audit-logs/export', {
+        params: {
+          action: selectedAction || undefined,
+        },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response as any], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `audit-logs-${selectedAction || 'all'}-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast({
+        title: 'CSV Exported',
+        message: 'Audit logs exported successfully (RFC 4180 format).',
+        type: 'success',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Export Failed',
+        message: err.message || 'Failed to export audit logs to CSV.',
+        type: 'error',
+      });
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
 
   const { data: logsData, isLoading } = useQuery<{ data: AuditLog[]; meta: any }>({
     queryKey: ['audit-logs', selectedAction, page],
@@ -44,11 +81,21 @@ export const AuditLogPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">System Compliance & Audit Trail</h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Immutable ledger of security events, administrative mutations, and seat allocations.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">System Compliance & Audit Trail</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Immutable ledger of security events, administrative mutations, and seat allocations.
+          </p>
+        </div>
+        <button
+          onClick={handleExportCsv}
+          disabled={isExportingCsv}
+          className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-200 bg-slate-800 border border-slate-700 hover:bg-slate-750 transition-colors shadow-sm disabled:opacity-50 shrink-0 self-start sm:self-auto"
+        >
+          <Download className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
+          {isExportingCsv ? 'Exporting...' : 'Export Filtered CSV'}
+        </button>
       </div>
 
       {/* Action Filter Pills */}

@@ -11,7 +11,7 @@ export class VersionRepository {
       where: { assetId },
       orderBy: { versionNo: 'desc' },
       include: {
-        createdBy: { select: { id: true, fullName: true, email: true } },
+        uploader: { select: { id: true, fullName: true, email: true } },
       },
     });
   }
@@ -26,7 +26,7 @@ export class VersionRepository {
         assetId_versionNo: { assetId, versionNo },
       },
       include: {
-        createdBy: { select: { id: true, fullName: true, email: true } },
+        uploader: { select: { id: true, fullName: true, email: true } },
       },
     });
   }
@@ -35,7 +35,7 @@ export class VersionRepository {
     return prisma.assetVersion.findUnique({
       where: { id },
       include: {
-        createdBy: { select: { id: true, fullName: true, email: true } },
+        uploader: { select: { id: true, fullName: true, email: true } },
       },
     });
   }
@@ -53,7 +53,7 @@ export class VersionRepository {
     return prisma.assetVersion.create({
       data,
       include: {
-        createdBy: { select: { id: true, fullName: true, email: true } },
+        uploader: { select: { id: true, fullName: true, email: true } },
       },
     });
   }

@@ -64,7 +64,6 @@ export class AccessController {
 
   public listLogsForAsset = asyncHandler(async (req: Request, res: Response) => {
     const assetId = (req.params.id || req.params.assetId) as string;
-    const params = getPaginationParams(req, 'created_at', ['created_at', 'action']);
     const filter = {
       assetId,
       action: req.query.action as AccessAction,
@@ -73,12 +72,24 @@ export class AccessController {
       dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
     };
 
+    if (req.query.cursor !== undefined) {
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+      const result = await accessService.listAccessLogsCursor(
+        req.prisma,
+        req.query.cursor as string,
+        limit,
+        filter
+      );
+      sendResponse(res, 200, result.data, result.meta);
+      return;
+    }
+
+    const params = getPaginationParams(req, 'created_at', ['created_at', 'action']);
     const result = await accessService.listAccessLogs(req.prisma, params, filter);
     sendResponse(res, 200, result.data, result.meta);
   });
 
   public listAllLogs = asyncHandler(async (req: Request, res: Response) => {
-    const params = getPaginationParams(req, 'created_at', ['created_at', 'action']);
     const filter = {
       assetId: req.query.assetId as string,
       action: req.query.action as AccessAction,
@@ -87,6 +98,19 @@ export class AccessController {
       dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
     };
 
+    if (req.query.cursor !== undefined) {
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+      const result = await accessService.listAccessLogsCursor(
+        req.prisma,
+        req.query.cursor as string,
+        limit,
+        filter
+      );
+      sendResponse(res, 200, result.data, result.meta);
+      return;
+    }
+
+    const params = getPaginationParams(req, 'created_at', ['created_at', 'action']);
     const result = await accessService.listAccessLogs(req.prisma, params, filter);
     sendResponse(res, 200, result.data, result.meta);
   });

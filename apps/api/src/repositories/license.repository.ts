@@ -190,7 +190,7 @@ export class LicenseRepository {
       where: { licenseId },
       orderBy: { renewedAt: 'desc' },
       include: {
-        performedBy: { select: { id: true, fullName: true, email: true } },
+        renewer: { select: { id: true, fullName: true, email: true } },
       },
     });
   }

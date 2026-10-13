@@ -9,6 +9,7 @@ import { NotFoundError, ForbiddenError } from '../errors/AppError';
 import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.util';
 import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
+import { licenseAllocationFailuresTotal } from '../middleware/observability.middleware';
 
 export class AllocationService {
   /**
@@ -21,34 +22,50 @@ export class AllocationService {
     callerUserId: string,
     callerRole: string
   ) {
-    // MEMBER role constraint: can only allocate to self
-    if (callerRole === 'MEMBER' && targetUserId !== callerUserId) {
-      throw new ForbiddenError('Standard members can only allocate license seats to themselves.');
+    try {
+      // MEMBER role constraint: can only allocate to self
+      if (callerRole === 'MEMBER' && targetUserId !== callerUserId) {
+        licenseAllocationFailuresTotal.inc({ reason: 'forbidden_member_cross_allocation' });
+        throw new ForbiddenError('Standard members can only allocate license seats to themselves.');
+      }
+
+      return await prisma.$transaction(async (tx: any) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 
+            set_config('app.current_tenant_id', ${tenantId}, true),
+            set_config('app.current_user_id', ${callerUserId}, true),
+            set_config('app.is_super_admin', 'false', true);`
+        );
+
+        const allocationId = await allocationRepository.allocateSeat(
+          tx,
+          licenseId,
+          targetUserId,
+          callerUserId
+        );
+
+        return {
+          success: true,
+          message: 'License seat allocated successfully via sp_allocate_license_seat',
+          allocationId,
+          licenseId,
+          userId: targetUserId,
+        };
+      });
+    } catch (err: any) {
+      const msg = err.message || '';
+      const reason = msg.includes('exhausted')
+        ? 'seats_exhausted'
+        : msg.includes('already holds')
+        ? 'already_allocated'
+        : msg.includes('expired')
+        ? 'license_expired'
+        : msg.includes('inactive')
+        ? 'user_inactive'
+        : 'unknown_failure';
+      licenseAllocationFailuresTotal.inc({ reason });
+      throw err;
     }
-
-    return prisma.$transaction(async (tx: any) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT 
-          set_config('app.current_tenant_id', ${tenantId}, true),
-          set_config('app.current_user_id', ${callerUserId}, true),
-          set_config('app.is_super_admin', 'false', true);`
-      );
-
-      const allocationId = await allocationRepository.allocateSeat(
-        tx,
-        licenseId,
-        targetUserId,
-        callerUserId
-      );
-
-      return {
-        success: true,
-        message: 'License seat allocated successfully via sp_allocate_license_seat',
-        allocationId,
-        licenseId,
-        userId: targetUserId,
-      };
-    });
   }
 
   /**

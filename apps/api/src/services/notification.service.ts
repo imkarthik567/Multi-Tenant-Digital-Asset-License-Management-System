@@ -7,6 +7,7 @@ import { notificationRepository } from '../repositories/notification.repository'
 import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.util';
 import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
+import { notificationStreamService } from './notificationStream.service';
 
 export class NotificationService {
   public async listUserNotifications(
@@ -35,7 +36,7 @@ export class NotificationService {
   }
 
   public async triggerExpiryCheck(tenantId: string, userId: string, lookaheadDays: number = 30) {
-    return prisma.$transaction(async (tx: any) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 
           set_config('app.current_tenant_id', ${tenantId}, true),
@@ -50,6 +51,20 @@ export class NotificationService {
         notificationsGenerated: count,
       };
     });
+
+    if (result.notificationsGenerated > 0) {
+      notificationStreamService.broadcastNotification({
+        tenantId,
+        notification: {
+          type: 'EXPIRY_CHECK_COMPLETED',
+          message: `${result.notificationsGenerated} license expiry alerts generated`,
+          count: result.notificationsGenerated,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+
+    return result;
   }
 }
 

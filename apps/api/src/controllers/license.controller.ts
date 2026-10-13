@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import { licenseService } from '../services/license.service';
+import { exportService } from '../services/export.service';
 import { getPaginationParams } from '../utils/pagination.util';
 import { sendResponse } from '../utils/response.util';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -110,6 +111,17 @@ export class LicenseController {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="licenses-export.csv"');
     res.status(200).send(csvContent);
+  });
+
+  public exportPdf = asyncHandler(async (req: Request, res: Response) => {
+    const licenseId = req.params.id as string;
+    const tenantId = req.user!.tenantId as string;
+    const doc = await exportService.generateLicensePdf(licenseId, tenantId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="license-report-${licenseId}.pdf"`);
+    doc.pipe(res);
+    doc.end();
   });
 }
 

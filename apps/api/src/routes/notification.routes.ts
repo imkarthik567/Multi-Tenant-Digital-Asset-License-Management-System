@@ -16,6 +16,9 @@ const router = Router();
 
 router.use(authenticate, loadUser, tenantContext);
 
+// Real-time Server-Sent Events stream for instant notification updates
+router.get('/stream', authorize('notifications:read'), notificationController.streamNotifications);
+
 // Read-all patch route (must precede /:id/read)
 router.patch('/read-all', authorize('notifications:read'), notificationController.markAllAsRead);
 

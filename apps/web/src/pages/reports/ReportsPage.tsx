@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   FileSpreadsheet,
   BarChart3,
@@ -15,7 +15,10 @@ import {
   Store,
   Activity,
   Award,
+  Coins,
+  UserX,
 } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 import {
   ResponsiveContainer,
   BarChart,
@@ -35,8 +38,9 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { StatusBadge } from '../../components/common/StatusBadge';
 
 export const ReportsPage: React.FC = () => {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<
-    'utilization' | 'vendor_spend' | 'monthly_spend' | 'top_assets' | 'unlicensed' | 'trends'
+    'utilization' | 'vendor_spend' | 'monthly_spend' | 'top_assets' | 'unlicensed' | 'trends' | 'cost_optimization'
   >('utilization');
 
   // 1. License Utilization View
@@ -99,6 +103,44 @@ export const ReportsPage: React.FC = () => {
     enabled: activeTab === 'trends',
   });
 
+  // 7. Cost Optimization & Dormant Seat Reclamation
+  const {
+    data: costOptData,
+    isLoading: isCostOptLoading,
+    refetch: refetchCostOpt,
+  } = useQuery({
+    queryKey: ['reports', 'unused-seats'],
+    queryFn: async () => {
+      const res = await api.get<any>('/reports/unused-seats');
+      return (res as any)?.data || res;
+    },
+    enabled: activeTab === 'cost_optimization',
+  });
+
+  // 1-Click Release Seat Mutation (uses sp_release_license_seat)
+  const releaseSeatMutation = useMutation({
+    mutationFn: async (allocationId: string) => {
+      return api.post(`/allocations/${allocationId}/release`, {
+        reason: 'Cost optimization: Dormant seat reclaimed (>30 days inactive)',
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Seat Reclaimed',
+        message: 'Successfully released license seat using sp_release_license_seat.',
+        type: 'success',
+      });
+      refetchCostOpt();
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Release Failed',
+        message: err.message || 'Failed to release seat allocation.',
+        type: 'error',
+      });
+    },
+  });
+
   // Export current table to CSV
   const handleExportCsv = (data: any[], filename: string) => {
     if (!data || data.length === 0) return;
@@ -156,7 +198,9 @@ export const ReportsPage: React.FC = () => {
                 ? topAssetsData
                 : activeTab === 'unlicensed'
                 ? unlicensedData
-                : accessTrendsData;
+                : activeTab === 'trends'
+                ? accessTrendsData
+                : costOptData?.reclaimCandidates || [];
             handleExportCsv(currentData, `assetvault-report-${activeTab}`);
           }}
           className="inline-flex items-center px-3.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors shadow-sm"
@@ -234,6 +278,17 @@ export const ReportsPage: React.FC = () => {
           >
             <Activity className="w-3.5 h-3.5 mr-1.5" />
             Access Trend (MV)
+          </button>
+          <button
+            onClick={() => setActiveTab('cost_optimization')}
+            className={`py-3 px-1 border-b-2 text-xs font-medium whitespace-nowrap transition-colors flex items-center ${
+              activeTab === 'cost_optimization'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400 font-semibold'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
+            }`}
+          >
+            <Coins className="w-3.5 h-3.5 mr-1.5" />
+            Cost Optimisation & Unused Seats
           </button>
         </nav>
       </div>
@@ -596,6 +651,191 @@ export const ReportsPage: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* 7. COST OPTIMIZATION & UNUSED SEATS TAB */}
+      {activeTab === 'cost_optimization' && (
+        <div className="space-y-6">
+          {isCostOptLoading ? (
+            <LoadingSkeleton variant="card" count={2} />
+          ) : (
+            <>
+              {/* Cost Optimization Metric Strip */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Dormant Seats (&gt;30d)
+                  </span>
+                  <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                    {costOptData?.summary?.totalUnusedSeats ?? 0}
+                  </div>
+                  <span className="text-xs text-slate-500 mt-0.5 block">Reclaim candidates</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Monthly Potential Savings
+                  </span>
+                  <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                    ${(costOptData?.summary?.potentialMonthlySavings ?? 0).toLocaleString()}
+                  </div>
+                  <span className="text-xs text-slate-500 mt-0.5 block">Recoverable runway / mo</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Annual Run-Rate Savings
+                  </span>
+                  <div className="text-2xl font-black text-primary-600 dark:text-primary-400 mt-1">
+                    ${(costOptData?.summary?.potentialAnnualSavings ?? 0).toLocaleString()}
+                  </div>
+                  <span className="text-xs text-slate-500 mt-0.5 block">Estimated annual reduction</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Avg Inactive Cost / Seat
+                  </span>
+                  <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                    ${(costOptData?.summary?.averageCostPerSeat ?? 0).toLocaleString()}
+                  </div>
+                  <span className="text-xs text-slate-500 mt-0.5 block">Per unutilized license seat</span>
+                </div>
+              </div>
+
+              {/* Table 1: Dormant Seats Reclaim Candidates */}
+              <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Seat Reclamation Candidates (&gt;30 Days Dormant)
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Allocated users who have not accessed any covered digital assets in the past 30 days. Release seats to eliminate license waste.
+                    </p>
+                  </div>
+                </div>
+
+                {!costOptData?.reclaimCandidates || costOptData.reclaimCandidates.length === 0 ? (
+                  <EmptyState
+                    title="No Inactive Seats Detected"
+                    message="All allocated license seats have logged activity within the past 30 days."
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold">
+                        <tr>
+                          <th className="py-2.5 px-3">License Name</th>
+                          <th className="py-2.5 px-3">Vendor</th>
+                          <th className="py-2.5 px-3">Seat Holder</th>
+                          <th className="py-2.5 px-3">Inactivity</th>
+                          <th className="py-2.5 px-3">Monthly Cost</th>
+                          <th className="py-2.5 px-3">Annual Savings</th>
+                          <th className="py-2.5 px-3 text-right">Optimization Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
+                        {costOptData.reclaimCandidates.map((candidate: any) => (
+                          <tr key={candidate.allocationId} className="hover:bg-slate-50 dark:hover:bg-slate-850">
+                            <td className="py-3 px-3 font-semibold text-slate-900 dark:text-white">
+                              {candidate.licenseName}
+                            </td>
+                            <td className="py-3 px-3 text-slate-500 dark:text-slate-400">
+                              {candidate.vendorName}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="font-medium text-slate-900 dark:text-slate-100">
+                                {candidate.userName}
+                              </span>
+                              <span className="block text-[11px] text-slate-400 font-mono">
+                                {candidate.userEmail}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                                {candidate.inactiveDays} days inactive
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-slate-700 dark:text-slate-300">
+                              ${candidate.monthlyCostPerSeat}/mo
+                            </td>
+                            <td className="py-3 px-3 font-bold text-emerald-600 dark:text-emerald-400">
+                              ${candidate.potentialAnnualSaving}/yr
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <button
+                                onClick={() => releaseSeatMutation.mutate(candidate.allocationId)}
+                                disabled={releaseSeatMutation.isPending}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors shadow-sm disabled:opacity-50"
+                              >
+                                <UserX className="w-3.5 h-3.5" />
+                                Release Seat
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Table 2: Top Expensive Vendors */}
+              <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Top 5 Most Expensive Vendors (PostgreSQL v_vendor_spend)
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Cumulative financial liability aggregated across contracts and average seat costs.
+                    </p>
+                  </div>
+                </div>
+
+                {!costOptData?.topExpensiveVendors || costOptData.topExpensiveVendors.length === 0 ? (
+                  <EmptyState title="No Vendor Spend" message="No vendor contracts recorded." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold">
+                        <tr>
+                          <th className="py-2.5 px-3">Vendor Name</th>
+                          <th className="py-2.5 px-3">Contact Email</th>
+                          <th className="py-2.5 px-3">Active Contracts</th>
+                          <th className="py-2.5 px-3">Grand Total Spend</th>
+                          <th className="py-2.5 px-3">Avg Cost / Seat</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
+                        {costOptData.topExpensiveVendors.map((vendor: any) => (
+                          <tr key={vendor.vendorId} className="hover:bg-slate-50 dark:hover:bg-slate-850">
+                            <td className="py-3 px-3 font-bold text-slate-900 dark:text-white">
+                              {vendor.vendorName}
+                            </td>
+                            <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-mono">
+                              {vendor.contactEmail || 'N/A'}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="font-semibold">{vendor.licenseCount}</span> licenses
+                            </td>
+                            <td className="py-3 px-3 font-bold text-emerald-600 dark:text-emerald-400">
+                              ${(vendor.grandTotalSpend || 0).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-slate-700 dark:text-slate-300">
+                              ${(vendor.avgCostPerSeat || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -36,6 +36,9 @@ router.post('/', authorize('licenses:create'), validate(createLicenseSchema), li
 // 4. Get single license (masks key unless TENANT_ADMIN or ASSET_MANAGER)
 router.get('/:id', authorize('licenses:read'), licenseController.getLicenseById);
 
+// 4b. Export license report to PDF
+router.get('/:id/pdf', authorize('licenses:read'), licenseController.exportPdf);
+
 // 5. Update license
 router.patch('/:id', authorize('licenses:update'), validate(updateLicenseSchema), licenseController.updateLicense);
 

@@ -211,13 +211,14 @@ export const LicenseListPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {licenses.map((lic) => {
+          {licenses.map((licItem) => {
+            const lic = licItem as any;
             const licId = lic.id || lic.license_id;
             const licName = lic.name || lic.license_name || 'Unnamed License';
             const vendorName = lic.vendor?.name || lic.vendor_name || 'Unknown Vendor';
             const licTypeName = lic.licenseType?.name || lic.license_type || 'Standard';
             const isUnlimited = licTypeName === 'SITE_LICENSE' || lic.licenseType?.isSeatBased === false;
-            const allocated = Number(lic.used_seats ?? lic.usedSeats ?? (lic.allocations ? lic.allocations.filter((a) => a.status === 'ACTIVE').length : 0));
+            const allocated = Number(lic.used_seats ?? lic.usedSeats ?? (lic.allocations ? lic.allocations.filter((a: any) => a.status === 'ACTIVE').length : 0));
             const total = Number(lic.total_seats ?? lic.totalSeats ?? 1);
             const pct = isUnlimited ? 100 : Math.min(100, Math.round((allocated / total) * 100));
             const endDateVal = lic.endDate || lic.end_date;

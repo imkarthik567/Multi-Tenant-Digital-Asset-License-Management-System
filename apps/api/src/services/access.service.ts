@@ -173,6 +173,53 @@ export class AccessService {
     const { data, total } = await accessRepository.findAccessLogs(prismaClient, params, filter);
     return formatPaginatedResponse(data, total, params);
   }
+
+  public async listAccessLogsCursor(
+    prismaClient: any,
+    cursor?: string,
+    limit: number = 20,
+    filter: AccessLogFilterOptions = {}
+  ) {
+    const take = Math.min(100, Math.max(1, limit));
+    const where: any = {};
+    if (filter.assetId) where.assetId = filter.assetId;
+    if (filter.userId) where.userId = filter.userId;
+    if (filter.action) where.action = filter.action;
+    if (filter.dateFrom || filter.dateTo) {
+      where.accessedAt = {};
+      if (filter.dateFrom) where.accessedAt.gte = filter.dateFrom;
+      if (filter.dateTo) where.accessedAt.lte = filter.dateTo;
+    }
+
+    const queryOptions: any = {
+      where,
+      take: take + 1,
+      orderBy: { id: 'desc' },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        asset: { select: { id: true, name: true, assetCode: true } },
+      },
+    };
+
+    if (cursor) {
+      queryOptions.cursor = { id: BigInt(cursor) };
+      queryOptions.skip = 1;
+    }
+
+    const items = await prismaClient.assetAccessLog.findMany(queryOptions);
+    const hasMore = items.length > take;
+    const data = hasMore ? items.slice(0, take) : items;
+    const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id.toString() : null;
+
+    return {
+      data,
+      meta: {
+        limit: take,
+        hasMore,
+        nextCursor,
+      },
+    };
+  }
 }
 
 export const accessService = new AccessService();

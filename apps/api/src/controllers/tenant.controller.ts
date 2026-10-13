@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import { tenantService } from '../services/tenant.service';
+import { tenantExportService } from '../services/tenantExport.service';
 import { getPaginationParams } from '../utils/pagination.util';
 import { sendResponse } from '../utils/response.util';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -51,6 +52,16 @@ export class TenantController {
   public deleteTenant = asyncHandler(async (req: Request, res: Response) => {
     await tenantService.deleteTenant(req.params.id as string, req.user?.id);
     sendResponse(res, 200, { message: 'Tenant organization removed successfully' });
+  });
+
+  public exportTenantData = asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user!.tenantId || (req.params.id as string);
+    const data = await tenantExportService.exportTenantData(tenantId);
+    const filename = `tenant-archive-${data.tenant.slug}-${new Date().toISOString().split('T')[0]}.json`;
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(JSON.stringify(data, null, 2));
   });
 }
 

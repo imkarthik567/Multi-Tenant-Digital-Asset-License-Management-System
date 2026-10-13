@@ -60,11 +60,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (token) {
         // Fetch current authenticated user & permissions
-        const meRes = await api.get<{ data: { user: User; tenant?: Tenant | null } }>('/auth/me');
-        const currentUser = meRes.data.user;
+        const meRes = await api.get<{ data: any }>('/auth/me');
+        const currentUser = (meRes as any).data?.user || (meRes as any).data || meRes;
         setUser(currentUser);
-        setTenant(meRes.data.tenant || currentUser.tenant || null);
-        setPermissions(currentUser.permissions || []);
+        setTenant((meRes as any).data?.tenant || currentUser?.tenant || null);
+        setPermissions(currentUser?.permissions || []);
       }
     } catch {
       setAccessToken(null);

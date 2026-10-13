@@ -5,6 +5,8 @@
 
 import { Request, Response } from 'express';
 import { reportService } from '../services/report.service';
+import { complianceService } from '../services/compliance.service';
+import { costOptimizationService } from '../services/costOptimization.service';
 import { sendResponse } from '../utils/response.util';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -51,6 +53,18 @@ export class ReportController {
 
   public getPlatformOverview = asyncHandler(async (req: Request, res: Response) => {
     const data = await reportService.getPlatformOverview(req.prisma);
+    sendResponse(res, 200, data);
+  });
+
+  public getComplianceReport = asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user!.tenantId || req.query.tenantId as string;
+    const data = await complianceService.getTenantCompliance(tenantId);
+    sendResponse(res, 200, data);
+  });
+
+  public getUnusedSeatsReport = asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user!.tenantId || req.query.tenantId as string;
+    const data = await costOptimizationService.getUnusedSeatsReport(tenantId);
     sendResponse(res, 200, data);
   });
 }

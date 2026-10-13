@@ -38,4 +38,10 @@ router.get('/unlicensed-assets', authorize('assets:read'), reportController.getU
 // 8. Monthly Access Trend (Materialized View)
 router.get('/access-trend', authorize('assets:read'), reportController.getAccessTrend);
 
+// 9. Compliance Engine (Score 0-100 & Drill-down remediation)
+router.get('/compliance', authorize('tenants:read_own'), reportController.getComplianceReport);
+
+// 10. Cost Optimization (Dormant Seats & Vendor Spend)
+router.get('/unused-seats', authorize('allocations:manage_all'), reportController.getUnusedSeatsReport);
+
 export default router;

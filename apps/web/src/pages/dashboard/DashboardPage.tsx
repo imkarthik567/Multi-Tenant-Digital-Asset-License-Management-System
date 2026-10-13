@@ -4,13 +4,14 @@
 // Visualizes Recharts KPIs, PostgreSQL view metrics, and platform governance
 // ==============================================================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { StatCard } from '../../components/common/StatCard';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { CardSkeleton } from '../../components/common/LoadingSkeleton';
+import { Modal } from '../../components/common/Modal';
 import {
   FolderLock,
   KeyRound,
@@ -22,6 +23,10 @@ import {
   Shield,
   Layers,
   ArrowRight,
+  ShieldCheck,
+  Wrench,
+  CheckCircle2,
+  ChevronRight,
 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import {
@@ -43,6 +48,7 @@ import {
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.isSuperAdmin;
+  const [isRemediationModalOpen, setIsRemediationModalOpen] = useState(false);
 
   if (user?.role === 'MEMBER') {
     return <Navigate to="/my-licenses" replace />;
@@ -69,7 +75,7 @@ export const DashboardPage: React.FC = () => {
       }>('/reports/dashboard');
       return res.data;
     },
-    enabled: !isSuperAdmin && user?.role !== 'MEMBER',
+    enabled: !isSuperAdmin,
   });
 
   // 2. Fetch License Utilization for Bar Chart
@@ -79,7 +85,7 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<{ data: any[] }>('/reports/license-utilization');
       return res.data;
     },
-    enabled: !isSuperAdmin && user?.role !== 'MEMBER',
+    enabled: !isSuperAdmin,
   });
 
   // 3. Fetch Monthly Spend for Line Chart
@@ -89,7 +95,7 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<{ data: any[] }>('/reports/spend-by-month');
       return res.data;
     },
-    enabled: !isSuperAdmin && user?.role !== 'MEMBER',
+    enabled: !isSuperAdmin,
   });
 
   // 4. Fetch Expiring Soon Licenses
@@ -99,10 +105,20 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<{ data: any[] }>('/reports/expiring-licenses');
       return res.data;
     },
-    enabled: !isSuperAdmin && user?.role !== 'MEMBER',
+    enabled: !isSuperAdmin,
   });
 
-  // 5. Super Admin Platform Overview Data
+  // 5. Fetch Compliance Engine Report
+  const { data: complianceReport } = useQuery({
+    queryKey: ['reports', 'compliance'],
+    queryFn: async () => {
+      const res = await api.get<{ data: any }>('/reports/compliance');
+      return (res as any)?.data || res;
+    },
+    enabled: !isSuperAdmin,
+  });
+
+  // 6. Super Admin Platform Overview Data
   const { data: platformData, isLoading: isPlatformLoading } = useQuery({
     queryKey: ['platform', 'overview'],
     queryFn: async () => {
@@ -340,6 +356,159 @@ export const DashboardPage: React.FC = () => {
         />
       </div>
 
+      {/* Compliance Engine Health Gauge & Remediation */}
+      {complianceReport && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            {/* Left: Gauge + Score + Status */}
+            <div className="flex items-center gap-5">
+              {/* Circular Gauge */}
+              <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
+                {(() => {
+                  const score = Number(complianceReport.score ?? 100);
+                  const grade = complianceReport.grade ?? 'A';
+                  const radius = 38;
+                  const circumference = 2 * Math.PI * radius;
+                  const strokeDashoffset = circumference - (score / 100) * circumference;
+                  const strokeColor =
+                    score >= 90
+                      ? '#10b981'
+                      : score >= 75
+                      ? '#3b82f6'
+                      : score >= 60
+                      ? '#f59e0b'
+                      : '#ef4444';
+                  const gradeBadgeColor =
+                    score >= 90
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                      : score >= 75
+                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                      : score >= 60
+                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                      : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border-rose-200 dark:border-rose-800';
+
+                  return (
+                    <>
+                      <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96">
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r={radius}
+                          className="text-slate-100 dark:text-slate-800"
+                          strokeWidth="8"
+                          stroke="currentColor"
+                          fill="transparent"
+                        />
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r={radius}
+                          stroke={strokeColor}
+                          strokeWidth="8"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={strokeDashoffset}
+                          strokeLinecap="round"
+                          fill="transparent"
+                          className="transition-all duration-1000 ease-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-xl font-black text-slate-900 dark:text-white leading-none">
+                          {score}%
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border mt-1 leading-none ${gradeBadgeColor}`}
+                        >
+                          Grade {grade}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-primary-500" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Compliance & Governance Engine
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md">
+                  {complianceReport.summary ||
+                    'Evaluates asset license coverage, seat allocations, expiration risk, and isolation.'}
+                </p>
+                <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>
+                    Assets:{' '}
+                    <strong className="text-slate-700 dark:text-slate-200">
+                      {complianceReport.stats?.compliantAssets ?? 0} / {complianceReport.stats?.totalAssets ?? 0}
+                    </strong>{' '}
+                    compliant
+                  </span>
+                  <span>&bull;</span>
+                  <span>
+                    Exhausted Seats:{' '}
+                    <strong className="text-slate-700 dark:text-slate-200">
+                      {complianceReport.stats?.exhaustedLicenses ?? 0}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle: Breakdown Factors Mini-Bars */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 max-w-xl w-full">
+              {(complianceReport.factors || []).map((factor: any) => (
+                <div
+                  key={factor.name}
+                  className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800"
+                >
+                  <div className="flex items-center justify-between text-[11px] mb-1">
+                    <span className="font-medium text-slate-700 dark:text-slate-300 truncate" title={factor.name}>
+                      {factor.name}
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-slate-100 ml-1">
+                      {factor.earned}/{factor.weight}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        factor.status === 'OPTIMAL'
+                          ? 'bg-emerald-500'
+                          : factor.status === 'WARNING'
+                          ? 'bg-amber-500'
+                          : 'bg-rose-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (factor.earned / factor.weight) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-1 truncate">
+                    {factor.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Right: Remediation Drill-down Trigger */}
+            <div className="shrink-0 self-end lg:self-center">
+              <button
+                onClick={() => setIsRemediationModalOpen(true)}
+                className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl shadow-sm transition-colors ${
+                  (complianceReport.remediationItems || []).length > 0
+                    ? 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-600/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                }`}
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                Remediate Issues ({complianceReport.remediationItems?.length || 0})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Visual Analytics Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart 1: License Utilization Bar Chart */}
@@ -537,6 +706,73 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Compliance Remediation Drill-Down Modal */}
+      <Modal
+        isOpen={isRemediationModalOpen}
+        onClose={() => setIsRemediationModalOpen(false)}
+        title="Compliance Remediation Action Plan"
+        description="Review and resolve identified non-compliance items, expired attachments, and license shortages."
+        maxWidth="2xl"
+      >
+        <div className="space-y-3">
+          {!complianceReport?.remediationItems || complianceReport.remediationItems.length === 0 ? (
+            <div className="py-8 text-center">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                100% Compliant — No Actions Needed
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                All digital assets are linked to active, unexpired licenses and seat allocations are within limits.
+              </p>
+            </div>
+          ) : (
+            complianceReport.remediationItems.map((item: any) => {
+              const priorityColor =
+                item.priority === 'CRITICAL'
+                  ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                  : item.priority === 'HIGH'
+                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                  : item.priority === 'MEDIUM'
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                  : 'bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+
+              return (
+                <div
+                  key={item.id}
+                  className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${priorityColor}`}>
+                        {item.priority}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                        {item.title}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {item.description}
+                    </p>
+                    <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 block">
+                      Target: {item.entityName}
+                    </span>
+                  </div>
+
+                  <Link
+                    to={item.actionUrl}
+                    onClick={() => setIsRemediationModalOpen(false)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary-600 hover:bg-primary-700 text-white shrink-0 self-start sm:self-center transition-colors shadow-sm"
+                  >
+                    Fix Issue
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };
