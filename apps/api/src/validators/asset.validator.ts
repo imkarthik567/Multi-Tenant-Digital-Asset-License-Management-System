@@ -5,23 +5,48 @@
 // ==============================================================================
 
 import { z } from 'zod';
-import { AssetType } from '@prisma/client';
+import { AssetType, AssetStatus } from '@prisma/client';
 
 export const createAssetSchema = z
   .object({
     name: z.string().min(2).max(200).trim(),
     assetCode: z.string().min(2).max(50).trim(),
     assetType: z.nativeEnum(AssetType),
-    description: z.string().max(1000).optional(),
-    categoryId: z.string().uuid().optional(),
+    description: z.string().max(1000).optional().nullable(),
+    categoryId: z.string().uuid().optional().nullable(),
   })
   .strip();
 
-export const searchAssetSchema = z
+export const updateAssetSchema = z
   .object({
-    query: z.string().optional(),
-    type: z.nativeEnum(AssetType).optional(),
+    name: z.string().min(2).max(200).trim().optional(),
+    assetType: z.nativeEnum(AssetType).optional(),
+    description: z.string().max(1000).optional().nullable(),
+    categoryId: z.string().uuid().optional().nullable(),
+    status: z.nativeEnum(AssetStatus).optional(),
   })
   .strip();
 
-export type CreateAssetInput = z.infer<typeof createAssetSchema>;
+export const attachTagsSchema = z
+  .object({
+    tagIds: z.array(z.string().uuid()).min(1, 'Must provide at least one tag ID'),
+  })
+  .strip();
+
+export const queryAssetSchema = z
+  .object({
+    page: z.string().optional(),
+    limit: z.string().optional(),
+    q: z.string().optional(),
+    sort: z.string().optional(),
+    order: z.enum(['asc', 'desc']).optional(),
+    categoryId: z.string().uuid().optional(),
+    assetType: z.nativeEnum(AssetType).optional(),
+    status: z.nativeEnum(AssetStatus).optional(),
+    tag: z.string().optional(),
+    ownerId: z.string().uuid().optional(),
+    complianceStatus: z.enum(['COMPLIANT', 'EXPIRED_LICENSE', 'UNLICENSED']).optional(),
+    createdFrom: z.string().datetime().optional(),
+    createdTo: z.string().datetime().optional(),
+  })
+  .strip();

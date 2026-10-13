@@ -1,0 +1,118 @@
+// ==============================================================================
+// AssetVault: License Allocation Service
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Enforces self-allocation boundaries for MEMBER roles and executes sp_allocate/release
+// ==============================================================================
+
+import { allocationRepository } from '../repositories/allocation.repository';
+import { NotFoundError, ForbiddenError } from '../errors/AppError';
+import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.util';
+import { prisma } from '../config/prisma';
+import { Prisma } from '@prisma/client';
+
+export class AllocationService {
+  /**
+   * Allocates a seat via stored procedure sp_allocate_license_seat
+   */
+  public async allocateSeat(
+    tenantId: string,
+    licenseId: string,
+    targetUserId: string,
+    callerUserId: string,
+    callerRole: string
+  ) {
+    // MEMBER role constraint: can only allocate to self
+    if (callerRole === 'MEMBER' && targetUserId !== callerUserId) {
+      throw new ForbiddenError('Standard members can only allocate license seats to themselves.');
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${callerUserId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+
+      const allocationId = await allocationRepository.allocateSeat(
+        tx,
+        licenseId,
+        targetUserId,
+        callerUserId
+      );
+
+      return {
+        success: true,
+        message: 'License seat allocated successfully via sp_allocate_license_seat',
+        allocationId,
+        licenseId,
+        userId: targetUserId,
+      };
+    });
+  }
+
+  /**
+   * Releases an allocated seat via stored procedure sp_release_license_seat
+   */
+  public async releaseSeat(
+    tenantId: string,
+    allocationId: string,
+    callerUserId: string,
+    callerRole: string,
+    reason?: string
+  ) {
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${callerUserId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+
+      const allocation = await allocationRepository.findById(tx, allocationId);
+      if (!allocation) {
+        throw new NotFoundError('License allocation not found');
+      }
+
+      // MEMBER role constraint: can only release self allocation
+      if (callerRole === 'MEMBER' && allocation.userId !== callerUserId) {
+        throw new ForbiddenError('Standard members can only release their own seat allocations.');
+      }
+
+      await allocationRepository.releaseSeat(
+        tx,
+        allocationId,
+        callerUserId,
+        reason || 'User seat release'
+      );
+
+      return {
+        success: true,
+        message: 'License seat released successfully via sp_release_license_seat',
+        allocationId,
+      };
+    });
+  }
+
+  public async listAllocationsByLicense(prismaClient: any, licenseId: string, params: PaginationParams) {
+    const { data, total } = await allocationRepository.findByLicense(prismaClient, licenseId, params);
+    return formatPaginatedResponse(data, total, params);
+  }
+
+  public async listAllocationsByUser(
+    prismaClient: any,
+    userId: string,
+    params: PaginationParams,
+    callerUserId: string,
+    callerRole: string
+  ) {
+    if (callerRole === 'MEMBER' && userId !== callerUserId) {
+      throw new ForbiddenError('Standard members cannot view allocations of other users.');
+    }
+
+    const { data, total } = await allocationRepository.findByUser(prismaClient, userId, params);
+    return formatPaginatedResponse(data, total, params);
+  }
+}
+
+export const allocationService = new AllocationService();

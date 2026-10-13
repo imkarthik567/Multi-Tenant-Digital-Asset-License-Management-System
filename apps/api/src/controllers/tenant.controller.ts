@@ -1,30 +1,57 @@
 // ==============================================================================
-// AssetVault: Tenant Governance Controller (Super Admin Platform Level)
+// AssetVault: Tenant HTTP Controller
 // Course: BCSE307L Database Systems (Fall 2026-27)
 // ==============================================================================
 
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
+import { tenantService } from '../services/tenant.service';
+import { getPaginationParams } from '../utils/pagination.util';
+import { sendResponse } from '../utils/response.util';
+import { asyncHandler } from '../utils/asyncHandler';
+import { TenantStatus } from '@prisma/client';
 
 export class TenantController {
-  public async listTenants(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const tenants = await req.prisma.tenant.findMany({
-        include: {
-          plan: { select: { id: true, name: true, maxUsers: true, maxAssets: true, monthlyPrice: true } },
-          _count: { select: { users: true, assets: true, licenses: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+  public listTenants = asyncHandler(async (req: Request, res: Response) => {
+    const params = getPaginationParams(req, 'createdAt', ['createdAt', 'name', 'slug', 'status']);
+    const status = req.query.status as TenantStatus;
+    const planId = req.query.planId ? parseInt(req.query.planId as string, 10) : undefined;
 
-      res.status(200).json({
-        status: 'success',
-        results: tenants.length,
-        data: tenants,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+    const result = await tenantService.listTenants(req.prisma, params, { status, planId });
+    sendResponse(res, 200, result.data, result.meta);
+  });
+
+  public getTenantById = asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.params.id === 'current' ? req.user?.tenantId : req.params.id;
+    const tenant = await tenantService.getTenantById(req.prisma, tenantId!);
+    sendResponse(res, 200, tenant);
+  });
+
+  public createTenant = asyncHandler(async (req: Request, res: Response) => {
+    const tenant = await tenantService.createTenant(req.prisma, req.body, req.user?.id);
+    sendResponse(res, 201, tenant);
+  });
+
+  public updateTenant = asyncHandler(async (req: Request, res: Response) => {
+    const tenant = await tenantService.updateTenant(req.prisma, req.params.id as string, req.body);
+    sendResponse(res, 200, tenant);
+  });
+
+  public updateStatus = asyncHandler(async (req: Request, res: Response) => {
+    const { status } = req.body;
+    const tenant = await tenantService.suspendOrActivateTenant(req.params.id as string, status, req.user?.id);
+    sendResponse(res, 200, tenant);
+  });
+
+  public changePlan = asyncHandler(async (req: Request, res: Response) => {
+    const { planId } = req.body;
+    const tenant = await tenantService.changePlan(req.prisma, req.params.id as string, planId);
+    sendResponse(res, 200, tenant);
+  });
+
+  public deleteTenant = asyncHandler(async (req: Request, res: Response) => {
+    await tenantService.deleteTenant(req.params.id as string, req.user?.id);
+    sendResponse(res, 200, { message: 'Tenant organization removed successfully' });
+  });
 }
 
 export const tenantController = new TenantController();

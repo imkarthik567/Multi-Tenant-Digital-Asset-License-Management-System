@@ -49,6 +49,8 @@ declare global {
       };
       tenant?: TenantContext;
       prisma?: any;
+      file?: any;
+      files?: any;
     }
   }
 }

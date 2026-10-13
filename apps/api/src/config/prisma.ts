@@ -78,7 +78,12 @@ export function prismaForRequest(ctx: RequestContext) {
           if (tenantId && !ctx.isSuperAdmin && TENANT_TOP_LEVEL_MODELS.includes(lowerModel)) {
             const mutableArgs = args as any;
             if (operation === 'create') {
-              mutableArgs.data = { ...(mutableArgs.data || {}), tenantId };
+              if (mutableArgs.data && !mutableArgs.data.tenant) {
+                mutableArgs.data.tenant = { connect: { id: tenantId } };
+              }
+              if (mutableArgs.data && 'tenantId' in mutableArgs.data) {
+                delete mutableArgs.data.tenantId;
+              }
             } else if (
               ['findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy'].includes(
                 operation

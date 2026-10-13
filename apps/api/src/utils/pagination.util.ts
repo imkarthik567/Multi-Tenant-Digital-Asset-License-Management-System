@@ -1,3 +1,9 @@
+// ==============================================================================
+// AssetVault: Reusable Pagination & Query Helper
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Enforces standard response shape: { data: [...], meta: { page, limit, total, totalPages, hasNext, hasPrev } }
+// ==============================================================================
+
 import { Request } from 'express';
 
 export interface PaginationParams {
@@ -18,13 +24,31 @@ export interface PaginationMeta {
   hasPrev: boolean;
 }
 
-export const getPaginationParams = (req: Request, defaultSort = 'createdAt'): PaginationParams => {
-  const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 10));
+export interface PaginatedResult<T> {
+  data: T[];
+  meta: PaginationMeta;
+}
+
+export const getPaginationParams = (
+  req: Request,
+  defaultSort = 'createdAt',
+  allowedSortFields: string[] = ['createdAt', 'updatedAt', 'name', 'id']
+): PaginationParams => {
+  const rawPage = parseInt(req.query.page as string, 10);
+  const rawLimit = parseInt(req.query.limit as string, 10);
+
+  const page = !isNaN(rawPage) && rawPage > 0 ? rawPage : 1;
+  const limit = !isNaN(rawLimit) && rawLimit > 0 ? Math.min(100, rawLimit) : 10;
   const skip = (page - 1) * limit;
-  const q = typeof req.query.q === 'string' && req.query.q.trim().length > 0 ? req.query.q.trim() : undefined;
-  const sort = typeof req.query.sort === 'string' ? req.query.sort : defaultSort;
-  const order = req.query.order === 'asc' ? 'asc' : 'desc';
+
+  const rawQ = req.query.q as string;
+  const q = typeof rawQ === 'string' && rawQ.trim().length > 0 ? rawQ.trim() : undefined;
+
+  const rawSort = req.query.sort as string;
+  const sort = allowedSortFields.includes(rawSort) ? rawSort : defaultSort;
+
+  const rawOrder = (req.query.order as string)?.toLowerCase();
+  const order = rawOrder === 'asc' ? 'asc' : 'desc';
 
   return {
     page,
@@ -36,8 +60,12 @@ export const getPaginationParams = (req: Request, defaultSort = 'createdAt'): Pa
   };
 };
 
-export const createPaginationMeta = (total: number, page: number, limit: number): PaginationMeta => {
-  const totalPages = Math.ceil(total / limit) || 1;
+export const createPaginationMeta = (
+  total: number,
+  page: number,
+  limit: number
+): PaginationMeta => {
+  const totalPages = Math.max(1, Math.ceil(total / limit));
   return {
     page,
     limit,
@@ -45,5 +73,16 @@ export const createPaginationMeta = (total: number, page: number, limit: number)
     totalPages,
     hasNext: page < totalPages,
     hasPrev: page > 1,
+  };
+};
+
+export const formatPaginatedResponse = <T>(
+  data: T[],
+  total: number,
+  params: { page: number; limit: number }
+): PaginatedResult<T> => {
+  return {
+    data,
+    meta: createPaginationMeta(total, params.page, params.limit),
   };
 };
