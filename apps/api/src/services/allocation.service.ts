@@ -113,6 +113,13 @@ export class AllocationService {
     const { data, total } = await allocationRepository.findByUser(prismaClient, userId, params);
     return formatPaginatedResponse(data, total, params);
   }
+
+  public async listAllocations(prismaClient: any, tenantId: string, params: PaginationParams) {
+    const { data, total } = await allocationRepository.findAll(prismaClient, tenantId, params);
+    return formatPaginatedResponse(data, total, params);
+  }
 }
 
 export const allocationService = new AllocationService();
+
+

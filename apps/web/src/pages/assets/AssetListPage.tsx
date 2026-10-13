@@ -1,503 +1,703 @@
+// ==============================================================================
+// AssetVault: Digital Asset Catalog & Lifecycle Management
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Grid/Table toggle, soft-delete with undo, CSV bulk import with preview, CSV export
+// ==============================================================================
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
-import { Asset, Category, Tag } from '../../types';
-import { useAuth } from '../../context/AuthContext';
+import { Asset, Category, AssetType } from '../../types';
+import { useToast } from '../../context/ToastContext';
+import { DataTable, Column } from '../../components/common/DataTable';
+import { SearchInput } from '../../components/common/SearchInput';
+import { FilterBar } from '../../components/common/FilterBar';
+import { StatusBadge } from '../../components/common/StatusBadge';
+import { Modal } from '../../components/common/Modal';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { FormField } from '../../components/common/FormField';
+import { TagInput } from '../../components/common/TagInput';
+import { RoleGate } from '../../components/auth/RoleGate';
 import {
-  FolderArchive,
-  Search,
   Plus,
-  Download,
-  Eye,
+  Upload,
+  LayoutGrid,
+  List as ListIcon,
   Trash2,
-  X,
-  CheckCircle,
+  RotateCcw,
+  FileSpreadsheet,
+  ExternalLink,
+  FileCode,
+  Image,
+  Video,
+  FileText,
+  Binary,
+  Layers,
 } from 'lucide-react';
 
 export const AssetListPage: React.FC = () => {
-  const { user } = useAuth();
+  const toast = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [search, setSearch] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [page, setPage] = useState(1);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  // URL state synchronization
+  const q = searchParams.get('q') || '';
+  const assetType = searchParams.get('assetType') || '';
+  const status = searchParams.get('status') || 'ACTIVE';
+  const categoryId = searchParams.get('categoryId') || '';
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const limit = parseInt(searchParams.get('limit') || '10', 10);
+  const sort = searchParams.get('sort') || 'name';
+  const order = (searchParams.get('order') || 'asc') as 'asc' | 'desc';
+
+  // UI Local States
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [accessNotice, setAccessNotice] = useState<string | null>(null);
+  const [showCsvModal, setShowCsvModal] = useState(false);
+  const [deleteAssetTarget, setDeleteAssetTarget] = useState<any | null>(null);
 
-  // Form states for creation
+  // Asset creation form state
   const [createForm, setCreateForm] = useState({
     name: '',
+    assetCode: '',
+    assetType: 'SOFTWARE' as AssetType,
     categoryId: '',
-    assetType: 'software',
     description: '',
     fileUrl: '',
     fileSizeBytes: 1048576,
-    version: '1.0.0',
-    tagIds: [] as string[],
-    licenseIds: [] as string[],
+    versionNo: 1,
+    checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    tags: [] as string[],
   });
 
-  const { data: assetsData, isLoading } = useQuery<{ data: Asset[]; meta: any }>({
-    queryKey: ['assets', search, selectedType, selectedCategory, page],
-    queryFn: () =>
-      api.get('/assets', {
-        params: {
-          q: search,
-          assetType: selectedType || undefined,
-          categoryId: selectedCategory || undefined,
-          page,
-          limit: 12,
-        },
-      }),
-  });
+  // CSV Import States
+  const [csvContent, setCsvContent] = useState('');
+  const [csvPreviewRows, setCsvPreviewRows] = useState<any[]>([]);
 
-  const { data: categoriesData } = useQuery<{ data: Category[] }>({
-    queryKey: ['categories'],
-    queryFn: () => api.get('/categories'),
-  });
+  // Update query string helper
+  const updateParams = (updates: Record<string, string | number | undefined>) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, val]) => {
+      if (val === undefined || val === '') {
+        next.delete(key);
+      } else {
+        next.set(key, String(val));
+      }
+    });
+    setSearchParams(next);
+  };
 
-  const { data: tagsData } = useQuery<{ data: Tag[] }>({
-    queryKey: ['tags'],
-    queryFn: () => api.get('/tags'),
-  });
-
-  const canManage = user?.role === 'tenant_admin' || user?.role === 'asset_manager' || user?.isSuperAdmin;
-
-  // Log Access mutation
-  const logAccessMutation = useMutation({
-    mutationFn: ({ assetId, action }: { assetId: string; action: string }) =>
-      api.post(`/assets/${assetId}/access`, { action }),
-    onSuccess: (_, vars) => {
-      setAccessNotice(`Action recorded: ${vars.action.toUpperCase()} logged in access history.`);
-      setTimeout(() => setAccessNotice(null), 4000);
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
-    },
-  });
-
-  // Create Asset mutation
-  const createAssetMutation = useMutation({
-    mutationFn: (newAsset: any) => api.post('/assets', newAsset),
-    onSuccess: () => {
-      setShowCreateModal(false);
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
-      setCreateForm({
-        name: '',
-        categoryId: '',
-        assetType: 'software',
-        description: '',
-        fileUrl: '',
-        fileSizeBytes: 1048576,
-        version: '1.0.0',
-        tagIds: [],
-        licenseIds: [],
+  // 1. Fetch Assets Query
+  const { data: assetsResponse, isLoading } = useQuery({
+    queryKey: ['assets', q, assetType, status, categoryId, page, limit, sort, order],
+    queryFn: async () => {
+      return api.get<{ data: Asset[]; meta: any }>('/assets', {
+        q: q || undefined,
+        assetType: assetType || undefined,
+        status: status || undefined,
+        categoryId: categoryId || undefined,
+        page,
+        limit,
+        sort,
+        order,
       });
     },
   });
 
-  // Soft delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: (assetId: string) => api.delete(`/assets/${assetId}`),
+  // 2. Fetch Categories for Filter Dropdown
+  const { data: categoriesResponse } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.get<{ data: Category[] }>('/categories', { limit: 100 }),
+  });
+
+  // Create Asset Mutation
+  const createAssetMutation = useMutation({
+    mutationFn: (payload: any) => api.post('/assets', payload),
     onSuccess: () => {
-      setSelectedAsset(null);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
+      setShowCreateModal(false);
+      toast.success('Asset successfully created in repository');
+      setCreateForm({
+        name: '',
+        assetCode: '',
+        assetType: 'SOFTWARE',
+        categoryId: '',
+        description: '',
+        fileUrl: '',
+        fileSizeBytes: 1048576,
+        versionNo: 1,
+        checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        tags: [],
+      });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to create asset');
     },
   });
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createAssetMutation.mutate(createForm);
+  // Soft Delete Mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/assets/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      setDeleteAssetTarget(null);
+      toast.success('Asset moved to Trash', 'Soft Deleted');
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to delete asset'),
+  });
+
+  // Restore Asset Mutation
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/assets/${id}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      toast.success('Asset restored to active catalog');
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to restore asset'),
+  });
+
+  // Bulk CSV Import Mutation
+  const bulkImportMutation = useMutation({
+    mutationFn: (csvText: string) =>
+      api.post('/assets/bulk-import', csvText, { 'Content-Type': 'text/csv' }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      setShowCsvModal(false);
+      setCsvContent('');
+      setCsvPreviewRows([]);
+      toast.success(res.data?.message || 'Bulk import completed successfully');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'CSV Bulk Import Failed - All changes rolled back');
+    },
+  });
+
+  // Parse CSV Preview
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCsvContent(text);
+
+      const lines = text.split('\n').filter((l) => l.trim().length > 0);
+      if (lines.length > 1) {
+        const rows = lines.slice(1, 6).map((line) => {
+          const cols = line.split(',').map((c) => c.replace(/^"|"$/g, '').trim());
+          return {
+            assetCode: cols[0],
+            name: cols[1],
+            assetType: cols[2],
+            description: cols[3],
+          };
+        });
+        setCsvPreviewRows(rows);
+      }
+    };
+    reader.readAsText(file);
   };
 
-  const assets = assetsData?.data || [];
-  const meta = assetsData?.meta;
-  const categories = categoriesData?.data || [];
-  const tags = tagsData?.data || [];
+  const handleExportCsv = () => {
+    window.open('/api/assets/export-csv', '_blank');
+  };
+
+  const assets = (assetsResponse?.data || []) as any[];
+  const meta = assetsResponse?.meta;
+  const categories = (categoriesResponse?.data || []) as Category[];
+
+  // Define Columns
+  const columns: Column<any>[] = [
+    {
+      key: 'name',
+      header: 'Asset Details',
+      sortable: true,
+      render: (row) => (
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+            {row.asset_type === 'SOFTWARE' && <FileCode className="w-4 h-4 text-indigo-500" />}
+            {row.asset_type === 'IMAGE' && <Image className="w-4 h-4 text-emerald-500" />}
+            {row.asset_type === 'VIDEO' && <Video className="w-4 h-4 text-rose-500" />}
+            {row.asset_type === 'DOCUMENT' && <FileText className="w-4 h-4 text-amber-500" />}
+            {row.asset_type === 'DATASET' && <Binary className="w-4 h-4 text-cyan-500" />}
+            {row.asset_type === 'FONT' && <Layers className="w-4 h-4 text-purple-500" />}
+          </div>
+          <div>
+            <Link
+              to={`/assets/${row.asset_id || row.id}`}
+              className="font-bold text-slate-900 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline block"
+            >
+              {row.asset_name || row.name}
+            </Link>
+            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded">
+                {row.asset_code || row.assetCode}
+              </span>
+              <span>&bull;</span>
+              <span>v{row.latest_version_no || 1}</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'assetType',
+      header: 'Type',
+      sortable: true,
+      render: (row) => (
+        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+          {row.asset_type || row.assetType}
+        </span>
+      ),
+    },
+    {
+      key: 'complianceStatus',
+      header: 'Compliance',
+      render: (row) => (
+        <StatusBadge
+          status={row.compliance_status || (row.status === 'ACTIVE' ? 'COMPLIANT' : 'UNLICENSED')}
+          size="sm"
+        />
+      ),
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      render: (row) => (
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {row.category_name || row.category?.name || 'Uncategorized'}
+        </span>
+      ),
+    },
+    {
+      key: 'owner',
+      header: 'Owner',
+      render: (row) => (
+        <span className="text-xs text-slate-600 dark:text-slate-300 truncate max-w-[120px] block">
+          {row.owner_name || row.owner?.fullName || 'System'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      className: 'text-right',
+      render: (row) => (
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <Link
+            to={`/assets/${row.asset_id || row.id}`}
+            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            title="View Details"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </Link>
+
+          {status === 'ARCHIVED' ? (
+            <button
+              type="button"
+              onClick={() => restoreMutation.mutate(row.asset_id || row.id)}
+              className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+              title="Restore Asset"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          ) : (
+            <RoleGate permission="assets:delete">
+              <button
+                type="button"
+                onClick={() => setDeleteAssetTarget(row)}
+                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                title="Move to Trash"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </RoleGate>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Header and Add button */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Top Header & Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Digital Asset Repository</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Browse and manage fonts, software packages, datasets, media, and license associations.
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+            Digital Asset Repository
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Enterprise assets, version timeline integrity, license attachments, and checkout status
           </p>
         </div>
 
-        {canManage && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30 transition flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Register Asset</span>
-          </button>
-        )}
-      </div>
-
-      {accessNotice && (
-        <div className="p-3 bg-emerald-950/60 border border-emerald-800 rounded-xl flex items-center space-x-2 text-xs text-emerald-300 animate-fade-in">
-          <CheckCircle className="w-4 h-4 text-emerald-400" />
-          <span>{accessNotice}</span>
-        </div>
-      )}
-
-      {/* Filter Toolbar */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-wrap gap-3 items-center justify-between">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search assets by name or description..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
         <div className="flex flex-wrap items-center gap-2">
-          {/* Asset Type Filter */}
-          <select
-            value={selectedType}
-            onChange={(e) => {
-              setSelectedType(e.target.value);
-              setPage(1);
-            }}
-            className="px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300 focus:outline-none"
-          >
-            <option value="">All Types</option>
-            <option value="font">Fonts</option>
-            <option value="software">Software Binaries</option>
-            <option value="dataset">Datasets</option>
-            <option value="image">Images</option>
-            <option value="video">Videos</option>
-            <option value="document">Documents</option>
-          </select>
+          {/* CSV Bulk Import Button */}
+          <RoleGate permission="assets:create">
+            <button
+              type="button"
+              onClick={() => setShowCsvModal(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 rounded-xl shadow-xs transition-colors"
+            >
+              <Upload className="w-4 h-4 text-slate-500" />
+              <span>Import CSV</span>
+            </button>
+          </RoleGate>
 
-          {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => {
-              setSelectedCategory(e.target.value);
-              setPage(1);
-            }}
-            className="px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300 focus:outline-none"
+          {/* Export CSV Button */}
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 rounded-xl shadow-xs transition-colors"
           >
-            <option value="">All Categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+            <span>Export CSV</span>
+          </button>
+
+          {/* Add Asset Button */}
+          <RoleGate permission="assets:create">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 active:bg-primary-800 rounded-xl shadow-sm transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Asset</span>
+            </button>
+          </RoleGate>
         </div>
       </div>
 
-      {/* Assets Grid */}
-      {isLoading ? (
-        <div className="py-20 flex justify-center">
-          <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+      {/* Filter Bar with Search, Type Dropdown, Category Dropdown, and Active Chips */}
+      <FilterBar
+        activeFilters={[
+          ...(assetType ? [{ key: 'assetType', label: 'Type', value: assetType }] : []),
+          ...(categoryId ? [{ key: 'categoryId', label: 'Category', value: categories.find((c) => c.id === categoryId)?.name || categoryId }] : []),
+          ...(status !== 'ACTIVE' ? [{ key: 'status', label: 'Status', value: status }] : []),
+        ]}
+        onRemoveFilter={(key) => updateParams({ [key]: undefined, page: 1 })}
+        onResetFilters={() => updateParams({ q: undefined, assetType: undefined, categoryId: undefined, status: 'ACTIVE', page: 1 })}
+      >
+        <SearchInput
+          value={q}
+          onChange={(newQ) => updateParams({ q: newQ, page: 1 })}
+          placeholder="Search by asset name, code..."
+          className="w-full sm:w-64"
+        />
+
+        <select
+          value={assetType}
+          onChange={(e) => updateParams({ assetType: e.target.value || undefined, page: 1 })}
+          aria-label="Filter by asset type"
+          className="py-2 px-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-primary-500"
+        >
+          <option value="">All Types</option>
+          <option value="SOFTWARE">Software</option>
+          <option value="DOCUMENT">Document</option>
+          <option value="IMAGE">Image</option>
+          <option value="VIDEO">Video</option>
+          <option value="DATASET">Dataset</option>
+          <option value="FONT">Font</option>
+        </select>
+
+        <select
+          value={categoryId}
+          onChange={(e) => updateParams({ categoryId: e.target.value || undefined, page: 1 })}
+          aria-label="Filter by category"
+          className="py-2 px-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-primary-500 max-w-[160px]"
+        >
+          <option value="">All Categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+
+        {/* View Trash / Active Selector */}
+        <select
+          value={status}
+          onChange={(e) => updateParams({ status: e.target.value, page: 1 })}
+          aria-label="Filter by status"
+          className="py-2 px-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-primary-500"
+        >
+          <option value="ACTIVE">Active Assets</option>
+          <option value="ARCHIVED">Trash / Archived</option>
+        </select>
+
+        {/* Grid vs Table Toggle */}
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 ml-auto">
+          <button
+            type="button"
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-white dark:bg-slate-700 text-primary-600 shadow-xs' : 'text-slate-400'}`}
+            title="Table View"
+          >
+            <ListIcon className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-primary-600 shadow-xs' : 'text-slate-400'}`}
+            title="Grid View"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+          </button>
         </div>
-      ) : assets.length === 0 ? (
-        <div className="py-20 text-center bg-slate-900 border border-slate-800 rounded-2xl">
-          <FolderArchive className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-300">No assets found</p>
-          <p className="text-xs text-slate-500 mt-1">Try refining your search terms or filters.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      </FilterBar>
+
+      {/* Grid View Mode */}
+      {viewMode === 'grid' && !isLoading && assets.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {assets.map((asset) => (
             <div
-              key={asset.id}
-              className="p-5 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl flex flex-col justify-between transition group shadow-lg"
+              key={asset.asset_id || asset.id}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-start justify-between">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    {asset.assetType}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                    {asset.asset_code || asset.assetCode}
                   </span>
-                  <span className="text-[11px] font-mono text-slate-500">v{asset.version}</span>
+                  <StatusBadge status={asset.compliance_status || 'COMPLIANT'} size="sm" />
                 </div>
-
-                <h3 className="font-bold text-white text-sm mt-3 group-hover:text-blue-400 transition line-clamp-1">
-                  {asset.name}
+                <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 line-clamp-1 mb-1">
+                  {asset.asset_name || asset.name}
                 </h3>
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2 h-8">
+                <p className="text-xs text-slate-400 line-clamp-2 mb-3">
                   {asset.description || 'No description provided.'}
                 </p>
-
-                {/* Tags */}
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {asset.assetTags.map(({ tag }) => (
-                    <span
-                      key={tag.id}
-                      style={{ borderColor: `${tag.colorHex}40`, color: tag.colorHex }}
-                      className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-800/80 border"
-                    >
-                      #{tag.name}
-                    </span>
-                  ))}
-                </div>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="text-[11px] text-slate-500">
-                  {asset.category?.name || 'Uncategorized'}
-                </span>
-
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => {
-                      logAccessMutation.mutate({ assetId: asset.id, action: 'view' });
-                      setSelectedAsset(asset);
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
-                    title="View Asset Details"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      logAccessMutation.mutate({ assetId: asset.id, action: 'download' });
-                      alert(`Download initiated for: ${asset.name}. Logged in asset_access_logs.`);
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition"
-                    title="Download Asset"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-
-                  {canManage && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`Are you sure you want to soft-delete "${asset.name}"?`)) {
-                          deleteMutation.mutate(asset.id);
-                        }
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition"
-                      title="Soft Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">v{asset.latest_version_no || 1}</span>
+                <Link
+                  to={`/assets/${asset.asset_id || asset.id}`}
+                  className="font-semibold text-primary-600 hover:underline flex items-center gap-1"
+                >
+                  Manage &rarr;
+                </Link>
               </div>
             </div>
           ))}
         </div>
+      ) : (
+        /* Table View Mode */
+        <DataTable
+          columns={columns}
+          data={assets}
+          meta={meta}
+          isLoading={isLoading}
+          sortBy={sort}
+          sortOrder={order}
+          onSort={(key) => {
+            const nextOrder = sort === key && order === 'asc' ? 'desc' : 'asc';
+            updateParams({ sort: key, order: nextOrder });
+          }}
+          onPageChange={(p) => updateParams({ page: p })}
+          onLimitChange={(l) => updateParams({ limit: l, page: 1 })}
+          keyExtractor={(row) => row.asset_id || row.id}
+          onRowClick={(row) => navigate(`/assets/${row.asset_id || row.id}`)}
+          emptyTitle="No assets found"
+          emptyMessage="No digital assets matched your filters or query."
+          emptyAction={{
+            label: 'Add New Asset',
+            onClick: () => setShowCreateModal(true),
+            icon: <Plus className="w-4 h-4" />,
+          }}
+        />
       )}
 
-      {/* Pagination Bar */}
-      {meta && meta.totalPages > 1 && (
-        <div className="flex justify-between items-center pt-4">
-          <span className="text-xs text-slate-400">
-            Page {meta.page} of {meta.totalPages} ({meta.total} total assets)
-          </span>
-          <div className="flex space-x-2">
+      {/* Modal: Create Asset */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create Digital Asset"
+        description="Provision a new digital asset in the repository with initial version control"
+        maxWidth="lg"
+        footer={
+          <>
             <button
-              disabled={!meta.hasPrev}
-              onClick={() => setPage(page - 1)}
-              className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              disabled={!meta.hasNext}
-              onClick={() => setPage(page + 1)}
-              className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Asset Detail Modal */}
-      {selectedAsset && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
-            <button
-              onClick={() => setSelectedAsset(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
-              {selectedAsset.assetType}
-            </span>
-            <h2 className="text-lg font-bold text-white mt-2">{selectedAsset.name}</h2>
-            <p className="text-xs text-slate-400 mt-1">{selectedAsset.description}</p>
-
-            <div className="mt-4 p-3 bg-slate-800/50 rounded-xl space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Category:</span>
-                <span className="text-slate-200">{selectedAsset.category?.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Version:</span>
-                <span className="text-slate-200 font-mono">v{selectedAsset.version}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Storage URI:</span>
-                <span className="text-slate-300 font-mono text-[11px] truncate max-w-[200px]">
-                  {selectedAsset.fileUrl || 'External / Unhosted'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Covering Licenses:</span>
-                <span className="text-blue-400 font-semibold">
-                  {selectedAsset.assetLicenses?.length || 0} active license(s)
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end space-x-2">
-              <button
-                onClick={() => setSelectedAsset(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-xl"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Asset Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button
+              type="button"
               onClick={() => setShowCreateModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50"
             >
-              <X className="w-5 h-5" />
+              Cancel
             </button>
+            <button
+              type="button"
+              disabled={createAssetMutation.isPending}
+              onClick={() => createAssetMutation.mutate(createForm)}
+              className="px-4 py-2 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm disabled:opacity-50"
+            >
+              {createAssetMutation.isPending ? 'Creating...' : 'Create Asset'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Asset Name" required>
+            <input
+              type="text"
+              value={createForm.name}
+              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+              placeholder="e.g. Core Design System Tokens"
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+            />
+          </FormField>
 
-            <h2 className="text-base font-bold text-white mb-4">Register New Digital Asset</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Asset Code (SKU)" required>
+              <input
+                type="text"
+                value={createForm.assetCode}
+                onChange={(e) => setCreateForm({ ...createForm, assetCode: e.target.value })}
+                placeholder="AST-TOKENS-01"
+                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono"
+              />
+            </FormField>
 
-            <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Asset Name</label>
-                <input
-                  required
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  placeholder="e.g. JetBrains IntelliJ 2026 Binary"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Asset Type</label>
-                  <select
-                    value={createForm.assetType}
-                    onChange={(e) => setCreateForm({ ...createForm, assetType: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    <option value="software">Software</option>
-                    <option value="font">Font</option>
-                    <option value="dataset">Dataset</option>
-                    <option value="image">Image</option>
-                    <option value="video">Video</option>
-                    <option value="document">Document</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Category</label>
-                  <select
-                    required
-                    value={createForm.categoryId}
-                    onChange={(e) => setCreateForm({ ...createForm, categoryId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">File Storage URL</label>
-                <input
-                  value={createForm.fileUrl}
-                  onChange={(e) => setCreateForm({ ...createForm, fileUrl: e.target.value })}
-                  placeholder="https://storage.internal/assets/..."
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                  placeholder="Technical specifications, author or licensing conditions..."
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Assign Tags</label>
-                <div className="flex flex-wrap gap-1.5 p-2 bg-slate-800/50 rounded-xl border border-slate-700">
-                  {tags.map((t) => {
-                    const isSelected = createForm.tagIds.includes(t.id);
-                    return (
-                      <button
-                        type="button"
-                        key={t.id}
-                        onClick={() => {
-                          const tagIds = isSelected
-                            ? createForm.tagIds.filter((id) => id !== t.id)
-                            : [...createForm.tagIds, t.id];
-                          setCreateForm({ ...createForm, tagIds });
-                        }}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition ${
-                          isSelected ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
-                        }`}
-                      >
-                        #{t.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createAssetMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium shadow-lg shadow-blue-600/30"
-                >
-                  {createAssetMutation.isPending ? 'Registering...' : 'Register Asset'}
-                </button>
-              </div>
-            </form>
+            <FormField label="Asset Type" required>
+              <select
+                value={createForm.assetType}
+                onChange={(e) => setCreateForm({ ...createForm, assetType: e.target.value as AssetType })}
+                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+              >
+                <option value="SOFTWARE">Software</option>
+                <option value="DOCUMENT">Document</option>
+                <option value="IMAGE">Image</option>
+                <option value="VIDEO">Video</option>
+                <option value="DATASET">Dataset</option>
+                <option value="FONT">Font</option>
+              </select>
+            </FormField>
           </div>
+
+          <FormField label="Category">
+            <select
+              value={createForm.categoryId}
+              onChange={(e) => setCreateForm({ ...createForm, categoryId: e.target.value })}
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+            >
+              <option value="">Select Category...</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Initial File URL" required helperText="CDN / Object Storage URL for version 1">
+            <input
+              type="text"
+              value={createForm.fileUrl}
+              onChange={(e) => setCreateForm({ ...createForm, fileUrl: e.target.value })}
+              placeholder="https://cdn.assetvault.io/tokens-v1.json"
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono"
+            />
+          </FormField>
+
+          <FormField label="Tags">
+            <TagInput
+              tags={createForm.tags}
+              onChange={(tags) => setCreateForm({ ...createForm, tags })}
+              placeholder="Type tag and press Enter..."
+            />
+          </FormField>
         </div>
-      )}
+      </Modal>
+
+      {/* Modal: Bulk CSV Import with Preview & Rollback guarantee */}
+      <Modal
+        isOpen={showCsvModal}
+        onClose={() => setShowCsvModal(false)}
+        title="All-or-Nothing Bulk CSV Import"
+        description="Upload CSV containing asset_code, name, asset_type, and description. Transactions roll back entirely on any error."
+        maxWidth="xl"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowCsvModal(false)}
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!csvContent || bulkImportMutation.isPending}
+              onClick={() => bulkImportMutation.mutate(csvContent)}
+              className="px-4 py-2 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm disabled:opacity-50"
+            >
+              {bulkImportMutation.isPending ? 'Importing Atomic Batch...' : 'Execute Import'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6 text-center hover:border-primary-500 transition-colors">
+            <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Select or drop your CSV file here
+            </p>
+            <p className="text-[11px] text-slate-400 mb-3">
+              Must include headers: asset_code, name, asset_type, description
+            </p>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCsvFileChange}
+              className="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 dark:file:bg-primary-950 dark:file:text-primary-300 cursor-pointer"
+            />
+          </div>
+
+          {csvPreviewRows.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-2">
+                Preview (First {csvPreviewRows.length} Rows)
+              </h4>
+              <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="p-2">Code</th>
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Type</th>
+                      <th className="p-2">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {csvPreviewRows.map((r, i) => (
+                      <tr key={i}>
+                        <td className="p-2 font-mono">{r.assetCode}</td>
+                        <td className="p-2 font-medium">{r.name}</td>
+                        <td className="p-2">{r.assetType}</td>
+                        <td className="p-2 text-slate-400 truncate max-w-xs">{r.description}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Confirm Soft Delete Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteAssetTarget}
+        onClose={() => setDeleteAssetTarget(null)}
+        onConfirm={() => deleteMutation.mutate(deleteAssetTarget?.asset_id || deleteAssetTarget?.id)}
+        title="Move Asset to Trash"
+        message={`Are you sure you want to move "${deleteAssetTarget?.asset_name || deleteAssetTarget?.name}" to trash? You can restore it later from the Archived filter.`}
+        confirmLabel="Move to Trash"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 };

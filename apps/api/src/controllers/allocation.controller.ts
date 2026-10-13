@@ -64,6 +64,17 @@ export class AllocationController {
     );
     sendResponse(res, 200, result.data, result.meta);
   });
+
+  public listAllocations = asyncHandler(async (req: Request, res: Response) => {
+    const params = getPaginationParams(req, 'allocated_at', ['allocated_at', 'status']);
+    const result = await allocationService.listAllocations(
+      req.prisma,
+      req.user!.tenantId as string,
+      params
+    );
+    sendResponse(res, 200, result.data, result.meta);
+  });
 }
 
 export const allocationController = new AllocationController();
+

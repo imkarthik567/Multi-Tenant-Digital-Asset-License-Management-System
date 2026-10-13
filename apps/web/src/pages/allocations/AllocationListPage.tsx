@@ -1,153 +1,213 @@
+// ==============================================================================
+// AssetVault: License Allocation Matrix
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Provisioned user software seats, release controls, and compliance status
+// ==============================================================================
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import {
+  Layers,
+  ExternalLink,
+  LogOut,
+} from 'lucide-react';
 import { api } from '../../services/api';
 import { LicenseAllocation } from '../../types';
-import { useAuth } from '../../context/AuthContext';
-import { Users2, ShieldAlert, CheckCircle, AlertCircle, KeyRound } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
+import { StatusBadge } from '../../components/common/StatusBadge';
+import { Modal } from '../../components/common/Modal';
+import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { EmptyState } from '../../components/common/EmptyState';
+import { SearchInput } from '../../components/common/SearchInput';
+import { Pagination } from '../../components/common/Pagination';
+import { RoleGate } from '../../components/auth/RoleGate';
 
 export const AllocationListPage: React.FC = () => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const [revokeReason, setRevokeReason] = useState('');
-  const [selectedAllocation, setSelectedAllocation] = useState<LicenseAllocation | null>(null);
-  const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
 
-  const { data: allocationsData, isLoading } = useQuery<{ data: LicenseAllocation[] }>({
-    queryKey: ['allocations'],
-    queryFn: () => api.get('/allocations', { params: { limit: 100 } }),
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const [releaseAllocationId, setReleaseAllocationId] = useState<string | null>(null);
+  const [releaseReason, setReleaseReason] = useState('Administrative seat release');
+
+  // Fetch Allocations
+  const { data: allocationsData, isLoading } = useQuery<{
+    data: LicenseAllocation[];
+    meta: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }>({
+    queryKey: ['allocations', page, limit, statusFilter],
+    queryFn: async () => {
+      const res = await api.get<{ data: LicenseAllocation[]; meta: any }>('/allocations', {
+        params: {
+          page,
+          limit,
+          status: statusFilter || undefined,
+        },
+      });
+      return res;
+    },
   });
 
-  const canManage = user?.role === 'tenant_admin' || user?.role === 'asset_manager' || user?.isSuperAdmin;
-
-  const revokeMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      api.post(`/allocations/${id}/revoke`, { reason }),
+  // Release Seat Mutation (sp_release_license_seat)
+  const releaseMutation = useMutation({
+    mutationFn: ({ allocationId, reason }: { allocationId: string; reason: string }) =>
+      api.post(`/allocations/${allocationId}/release`, { reason }),
     onSuccess: () => {
-      setSelectedAllocation(null);
-      setRevokeReason('');
-      setNotice({ text: 'License seat revoked successfully and capacity restored.' });
-      setTimeout(() => setNotice(null), 4000);
+      toast({
+        title: 'Seat Released',
+        message: 'License seat returned to tenant pool via sp_release_license_seat',
+        type: 'info',
+      });
+      setReleaseAllocationId(null);
       queryClient.invalidateQueries({ queryKey: ['allocations'] });
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
     },
     onError: (err: any) => {
-      setNotice({ text: err.message || 'Failed to revoke seat.', error: true });
+      toast({
+        title: 'Release Failed',
+        message: err.message || 'Could not release license seat.',
+        type: 'error',
+      });
     },
   });
 
   const allocations = allocationsData?.data || [];
+  const meta = allocationsData?.meta || { page: 1, limit: 15, total: 0, totalPages: 1 };
+
+  // Filter client-side by search query if needed
+  const filtered = allocations.filter((a) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const userName = a.user?.fullName?.toLowerCase() || '';
+    const userEmail = a.user?.email?.toLowerCase() || '';
+    const licName = a.license?.name?.toLowerCase() || '';
+    return userName.includes(q) || userEmail.includes(q) || licName.includes(q);
+  });
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Active License Allocations</h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Detailed seat distribution matrix tracking user software provisioning and compliance.
-        </p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div className="flex items-center space-x-2">
+            <div className="p-2 rounded-lg bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
+              <Layers className="w-5 h-5" />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+              License Seat Allocations
+            </h1>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Enterprise software seat distribution matrix tracking user software provisioning and compliance.
+          </p>
+        </div>
       </div>
 
-      {notice && (
-        <div
-          className={`p-3 rounded-xl border flex items-center space-x-2 text-xs ${
-            notice.error
-              ? 'bg-red-950/60 border-red-800 text-red-300'
-              : 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
-          }`}
-        >
-          {notice.error ? (
-            <AlertCircle className="w-4 h-4 text-red-400" />
-          ) : (
-            <CheckCircle className="w-4 h-4 text-emerald-400" />
-          )}
-          <span>{notice.text}</span>
+      {/* Filter / Search Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="w-full sm:w-72">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search by user or license..."
+          />
         </div>
-      )}
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        {isLoading ? (
-          <div className="py-20 flex justify-center">
-            <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-          </div>
-        ) : allocations.length === 0 ? (
-          <div className="py-16 text-center">
-            <Users2 className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-300">No active allocations</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Allocate seats from the Licenses & Quotas page.
-            </p>
-          </div>
-        ) : (
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 w-full sm:w-auto"
+        >
+          <option value="">All Statuses</option>
+          <option value="ACTIVE">Active Allocations</option>
+          <option value="RELEASED">Released Seats</option>
+        </select>
+      </div>
+
+      {/* Table / Content */}
+      {isLoading ? (
+        <LoadingSkeleton variant="table" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="No Allocations Found"
+          message="No user seat allocations recorded under the specified criteria."
+        />
+      ) : (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-800/40 text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800">
+            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-slate-850 text-slate-500 uppercase font-semibold">
                 <tr>
-                  <th className="px-6 py-3.5 font-semibold">User</th>
-                  <th className="px-6 py-3.5 font-semibold">Allocated License</th>
-                  <th className="px-6 py-3.5 font-semibold">Vendor</th>
-                  <th className="px-6 py-3.5 font-semibold">Allocated At</th>
-                  <th className="px-6 py-3.5 font-semibold">Status</th>
-                  <th className="px-6 py-3.5 font-semibold text-right">Actions</th>
+                  <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">License</th>
+                  <th className="px-4 py-3">Vendor</th>
+                  <th className="px-4 py-3">Allocated Date</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {allocations.map((alloc) => (
-                  <tr key={alloc.id} className="hover:bg-slate-800/30 transition">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-3">
-                        {alloc.user?.avatarUrl ? (
-                          <img
-                            src={alloc.user.avatarUrl}
-                            alt=""
-                            className="w-7 h-7 rounded-full bg-slate-800"
-                          />
-                        ) : (
-                          <div className="w-7 h-7 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center text-xs">
-                            {alloc.user?.fullName?.charAt(0) || 'U'}
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-semibold text-white">{alloc.user?.fullName}</p>
-                          <p className="text-[11px] text-slate-400">{alloc.user?.email}</p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 font-semibold text-slate-200">
-                      <div className="flex items-center space-x-2">
-                        <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-                        <span>{alloc.license?.name}</span>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 text-slate-400">
-                      {alloc.license?.vendor?.name || 'Commercial'}
-                    </td>
-
-                    <td className="px-6 py-4 text-slate-400">
-                      {new Date(alloc.allocatedAt).toLocaleDateString()}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      {alloc.revokedAt ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400">
-                          Revoked
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {filtered.map((alloc) => (
+                  <tr key={alloc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                    <td className="px-4 py-3">
+                      <div>
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {alloc.user?.fullName || 'User'}
                         </span>
+                        <span className="block text-[11px] text-slate-400 font-mono">
+                          {alloc.user?.email || 'N/A'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {alloc.license ? (
+                        <Link
+                          to={`/licenses/${alloc.license.id}`}
+                          className="font-medium text-primary-600 dark:text-primary-400 hover:underline flex items-center"
+                        >
+                          {alloc.license.name}
+                          <ExternalLink className="w-3 h-3 ml-1 text-slate-400" />
+                        </Link>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          Active Seat
-                        </span>
+                        'License'
                       )}
                     </td>
-
-                    <td className="px-6 py-4 text-right">
-                      {canManage && !alloc.revokedAt && (
-                        <button
-                          onClick={() => setSelectedAllocation(alloc)}
-                          className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-[11px] font-semibold transition"
-                        >
-                          Revoke
-                        </button>
+                    <td className="px-4 py-3 text-slate-500">
+                      {alloc.license?.vendor?.name || 'Independent'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {new Date(alloc.allocatedAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={alloc.status} size="sm" />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {alloc.status === 'ACTIVE' && (
+                        <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <button
+                            onClick={() => setReleaseAllocationId(alloc.id)}
+                            className="text-rose-600 dark:text-rose-400 font-medium hover:underline inline-flex items-center text-xs"
+                          >
+                            <LogOut className="w-3.5 h-3.5 mr-1" />
+                            Release Seat
+                          </button>
+                        </RoleGate>
                       )}
                     </td>
                   </tr>
@@ -155,58 +215,67 @@ export const AllocationListPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
 
-      {/* Revoke Seat Confirmation Modal */}
-      {selectedAllocation && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-            <div className="flex items-center space-x-2 text-red-400 mb-2">
-              <ShieldAlert className="w-5 h-5" />
-              <h3 className="font-bold text-sm text-white">Revoke License Seat</h3>
-            </div>
-            <p className="text-xs text-slate-400">
-              Are you sure you want to reclaim the seat for{' '}
-              <strong className="text-white">{selectedAllocation.license?.name}</strong> from{' '}
-              <strong className="text-white">{selectedAllocation.user?.fullName}</strong>?
-            </p>
-
-            <div className="mt-4">
-              <label className="block text-[11px] text-slate-300 font-medium mb-1">
-                Revocation Reason (Optional)
-              </label>
-              <input
-                value={revokeReason}
-                onChange={(e) => setRevokeReason(e.target.value)}
-                placeholder="e.g. Project offboarding, Role transition"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none"
-              />
-            </div>
-
-            <div className="mt-6 flex justify-end space-x-2">
-              <button
-                onClick={() => setSelectedAllocation(null)}
-                className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() =>
-                  revokeMutation.mutate({
-                    id: selectedAllocation.id,
-                    reason: revokeReason,
-                  })
-                }
-                disabled={revokeMutation.isPending}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-red-600/30"
-              >
-                {revokeMutation.isPending ? 'Revoking...' : 'Confirm Revoke'}
-              </button>
-            </div>
+          <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+            <Pagination
+              currentPage={meta.page}
+              totalPages={meta.totalPages}
+              totalItems={meta.total}
+              pageSize={limit}
+              onPageChange={setPage}
+              onPageSizeChange={setLimit}
+            />
           </div>
         </div>
       )}
+
+      {/* RELEASE SEAT MODAL */}
+      <Modal
+        isOpen={!!releaseAllocationId}
+        onClose={() => setReleaseAllocationId(null)}
+        title="Release License Seat"
+      >
+        <div className="space-y-4 text-xs">
+          <p className="text-slate-600 dark:text-slate-300">
+            Releasing this seat invokes stored procedure{' '}
+            <code className="font-mono text-primary-500">sp_release_license_seat</code> and restores available seat
+            capacity for the license.
+          </p>
+
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Reason for Release</label>
+            <input
+              type="text"
+              value={releaseReason}
+              onChange={(e) => setReleaseReason(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setReleaseAllocationId(null)}
+              className="px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={releaseMutation.isPending}
+              onClick={() =>
+                releaseMutation.mutate({
+                  allocationId: releaseAllocationId!,
+                  reason: releaseReason,
+                })
+              }
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg shadow-sm"
+            >
+              {releaseMutation.isPending ? 'Releasing...' : 'Release Seat'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

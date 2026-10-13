@@ -105,6 +105,37 @@ export class AllocationRepository {
     ]);
     return { data, total };
   }
+
+  public async findAll(
+    prisma: PrismaClient | any,
+    tenantId: string,
+    params: PaginationParams
+  ): Promise<{ data: any[]; total: number }> {
+    const where = {
+      license: { tenantId },
+    };
+    const [data, total] = await Promise.all([
+      prisma.licenseAllocation.findMany({
+        where,
+        skip: params.skip,
+        take: params.limit,
+        orderBy: { allocatedAt: 'desc' },
+        include: {
+          license: {
+            select: {
+              id: true,
+              name: true,
+              totalSeats: true,
+              vendor: { select: { id: true, name: true } },
+            },
+          },
+          user: { select: { id: true, fullName: true, email: true } },
+        },
+      }),
+      prisma.licenseAllocation.count({ where }),
+    ]);
+    return { data, total };
+  }
 }
 
 export const allocationRepository = new AllocationRepository();

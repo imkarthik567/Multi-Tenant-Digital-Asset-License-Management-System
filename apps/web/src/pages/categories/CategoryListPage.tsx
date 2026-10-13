@@ -1,215 +1,431 @@
+// ==============================================================================
+// AssetVault: Category Taxonomy Management
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Hierarchical category tree (/api/categories/tree), cycle prevention, & asset counts
+// ==============================================================================
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  FolderTree,
+  Plus,
+  Trash2,
+  Edit2,
+  ChevronRight,
+  ChevronDown,
+  Folder,
+  FolderOpen,
+  LayoutGrid,
+  ListTree,
+} from 'lucide-react';
 import { api } from '../../services/api';
 import { Category } from '../../types';
-import { useAuth } from '../../context/AuthContext';
-import { FolderTree, Plus, Trash2, X, AlertCircle } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
+import { Modal } from '../../components/common/Modal';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { EmptyState } from '../../components/common/EmptyState';
+import { RoleGate } from '../../components/auth/RoleGate';
 
 export const CategoryListPage: React.FC = () => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', parentCategoryId: '' });
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'tree' | 'grid'>('tree');
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
 
-  const { data: categoriesData, isLoading } = useQuery<{ data: Category[] }>({
-    queryKey: ['categories'],
-    queryFn: () => api.get('/categories'),
+  // Modals state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deleteCategory, setDeleteCategory] = useState<Category | null>(null);
+
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    parentId: '',
   });
 
-  const canManage = user?.role === 'tenant_admin' || user?.role === 'asset_manager' || user?.isSuperAdmin;
+  // 1. Fetch Flat Categories List
+  const { data: flatCategories = [], isLoading: isFlatLoading } = useQuery<Category[]>({
+    queryKey: ['categories', 'flat'],
+    queryFn: async () => {
+      const res = await api.get<{ data: Category[] }>('/categories');
+      return res.data || [];
+    },
+  });
 
-  const createMutation = useMutation({
-    mutationFn: (newCat: any) =>
-      api.post('/categories', {
-        ...newCat,
-        parentCategoryId: newCat.parentCategoryId || undefined,
-      }),
+  // 2. Fetch Nested Categories Tree (/api/categories/tree)
+  const { data: categoryTree = [], isLoading: isTreeLoading } = useQuery<Category[]>({
+    queryKey: ['categories', 'tree'],
+    queryFn: async () => {
+      const res = await api.get<Category[] | { data: Category[] }>('/categories/tree');
+      return Array.isArray(res) ? res : (res as any).data || [];
+    },
+  });
+
+  // MUTATIONS
+  // Create or Update Category
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => {
+      const payload = {
+        name: data.name,
+        description: data.description || undefined,
+        parentId: data.parentId || undefined,
+      };
+      if (editingCategory) {
+        return api.patch(`/categories/${editingCategory.id}`, payload);
+      }
+      return api.post('/categories', payload);
+    },
     onSuccess: () => {
-      setShowModal(false);
-      setForm({ name: '', description: '', parentCategoryId: '' });
-      setErrorMessage(null);
+      toast({
+        title: 'Success',
+        message: editingCategory ? 'Category updated' : 'Category created',
+        type: 'success',
+      });
+      setIsModalOpen(false);
+      setEditingCategory(null);
+      setForm({ name: '', description: '', parentId: '' });
       queryClient.invalidateQueries({ queryKey: ['categories'] });
     },
     onError: (err: any) => {
-      setErrorMessage(err.message || 'Failed to create category.');
+      toast({
+        title: 'Category Error',
+        message: err.message || 'Operation failed. Cycles or duplicate names are forbidden.',
+        type: 'error',
+      });
     },
   });
 
+  // Delete Category (409 Conflict if children or assets exist)
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/categories/${id}`),
     onSuccess: () => {
+      toast({ title: 'Category Deleted', message: 'Category removed', type: 'info' });
+      setDeleteCategory(null);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
     },
     onError: (err: any) => {
-      alert(err.message || 'Cannot delete category with associated assets.');
+      toast({
+        title: 'Cannot Delete Category',
+        message: err.message || 'Category has associated sub-categories or digital assets.',
+        type: 'error',
+      });
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate(form);
+  const toggleExpand = (id: string) => {
+    setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const categories = categoriesData?.data || [];
+  // Recursive Tree Node Renderer
+  const renderTreeNode = (node: Category, depth: number = 0) => {
+    const hasChildren = node.children && node.children.length > 0;
+    const isExpanded = expandedNodes[node.id] ?? true;
+
+    return (
+      <div key={node.id} className="space-y-1">
+        <div
+          className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
+            depth === 0
+              ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm'
+              : 'bg-slate-50/70 dark:bg-slate-850/50 border-slate-200/60 dark:border-slate-800/60'
+          }`}
+          style={{ marginLeft: `${depth * 24}px` }}
+        >
+          <div className="flex items-center space-x-2">
+            {hasChildren ? (
+              <button
+                onClick={() => toggleExpand(node.id)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+              >
+                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+            ) : (
+              <span className="w-6" />
+            )}
+
+            {isExpanded && hasChildren ? (
+              <FolderOpen className="w-4 h-4 text-primary-500" />
+            ) : (
+              <Folder className="w-4 h-4 text-slate-400" />
+            )}
+
+            <div>
+              <span className="text-xs font-bold text-slate-900 dark:text-white">{node.name}</span>
+              {node.description && (
+                <span className="text-[11px] text-slate-400 ml-2 hidden sm:inline truncate max-w-xs">
+                  — {node.description}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              {node._count?.assets ?? 0} assets
+            </span>
+
+            <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
+              <button
+                onClick={() => {
+                  setEditingCategory(node);
+                  setForm({
+                    name: node.name,
+                    description: node.description || '',
+                    parentId: node.parentId || '',
+                  });
+                  setIsModalOpen(true);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+                title="Edit Category"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setDeleteCategory(node)}
+                className="p-1 text-slate-400 hover:text-rose-500 rounded"
+                title="Delete Category"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </RoleGate>
+          </div>
+        </div>
+
+        {hasChildren && isExpanded && (
+          <div className="space-y-1">
+            {node.children!.map((child) => renderTreeNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const isLoading = isFlatLoading || isTreeLoading;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Category Taxonomy</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Hierarchical asset classifications and taxonomic structures.
+          <div className="flex items-center space-x-2">
+            <div className="p-2 rounded-lg bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
+              <FolderTree className="w-5 h-5" />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Taxonomy Categories
+            </h1>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Hierarchical tree classification with cycle detection and asset dependency guards.
           </p>
         </div>
 
-        {canManage && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30 transition flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Category</span>
-          </button>
-        )}
+        <div className="flex items-center space-x-2">
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+            <button
+              onClick={() => setViewMode('tree')}
+              className={`p-1.5 rounded-md text-xs font-medium transition-colors ${
+                viewMode === 'tree'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+              }`}
+              title="Tree View"
+            >
+              <ListTree className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-md text-xs font-medium transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+              }`}
+              title="Grid View"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
+            <button
+              onClick={() => {
+                setEditingCategory(null);
+                setForm({ name: '', description: '', parentId: '' });
+                setIsModalOpen(true);
+              }}
+              className="inline-flex items-center px-3.5 py-2 text-xs font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 shadow-sm transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Category
+            </button>
+          </RoleGate>
+        </div>
       </div>
 
+      {/* Main Content */}
       {isLoading ? (
-        <div className="py-20 flex justify-center">
-          <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-        </div>
-      ) : categories.length === 0 ? (
-        <div className="py-16 text-center bg-slate-900 border border-slate-800 rounded-2xl">
-          <FolderTree className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-300">No categories found</p>
+        <LoadingSkeleton variant="card" count={3} />
+      ) : flatCategories.length === 0 ? (
+        <EmptyState
+          title="No Categories"
+          message="No classification categories have been created yet."
+          action={{
+            label: 'Create First Category',
+            onClick: () => {
+              setEditingCategory(null);
+              setForm({ name: '', description: '', parentId: '' });
+              setIsModalOpen(true);
+            },
+          }}
+        />
+      ) : viewMode === 'tree' ? (
+        /* Hierarchical Tree View */
+        <div className="space-y-2 p-4 rounded-xl bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800">
+          {categoryTree.map((rootNode) => renderTreeNode(rootNode, 0))}
         </div>
       ) : (
+        /* Grid View */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {categories.map((cat) => (
+          {flatCategories.map((c) => (
             <div
-              key={cat.id}
-              className="p-5 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col justify-between shadow-lg"
+              key={c.id}
+              className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-3"
             >
               <div>
                 <div className="flex items-start justify-between">
-                  <h3 className="font-bold text-white text-sm">{cat.name}</h3>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    {cat._count?.assets || 0} assets
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">{c.name}</h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    {c._count?.assets ?? 0} assets
                   </span>
                 </div>
-
-                {cat.parentCategory && (
-                  <p className="text-[11px] text-blue-400 mt-1">
-                    ↳ Sub-category of: <strong>{cat.parentCategory.name}</strong>
+                {c.parent && (
+                  <p className="text-[11px] text-primary-600 dark:text-primary-400 mt-1">
+                    ↳ Parent: {c.parent.name}
                   </p>
                 )}
-
-                <p className="text-xs text-slate-400 mt-2 line-clamp-2">
-                  {cat.description || 'No description provided.'}
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
+                  {c.description || 'No description provided.'}
                 </p>
               </div>
 
-              {canManage && (
-                <div className="mt-4 pt-3 border-t border-slate-800 flex justify-end">
+              <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end space-x-2">
                   <button
                     onClick={() => {
-                      if (confirm(`Remove category "${cat.name}"?`)) {
-                        deleteMutation.mutate(cat.id);
-                      }
+                      setEditingCategory(c);
+                      setForm({
+                        name: c.name,
+                        description: c.description || '',
+                        parentId: c.parentId || '',
+                      });
+                      setIsModalOpen(true);
                     }}
-                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition"
+                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteCategory(c)}
+                    className="p-1.5 text-slate-400 hover:text-rose-500 rounded"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              )}
+              </RoleGate>
             </div>
           ))}
         </div>
       )}
 
-      {/* Create Category Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h2 className="text-base font-bold text-white mb-4">Create Classification Category</h2>
-
-            {errorMessage && (
-              <div className="mb-4 p-3 bg-red-950/60 border border-red-800 rounded-xl flex items-center space-x-2 text-xs text-red-300">
-                <AlertCircle className="w-4 h-4 text-red-400" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Category Name</label>
-                <input
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g. Computer Vision Datasets"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  Parent Category (Optional - For Hierarchies)
-                </label>
-                <select
-                  value={form.parentCategoryId}
-                  onChange={(e) => setForm({ ...form, parentCategoryId: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                >
-                  <option value="">None (Top-Level Category)</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Categorization guidelines..."
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30"
-                >
-                  {createMutation.isPending ? 'Saving...' : 'Save Category'}
-                </button>
-              </div>
-            </form>
+      {/* CREATE / EDIT CATEGORY MODAL */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingCategory ? 'Edit Taxonomy Category' : 'Create Taxonomy Category'}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveMutation.mutate(form);
+          }}
+          className="space-y-4 text-xs"
+        >
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Category Name</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Computer Vision Datasets"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+              Parent Category (Hierarchy Root)
+            </label>
+            <select
+              value={form.parentId}
+              onChange={(e) => setForm({ ...form, parentId: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            >
+              <option value="">None (Top-Level Category)</option>
+              {flatCategories
+                .filter((c) => c.id !== editingCategory?.id)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Description</label>
+            <textarea
+              rows={2}
+              placeholder="Classification guidelines..."
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saveMutation.isPending}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg shadow-sm"
+            >
+              {saveMutation.isPending ? 'Saving...' : 'Save Category'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* CONFIRM DELETE DIALOG */}
+      <ConfirmDialog
+        isOpen={!!deleteCategory}
+        onClose={() => setDeleteCategory(null)}
+        onConfirm={() => deleteMutation.mutate(deleteCategory!.id)}
+        title="Delete Taxonomy Category"
+        message={`Are you sure you want to delete category "${deleteCategory?.name}"? The system will block deletion if this category contains child sub-categories or digital assets.`}
+        confirmText="Delete Category"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 };

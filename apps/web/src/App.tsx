@@ -1,19 +1,55 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// ==============================================================================
+// AssetVault: Root Application Router & State Providers
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Multi-tenant enterprise RBAC router, silent token refresh, & lazy loading
+// ==============================================================================
+
+import React, { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
-import { LoginPage } from './pages/auth/LoginPage';
-import { RegisterPage } from './pages/auth/RegisterPage';
-import { DashboardPage } from './pages/dashboard/DashboardPage';
-import { AssetListPage } from './pages/assets/AssetListPage';
-import { LicenseListPage } from './pages/licenses/LicenseListPage';
-import { AllocationListPage } from './pages/allocations/AllocationListPage';
-import { VendorListPage } from './pages/vendors/VendorListPage';
-import { CategoryListPage } from './pages/categories/CategoryListPage';
-import { TagListPage } from './pages/tags/TagListPage';
-import { AuditLogPage } from './pages/audit-logs/AuditLogPage';
-import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
+
+// Loading fallback spinner for lazy components
+const PageLoader: React.FC = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 border-3 border-primary-500/20 border-t-primary-600 rounded-full animate-spin" />
+      <span className="text-xs text-slate-400 font-medium animate-pulse">Loading view...</span>
+    </div>
+  </div>
+);
+
+// Lazy Loaded Pages
+const LoginPage = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })));
+const ForbiddenPage = lazy(() => import('./pages/error/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })));
+const NotFoundPage = lazy(() => import('./pages/error/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const AssetListPage = lazy(() => import('./pages/assets/AssetListPage').then((m) => ({ default: m.AssetListPage })));
+const AssetDetailPage = lazy(() => import('./pages/assets/AssetDetailPage').then((m) => ({ default: m.AssetDetailPage })));
+
+const MyLicensesPage = lazy(() => import('./pages/licenses/MyLicensesPage').then((m) => ({ default: m.MyLicensesPage })));
+const LicenseListPage = lazy(() => import('./pages/licenses/LicenseListPage').then((m) => ({ default: m.LicenseListPage })));
+const LicenseDetailPage = lazy(() => import('./pages/licenses/LicenseDetailPage').then((m) => ({ default: m.LicenseDetailPage })));
+const AllocationListPage = lazy(() => import('./pages/allocations/AllocationListPage').then((m) => ({ default: m.AllocationListPage })));
+
+const VendorListPage = lazy(() => import('./pages/vendors/VendorListPage').then((m) => ({ default: m.VendorListPage })));
+const CategoryListPage = lazy(() => import('./pages/categories/CategoryListPage').then((m) => ({ default: m.CategoryListPage })));
+const TagListPage = lazy(() => import('./pages/tags/TagListPage').then((m) => ({ default: m.TagListPage })));
+
+const UserListPage = lazy(() => import('./pages/users/UserListPage').then((m) => ({ default: m.UserListPage })));
+const NotificationListPage = lazy(() => import('./pages/notifications/NotificationListPage').then((m) => ({ default: m.NotificationListPage })));
+const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const AuditLogPage = lazy(() => import('./pages/audit-logs/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
+const TenantSettingsPage = lazy(() => import('./pages/settings/TenantSettingsPage').then((m) => ({ default: m.TenantSettingsPage })));
+
+const TenantListPage = lazy(() => import('./pages/platform/TenantListPage').then((m) => ({ default: m.TenantListPage })));
+const PlanListPage = lazy(() => import('./pages/platform/PlanListPage').then((m) => ({ default: m.PlanListPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,31 +64,148 @@ const queryClient = new QueryClient({
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            {/* Public Auth Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+      <ThemeProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  {/* Public Authentication Routes */}
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
 
-            {/* Protected App Shell */}
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/assets" element={<AssetListPage />} />
-              <Route path="/licenses" element={<LicenseListPage />} />
-              <Route path="/allocations" element={<AllocationListPage />} />
-              <Route path="/vendors" element={<VendorListPage />} />
-              <Route path="/categories" element={<CategoryListPage />} />
-              <Route path="/tags" element={<TagListPage />} />
-              <Route path="/audit-logs" element={<AuditLogPage />} />
-              <Route path="/settings" element={<TenantSettingsPage />} />
-            </Route>
+                  {/* HTTP Error Pages */}
+                  <Route path="/403" element={<ForbiddenPage />} />
+                  <Route path="/404" element={<NotFoundPage />} />
 
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+                  {/* Authenticated Workspace Shell */}
+                  <Route
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    {/* Common Protected Routes */}
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/assets" element={<AssetListPage />} />
+                    <Route path="/assets/:id" element={<AssetDetailPage />} />
+                    <Route path="/notifications" element={<NotificationListPage />} />
+                    <Route path="/settings" element={<TenantSettingsPage />} />
+
+                    {/* Member Self-Service Allocation Portal */}
+                    <Route
+                      path="/my-licenses"
+                      element={
+                        <ProtectedRoute allowedRoles={['MEMBER', 'ASSET_MANAGER', 'TENANT_ADMIN']}>
+                          <MyLicensesPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Asset & License Management Routes (Admin & Asset Manager) */}
+                    <Route
+                      path="/licenses"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <LicenseListPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/licenses/:id"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <LicenseDetailPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/allocations"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <AllocationListPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/vendors"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <VendorListPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/categories"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <CategoryListPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/tags"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <TagListPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/reports"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <ReportsPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Tenant Administration Routes (Tenant Admin & Super Admin) */}
+                    <Route
+                      path="/users"
+                      element={
+                        <ProtectedRoute allowedRoles={['TENANT_ADMIN', 'SUPER_ADMIN']}>
+                          <UserListPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/audit-logs"
+                      element={
+                        <ProtectedRoute allowedRoles={['TENANT_ADMIN', 'SUPER_ADMIN']}>
+                          <AuditLogPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Super Admin Cross-Tenant Platform Governance Routes */}
+                    <Route
+                      path="/platform/tenants"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+                          <TenantListPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/platform/plans"
+                      element={
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+                          <PlanListPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Route>
+
+                  {/* Fallback to 404 */}
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </Suspense>
+            </AuthProvider>
+          </BrowserRouter>
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };

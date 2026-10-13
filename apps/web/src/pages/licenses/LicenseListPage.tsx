@@ -1,4 +1,11 @@
+// ==============================================================================
+// AssetVault: License Catalog & Quota Tracking
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Multi-tenant software contract inventory, seat utilization & renewals
+// ==============================================================================
+
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { License, Vendor, User } from '../../types';
@@ -14,12 +21,15 @@ import {
   X,
   CheckCircle,
   Building,
+  Search,
+  ExternalLink,
 } from 'lucide-react';
 
 export const LicenseListPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [selectedLicense, setSelectedLicense] = useState<License | null>(null);
@@ -27,25 +37,23 @@ export const LicenseListPage: React.FC = () => {
   const [allocationNotes, setAllocationNotes] = useState('');
   const [actionMessage, setActionMessage] = useState<{ text: string; error?: boolean } | null>(null);
 
-  // Creation form state
+  // Creation form state matching backend createLicenseSchema
   const [createForm, setCreateForm] = useState({
-    vendorId: '',
     name: '',
+    vendorId: '',
+    licenseTypeId: 1,
     licenseKey: '',
-    licenseType: 'per_seat',
     totalSeats: 10,
     cost: 499.0,
     currency: 'USD',
-    startsAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    isAutoRenew: true,
-    renewalReminderDays: 30,
-    status: 'active',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    autoRenew: true,
   });
 
   const { data: licensesData, isLoading } = useQuery<{ data: License[]; meta: any }>({
-    queryKey: ['licenses'],
-    queryFn: () => api.get('/licenses', { params: { limit: 50 } }),
+    queryKey: ['licenses', searchTerm],
+    queryFn: () => api.get('/licenses', { params: { limit: 50, q: searchTerm || undefined } }),
   });
 
   const { data: vendorsData } = useQuery<{ data: Vendor[] }>({
@@ -58,17 +66,21 @@ export const LicenseListPage: React.FC = () => {
     queryFn: () => api.get('/users', { params: { limit: 100 } }),
   });
 
-  const canManage = user?.role === 'tenant_admin' || user?.role === 'asset_manager' || user?.isSuperAdmin;
+  const canManage =
+    user?.role === 'TENANT_ADMIN' ||
+    user?.role === 'ASSET_MANAGER' ||
+    user?.role === 'SUPER_ADMIN' ||
+    user?.isSuperAdmin;
 
   // Allocate Seat mutation
   const allocateSeatMutation = useMutation({
     mutationFn: (payload: { licenseId: string; userId: string; notes?: string }) =>
-      api.post('/allocations', payload),
+      api.post(`/licenses/${payload.licenseId}/allocate`, { userId: payload.userId, notes: payload.notes }),
     onSuccess: () => {
       setShowAllocateModal(false);
       setSelectedUserId('');
       setAllocationNotes('');
-      setActionMessage({ text: 'License seat allocated successfully!' });
+      setActionMessage({ text: 'License seat allocated successfully via sp_allocate_license_seat!' });
       setTimeout(() => setActionMessage(null), 4000);
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
     },
@@ -79,12 +91,24 @@ export const LicenseListPage: React.FC = () => {
 
   // Create License mutation
   const createLicenseMutation = useMutation({
-    mutationFn: (newLicense: any) => api.post('/licenses', newLicense),
+    mutationFn: (newLicense: typeof createForm) => api.post('/licenses', newLicense),
     onSuccess: () => {
       setShowCreateModal(false);
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
       setActionMessage({ text: 'License created successfully.' });
       setTimeout(() => setActionMessage(null), 4000);
+      setCreateForm({
+        name: '',
+        vendorId: '',
+        licenseTypeId: 1,
+        licenseKey: '',
+        totalSeats: 10,
+        cost: 499.0,
+        currency: 'USD',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        autoRenew: true,
+      });
     },
     onError: (err: any) => {
       setActionMessage({ text: err.message || 'Failed to create license.', error: true });
@@ -125,101 +149,125 @@ export const LicenseListPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Software & Asset Licenses</h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Software & Asset Licenses</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Contract quotas, seat allocations, expiration schedules, and vendor compliance.
           </p>
         </div>
 
-        {canManage && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30 transition flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create License</span>
-          </button>
-        )}
+        <div className="flex items-center space-x-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search licenses..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+          </div>
+
+          {canManage && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-primary-600/30 transition flex items-center space-x-2 shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create License</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {actionMessage && (
         <div
           className={`p-3 rounded-xl border flex items-center space-x-2 text-xs ${
             actionMessage.error
-              ? 'bg-red-950/60 border-red-800 text-red-300'
-              : 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
+              ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+              : 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
           }`}
         >
           {actionMessage.error ? (
-            <AlertCircle className="w-4 h-4 text-red-400" />
+            <AlertCircle className="w-4 h-4 text-rose-500" />
           ) : (
-            <CheckCircle className="w-4 h-4 text-emerald-400" />
+            <CheckCircle className="w-4 h-4 text-emerald-500" />
           )}
           <span>{actionMessage.text}</span>
         </div>
       )}
 
-      {/* Licenses Grid */}
+      {/* License Grid */}
       {isLoading ? (
-        <div className="py-20 flex justify-center">
-          <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-48 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          ))}
         </div>
       ) : licenses.length === 0 ? (
-        <div className="py-20 text-center bg-slate-900 border border-slate-800 rounded-2xl">
-          <KeyRound className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-300">No licenses configured</p>
-          <p className="text-xs text-slate-500 mt-1">Add software contracts to track seat availability.</p>
+        <div className="p-12 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+          <KeyRound className="w-10 h-10 text-slate-400 mx-auto mb-3 opacity-40" />
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No licenses found</p>
+          <p className="text-xs text-slate-500 mt-1">Add software contracts to track seat availability and compliance.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {licenses.map((lic) => {
-            const isUnlimited = lic.licenseType === 'site' || lic.licenseType === 'open_source';
-            const allocated = lic.allocatedSeats || 0;
+            const isUnlimited = lic.licenseType?.isSeatBased === false;
+            const allocated =
+              lic.usedSeats ?? (lic.allocations ? lic.allocations.filter((a) => a.status === 'ACTIVE').length : 0);
             const total = lic.totalSeats || 1;
             const pct = isUnlimited ? 100 : Math.min(100, Math.round((allocated / total) * 100));
 
             return (
               <div
                 key={lic.id}
-                className="p-5 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col justify-between shadow-lg"
+                className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col justify-between shadow-sm hover:shadow-md transition"
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
-                      {lic.licenseType.replace('_', ' ')}
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10 px-2 py-0.5 rounded-full border border-primary-200 dark:border-primary-500/20">
+                      {lic.licenseType?.name || 'Standard'}
                     </span>
                     <span
                       className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                        lic.status === 'active'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        lic.status === 'ACTIVE'
+                          ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
+                          : 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20'
                       }`}
                     >
                       {lic.status}
                     </span>
                   </div>
 
-                  <h3 className="text-sm font-bold text-white mt-3">{lic.name}</h3>
-                  <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
-                    <Building className="w-3.5 h-3.5 text-slate-500" />
+                  <div className="flex items-start justify-between mt-3">
+                    <Link to={`/licenses/${lic.id}`} className="group">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary-600 transition flex items-center gap-1.5">
+                        {lic.name}
+                        <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </h3>
+                    </Link>
+                  </div>
+
+                  <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    <Building className="w-3.5 h-3.5 text-slate-400" />
                     <span>{lic.vendor?.name || 'Unknown Vendor'}</span>
                   </div>
 
                   {/* Seat Capacity Progress */}
-                  <div className="mt-4 p-3 bg-slate-800/40 border border-slate-700/50 rounded-xl space-y-2">
+                  <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl space-y-2">
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Seat Utilization:</span>
-                      <span className="font-bold text-white font-mono">
+                      <span className="text-slate-500 dark:text-slate-400">Seat Utilization:</span>
+                      <span className="font-bold text-slate-900 dark:text-white font-mono">
                         {isUnlimited ? 'Unlimited (Site License)' : `${allocated} / ${total} seats (${pct}%)`}
                       </span>
                     </div>
 
                     {!isUnlimited && (
-                      <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                      <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
                         <div
                           style={{ width: `${pct}%` }}
                           className={`h-full rounded-full transition-all ${
-                            pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-blue-500'
+                            pct >= 100 ? 'bg-rose-500' : pct >= 80 ? 'bg-amber-500' : 'bg-primary-500'
                           }`}
                         />
                       </div>
@@ -228,18 +276,18 @@ export const LicenseListPage: React.FC = () => {
 
                   {/* Expiration and Cost */}
                   <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                    <div className="flex items-center space-x-1.5 text-slate-400">
-                      <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                    <div className="flex items-center space-x-1.5 text-slate-500 dark:text-slate-400">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
                       <span>
-                        {lic.expiresAt
-                          ? `Expires: ${new Date(lic.expiresAt).toLocaleDateString()}`
+                        {lic.endDate
+                          ? `Expires: ${new Date(lic.endDate).toLocaleDateString()}`
                           : 'Perpetual Contract'}
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-1.5 text-slate-400 justify-end">
-                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="font-mono text-slate-200">
+                    <div className="flex items-center space-x-1.5 text-slate-500 dark:text-slate-400 justify-end">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="font-mono text-slate-700 dark:text-slate-200">
                         ${Number(lic.cost).toFixed(2)} {lic.currency}
                       </span>
                     </div>
@@ -247,12 +295,19 @@ export const LicenseListPage: React.FC = () => {
                 </div>
 
                 {/* Card Actions */}
-                <div className="mt-5 pt-3 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">
-                    {lic.linkedAssetCount || 0} linked asset(s)
+                <div className="mt-5 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">
+                    {lic.assetLicenses?.length || 0} linked asset(s)
                   </span>
 
                   <div className="flex items-center space-x-2">
+                    <Link
+                      to={`/licenses/${lic.id}`}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition"
+                    >
+                      Details
+                    </Link>
+
                     {canManage && (
                       <button
                         onClick={() => {
@@ -260,21 +315,21 @@ export const LicenseListPage: React.FC = () => {
                           setShowAllocateModal(true);
                         }}
                         disabled={!isUnlimited && allocated >= total}
-                        className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-semibold disabled:opacity-40 flex items-center space-x-1.5 transition"
+                        className="px-3 py-1.5 bg-primary-50 dark:bg-primary-950/40 hover:bg-primary-100 dark:hover:bg-primary-900/40 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30 rounded-xl text-xs font-semibold disabled:opacity-40 flex items-center space-x-1.5 transition"
                       >
                         <Users2 className="w-3.5 h-3.5" />
-                        <span>Allocate Seat</span>
+                        <span>Allocate</span>
                       </button>
                     )}
 
                     {canManage && (
                       <button
                         onClick={() => {
-                          if (confirm(`Soft-delete license "${lic.name}"?`)) {
+                          if (window.confirm(`Soft-delete license "${lic.name}"?`)) {
                             deleteMutation.mutate(lic.id);
                           }
                         }}
-                        className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition"
+                        className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
                         title="Delete License"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -291,27 +346,27 @@ export const LicenseListPage: React.FC = () => {
       {/* Allocate Seat Modal */}
       {showAllocateModal && selectedLicense && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
             <button
               onClick={() => setShowAllocateModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h2 className="text-base font-bold text-white">Allocate Seat</h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Assign a license seat for <strong className="text-white">{selectedLicense.name}</strong>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">Allocate Seat</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Assign a license seat for <strong className="text-slate-900 dark:text-white">{selectedLicense.name}</strong>
             </p>
 
             <form onSubmit={handleAllocateSubmit} className="space-y-4 mt-4 text-xs">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Select Member</label>
+                <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Select Member</label>
                 <select
                   required
                   value={selectedUserId}
                   onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                 >
                   <option value="">Choose an employee...</option>
                   {members.map((m) => (
@@ -323,12 +378,12 @@ export const LicenseListPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Assignment Notes</label>
+                <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Assignment Notes</label>
                 <input
                   value={allocationNotes}
                   onChange={(e) => setAllocationNotes(e.target.value)}
                   placeholder="e.g. Workstation ID, Project authorization code"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                 />
               </div>
 
@@ -336,14 +391,14 @@ export const LicenseListPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAllocateModal(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-medium"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={allocateSeatMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30"
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold shadow-lg shadow-primary-600/30"
                 >
                   {allocateSeatMutation.isPending ? 'Allocating...' : 'Confirm Seat Allocation'}
                 </button>
@@ -356,36 +411,36 @@ export const LicenseListPage: React.FC = () => {
       {/* Create License Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowCreateModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h2 className="text-base font-bold text-white mb-4">Register New License Contract</h2>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4">Register New License Contract</h2>
 
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">License Name</label>
+                <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">License Name</label>
                 <input
                   required
                   value={createForm.name}
                   onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                   placeholder="e.g. Adobe Creative Cloud Enterprise"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Vendor</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Vendor</label>
                   <select
                     required
                     value={createForm.vendorId}
                     onChange={(e) => setCreateForm({ ...createForm, vendorId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                   >
                     <option value="">Select Vendor</option>
                     {vendors.map((v) => (
@@ -397,53 +452,77 @@ export const LicenseListPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Licensing Model</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Licensing Model</label>
                   <select
-                    value={createForm.licenseType}
-                    onChange={(e) => setCreateForm({ ...createForm, licenseType: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                    value={createForm.licenseTypeId}
+                    onChange={(e) => setCreateForm({ ...createForm, licenseTypeId: parseInt(e.target.value, 10) })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                   >
-                    <option value="per_seat">Per Seat</option>
-                    <option value="site">Site License (Unlimited)</option>
-                    <option value="subscription">Subscription</option>
-                    <option value="perpetual">Perpetual</option>
-                    <option value="open_source">Open Source</option>
+                    <option value={1}>Proprietary Commercial (Per-Seat)</option>
+                    <option value={2}>Open Source (Unlimited)</option>
+                    <option value={3}>Site License (Unlimited Enterprise)</option>
+                    <option value={4}>Perpetual (Fixed Cap)</option>
+                    <option value={5}>SaaS Subscription</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Total Seats</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Total Seats</label>
                   <input
                     type="number"
                     min={1}
                     value={createForm.totalSeats}
                     onChange={(e) => setCreateForm({ ...createForm, totalSeats: parseInt(e.target.value, 10) })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Cost (USD)</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Cost (USD)</label>
                   <input
                     type="number"
                     step="0.01"
                     min={0}
                     value={createForm.cost}
                     onChange={(e) => setCreateForm({ ...createForm, cost: parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none font-mono"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={createForm.startDate}
+                    onChange={(e) => setCreateForm({ ...createForm, startDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={createForm.endDate}
+                    onChange={(e) => setCreateForm({ ...createForm, endDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">License Key / Code (Optional)</label>
+                <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">License Key / Secret Code</label>
                 <input
+                  required
                   value={createForm.licenseKey}
                   onChange={(e) => setCreateForm({ ...createForm, licenseKey: e.target.value })}
                   placeholder="XXXX-XXXX-XXXX-XXXX"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none font-mono"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none font-mono"
                 />
               </div>
 
@@ -451,14 +530,14 @@ export const LicenseListPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-medium"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createLicenseMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium shadow-lg shadow-blue-600/30"
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium shadow-lg shadow-primary-600/30"
                 >
                   {createLicenseMutation.isPending ? 'Creating...' : 'Create License'}
                 </button>

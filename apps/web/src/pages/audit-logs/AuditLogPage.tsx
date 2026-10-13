@@ -112,7 +112,7 @@ export const AuditLogPage: React.FC = () => {
                 {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-800/30 transition">
                     <td className="px-6 py-3.5 text-slate-400 text-[11px]">
-                      {new Date(log.createdAt).toLocaleString()}
+                      {new Date(log.performedAt || log.createdAt || Date.now()).toLocaleString()}
                     </td>
 
                     <td className="px-6 py-3.5 font-sans font-medium text-white">
@@ -170,7 +170,7 @@ export const AuditLogPage: React.FC = () => {
               <span className="font-mono text-xs">{selectedLog.action}</span>]
             </h3>
             <p className="text-[11px] text-slate-400 mt-1">
-              Recorded at {new Date(selectedLog.createdAt).toUTCString()}
+              Recorded at {new Date(selectedLog.performedAt || selectedLog.createdAt || Date.now()).toUTCString()}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 font-mono text-[11px]">

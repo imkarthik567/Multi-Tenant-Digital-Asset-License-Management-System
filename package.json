@@ -7,15 +7,16 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "concurrently -n \"API,WEB\" -c \"blue,green\" \"npm run dev --workspace=@assetvault/api\" \"npm run dev --workspace=@assetvault/web\"",
-    "dev:api": "npm run dev --workspace=@assetvault/api",
-    "dev:web": "npm run dev --workspace=@assetvault/web",
+    "dev": "node node_modules/concurrently/dist/bin/concurrently.js -n \"API,WEB\" -c \"blue,green\" \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "node node_modules/nodemon/bin/nodemon.js --watch apps/api/src -e ts --exec \"node node_modules/ts-node/dist/bin.js apps/api/src/server.ts\"",
+    "dev:web": "node node_modules/vite/bin/vite.js apps/web",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspaces",
-    "db:migrate": "npm run prisma:migrate --workspace=@assetvault/api",
-    "db:seed": "npm run prisma:seed --workspace=@assetvault/api",
-    "db:studio": "npm run prisma:studio --workspace=@assetvault/api",
+    "db:push": "node node_modules/prisma/build/index.js db push --schema apps/api/prisma/schema.prisma",
+    "db:migrate": "node node_modules/prisma/build/index.js migrate dev --schema apps/api/prisma/schema.prisma",
+    "db:seed": "node node_modules/ts-node/dist/bin.js apps/api/prisma/seed.ts",
+    "db:studio": "node node_modules/prisma/build/index.js studio --schema apps/api/prisma/schema.prisma",
     "check:sqli": "node scripts/check-sqli.js",
     "check:secrets": "node scripts/scan-secrets.js"
   },

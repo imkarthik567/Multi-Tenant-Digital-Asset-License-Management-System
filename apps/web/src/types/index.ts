@@ -1,4 +1,47 @@
-export type RoleName = 'super_admin' | 'tenant_admin' | 'asset_manager' | 'member' | 'auditor';
+// ==============================================================================
+// AssetVault: Frontend TypeScript Domain Definitions
+// Course: BCSE307L Database Systems (Fall 2026-27)
+// Matches Backend Domain Schema & OpenAPI Contract
+// ==============================================================================
+
+export type RoleName = 'SUPER_ADMIN' | 'TENANT_ADMIN' | 'ASSET_MANAGER' | 'MEMBER';
+
+export type TenantStatus = 'TRIAL' | 'ACTIVE' | 'SUSPENDED';
+
+export type AssetType = 'FONT' | 'IMAGE' | 'SOFTWARE' | 'DATASET' | 'VIDEO' | 'DOCUMENT';
+
+export type AssetStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+
+export type LicenseStatus = 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
+
+export type AllocationStatus = 'ACTIVE' | 'RELEASED';
+
+export type AccessAction = 'VIEW' | 'DOWNLOAD' | 'CHECKOUT' | 'CHECKIN';
+
+export type AuditAction = 'INSERT' | 'UPDATE' | 'DELETE' | 'TRUNCATE';
+
+export type NotificationType = 'LICENSE_EXPIRY' | 'SEAT_LIMIT' | 'SYSTEM';
+
+export interface Plan {
+  id: number;
+  name: string;
+  maxUsers: number;
+  maxAssets: number;
+  monthlyPrice: number | string;
+  isActive: boolean;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  slug: string;
+  status: TenantStatus;
+  contactEmail?: string | null;
+  planId: number;
+  plan?: Plan;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface User {
   id: string;
@@ -6,122 +49,184 @@ export interface User {
   fullName: string;
   avatarUrl?: string | null;
   roleId: number;
-  role: string;
+  role: RoleName;
   isActive: boolean;
   isSuperAdmin?: boolean;
-}
-
-export interface Tenant {
-  id: string;
-  name: string;
-  slug: string;
-  status: 'active' | 'suspended' | 'trial';
-  subscriptionTier: 'free' | 'standard' | 'enterprise';
+  tenantId?: string | null;
+  tenant?: Tenant | null;
+  permissions?: string[];
+  lastLoginAt?: string | null;
+  createdAt?: string;
 }
 
 export interface Category {
   id: string;
+  tenantId: string;
+  parentId?: string | null;
   name: string;
   description?: string | null;
-  parentCategoryId?: string | null;
-  parentCategory?: { id: string; name: string } | null;
-  subCategories?: { id: string; name: string }[];
+  parent?: Category | null;
+  children?: Category[];
   _count?: { assets: number };
 }
 
 export interface Tag {
   id: string;
+  tenantId: string;
   name: string;
-  colorHex: string;
+  color: string;
   _count?: { assetTags: number };
 }
 
 export interface Vendor {
   id: string;
+  tenantId: string;
   name: string;
   contactEmail?: string | null;
-  contactPhone?: string | null;
-  websiteUrl?: string | null;
-  address?: string | null;
+  website?: string | null;
+  supportPhone?: string | null;
+  licenses?: License[];
   _count?: { licenses: number };
+}
+
+export interface AssetVersion {
+  id: string;
+  assetId: string;
+  versionNo: number;
+  fileUrl: string;
+  fileSizeBytes: number | string;
+  checksumSha256: string;
+  changeNotes?: string | null;
+  uploadedBy?: string | null;
+  uploader?: { id: string; fullName: string; email: string } | null;
+  createdAt: string;
 }
 
 export interface Asset {
   id: string;
+  tenantId: string;
+  ownerId: string;
+  categoryId?: string | null;
+  assetCode: string;
   name: string;
-  assetType: 'font' | 'image' | 'software' | 'dataset' | 'video' | 'document' | 'other';
   description?: string | null;
-  fileUrl?: string | null;
-  fileSizeBytes?: string | number | null;
-  mimeType?: string | null;
-  version: string;
-  metadata?: Record<string, unknown>;
+  assetType: AssetType;
+  status: AssetStatus;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
-  category: { id: string; name: string };
-  createdByUser?: { id: string; fullName: string; email: string } | null;
-  assetTags: { tag: Tag }[];
-  assetLicenses: {
-    license: {
-      id: string;
-      name: string;
-      licenseType: string;
-      expiresAt?: string | null;
-      status: string;
-      vendor: { name: string };
-    };
-  }[];
+  updatedAt: string;
+  deletedAt?: string | null;
+  category?: Category | null;
+  owner?: { id: string; fullName: string; email: string } | null;
+  versions?: AssetVersion[];
+  tags?: { tag: Tag }[] | Tag[];
+  assetLicenses?: { license: License }[];
+  complianceStatus?: 'COMPLIANT' | 'UNLICENSED' | 'EXPIRED_LICENSE';
+}
+
+export interface LicenseType {
+  id: number;
+  name: string;
+  isSeatBased: boolean;
+  isExpirable: boolean;
+  description?: string | null;
 }
 
 export interface License {
   id: string;
+  tenantId: string;
+  vendorId: string;
+  licenseTypeId: number;
   name: string;
-  licenseKey?: string | null;
-  licenseType: 'per_seat' | 'site' | 'subscription' | 'perpetual' | 'open_source';
+  licenseKey: string;
   totalSeats: number;
-  allocatedSeats: number;
-  availableSeats: number;
+  startDate: string;
+  endDate?: string | null;
   cost: number | string;
   currency: string;
-  startsAt: string;
-  expiresAt?: string | null;
-  isAutoRenew: boolean;
-  renewalReminderDays: number;
-  status: 'active' | 'expired' | 'suspended' | 'pending_renewal';
-  vendor: { id: string; name: string };
+  autoRenew: boolean;
+  status: LicenseStatus;
+  terms?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  vendor?: Vendor;
+  licenseType?: LicenseType;
   allocations?: LicenseAllocation[];
-  linkedAssetCount?: number;
+  renewals?: LicenseRenewal[];
+  assetLicenses?: { asset: Asset }[];
+  usedSeats?: number;
+  availableSeats?: number;
+  utilizationPct?: number;
+  daysToExpiry?: number | null;
 }
 
 export interface LicenseAllocation {
   id: string;
   licenseId: string;
   userId: string;
+  allocatedBy?: string | null;
   allocatedAt: string;
-  revokedAt?: string | null;
-  notes?: string | null;
+  releasedAt?: string | null;
+  status: AllocationStatus;
   user?: { id: string; fullName: string; email: string; avatarUrl?: string | null };
-  license?: { id: string; name: string; licenseType: string; totalSeats: number; vendor: { name: string } };
+  allocator?: { id: string; fullName: string; email: string } | null;
+  license?: License;
 }
 
-export interface AuditLog {
+export interface LicenseRenewal {
   id: string;
-  entityType: string;
-  entityId: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'ALLOCATE' | 'REVOKE' | 'LOGIN' | 'LOGOUT';
-  oldValues?: Record<string, unknown> | null;
-  newValues?: Record<string, unknown> | null;
+  licenseId: string;
+  renewedBy?: string | null;
+  oldEndDate: string;
+  newEndDate: string;
+  cost: number | string;
+  notes?: string | null;
+  renewedAt: string;
+  renewer?: { id: string; fullName: string } | null;
+}
+
+export interface AssetAccessLog {
+  id: string | number;
+  assetId: string;
+  userId?: string | null;
+  licenseId?: string | null;
+  action: AccessAction;
   ipAddress?: string | null;
-  createdAt: string;
-  user?: { id: string; fullName: string; email: string; avatarUrl?: string | null } | null;
+  accessedAt: string;
+  asset?: Asset;
+  user?: { id: string; fullName: string; email: string } | null;
+  license?: License | null;
 }
 
 export interface Notification {
   id: string;
+  tenantId: string;
+  userId?: string | null;
+  licenseId?: string | null;
+  type: NotificationType;
   title: string;
   message: string;
-  type: 'license_expiry' | 'renewal_due' | 'seat_exhaustion' | 'system';
   isRead: boolean;
   createdAt: string;
+}
+
+export interface AuditLog {
+  id: string | number;
+  tenantId?: string | null;
+  userId?: string | null;
+  tableName: string;
+  entityType?: string;
+  recordId: string;
+  action: AuditAction;
+  oldData?: Record<string, any> | null;
+  newData?: Record<string, any> | null;
+  oldValues?: Record<string, any> | null;
+  newValues?: Record<string, any> | null;
+  performedAt: string;
+  createdAt?: string;
+  ipAddress?: string | null;
+  user?: { id: string; fullName: string; email: string } | null;
 }
 
 export interface PaginationMeta {
@@ -131,4 +236,23 @@ export interface PaginationMeta {
   totalPages: number;
   hasNext: boolean;
   hasPrev: boolean;
+}
+
+export interface ApiResponse<T> {
+  status: 'success' | 'error';
+  data: T;
+  meta?: PaginationMeta;
+  error?: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+export interface MenuItem {
+  id: string;
+  label: string;
+  path: string;
+  icon: string;
+  badge?: number | string | null;
 }

@@ -5,7 +5,7 @@
   "type": "module",
   "description": "AssetVault Frontend - React 18 + Vite + TypeScript + Tailwind CSS",
   "scripts": {
-    "dev": "vite",
+    "dev": "node ../../node_modules/vite/bin/vite.js",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
@@ -13,12 +13,14 @@
   "dependencies": {
     "@hookform/resolvers": "^3.4.2",
     "@tanstack/react-query": "^5.39.0",
+    "axios": "^1.20.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.379.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.51.5",
     "react-router-dom": "^6.23.1",
+    "recharts": "^3.10.1",
     "tailwind-merge": "^2.3.0",
     "zod": "^3.23.8"
   },

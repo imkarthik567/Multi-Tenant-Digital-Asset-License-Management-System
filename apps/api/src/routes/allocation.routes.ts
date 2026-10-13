@@ -16,6 +16,13 @@ const router = Router();
 
 router.use(authenticate, loadUser, tenantContext);
 
+// List allocations across tenant
+router.get(
+  '/',
+  authorize('allocations:read'),
+  allocationController.listAllocations
+);
+
 // Allocate seat
 router.post(
   '/',
