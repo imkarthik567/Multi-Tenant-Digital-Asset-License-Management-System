@@ -16,8 +16,11 @@ const router = Router();
 
 router.use(authenticate, loadUser, tenantContext);
 
-// 1. List audit logs with multi-field filtering
+// 1. List audit logs with multi-field filtering (supports cursor pagination via ?cursor=)
 router.get('/', authorize('audit:read'), validate({ query: queryAuditLogSchema }), auditController.listAuditLogs);
+
+// 1b. Export audit logs to RFC 4180 CSV
+router.get('/export', authorize('audit:read'), auditController.exportCsv);
 
 // 2. Retrieve JSON diff comparing oldData and newData for a specific audit log entry
 router.get('/:id/diff', authorize('audit:read'), auditController.getDiff);

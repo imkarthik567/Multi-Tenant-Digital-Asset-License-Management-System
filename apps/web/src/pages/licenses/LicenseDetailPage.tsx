@@ -20,6 +20,7 @@ import {
   Unlink,
   ExternalLink,
   FileText,
+  Download,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { License, Asset, LicenseAllocation, LicenseRenewal, User } from '../../types';
@@ -244,6 +245,40 @@ export const LicenseDetailPage: React.FC = () => {
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (!id || !license) return;
+    setIsExportingPdf(true);
+    try {
+      const response = await api.get(`/licenses/${id}/pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response as any], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `license-${license.name.replace(/[^a-zA-Z0-9_-]/g, '_')}-${license.id.slice(0, 8)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast({
+        title: 'PDF Exported',
+        message: 'License dossier generated and downloaded successfully.',
+        type: 'success',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Export Failed',
+        message: err.message || 'Failed to download license PDF dossier.',
+        type: 'error',
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   if (isLicenseLoading) {
     return (
       <div className="space-y-6">
@@ -307,6 +342,17 @@ export const LicenseDetailPage: React.FC = () => {
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Export PDF Dossier */}
+          <button
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
+            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors shadow-sm disabled:opacity-50"
+            title="Download PDF dossier (covers details, seats, covered assets, renewals)"
+          >
+            <Download className="w-3.5 h-3.5 mr-1.5 text-primary-500" />
+            {isExportingPdf ? 'Exporting...' : 'Export PDF'}
+          </button>
+
           {/* Renew Button (calls sp_renew_license) */}
           <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
             <button

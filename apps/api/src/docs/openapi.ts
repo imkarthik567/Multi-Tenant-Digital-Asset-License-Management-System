@@ -434,6 +434,33 @@ export const openApiSpec = {
     '/reports/access-trend': {
       get: { tags: ['Reports'], summary: 'Access frequency trends (mv_monthly_access_stats)', responses: { 200: { description: 'Access trends' } } },
     },
+    '/reports/compliance': {
+      get: { tags: ['Reports'], summary: 'Tenant compliance score (0-100) and remediation checklist', responses: { 200: { description: 'Compliance score and drill-down' } } },
+    },
+    '/reports/unused-seats': {
+      get: { tags: ['Reports'], summary: 'Unused license seat reclamation candidates and top vendor costs', responses: { 200: { description: 'Cost optimization insights' } } },
+    },
+    '/search': {
+      get: { tags: ['Search'], summary: 'Global trigram multi-entity search across assets, licenses, vendors, and tags', parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Search results grouped by entity' } } },
+    },
+    '/licenses/{id}/pdf': {
+      get: { tags: ['Licenses'], summary: 'Download branded PDF dossier for a software license', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }], responses: { 200: { description: 'PDF binary stream' } } },
+    },
+    '/audit-logs/export': {
+      get: { tags: ['Audit'], summary: 'Export filtered audit ledger records to RFC 4180 CSV', responses: { 200: { description: 'CSV file stream' } } },
+    },
+    '/tenant/export': {
+      get: { tags: ['Tenants'], summary: 'Export complete tenant organization data archive as JSON (Tenant Admin)', responses: { 200: { description: 'Full JSON backup archive' } } },
+    },
+    '/notifications/stream': {
+      get: { tags: ['Notifications'], summary: 'Server-Sent Events (SSE) stream for real-time notification delivery', responses: { 200: { description: 'SSE event stream' } } },
+    },
+    '/ready': {
+      get: { tags: ['Health'], summary: 'Database connectivity readiness probe', responses: { 200: { description: 'PostgreSQL ready' }, 503: { description: 'Database disconnected' } } },
+    },
+    '/metrics': {
+      get: { tags: ['Observability'], summary: 'Prometheus metrics endpoint (Protected by Bearer Token)', security: [{ BearerAuth: [] }], responses: { 200: { description: 'Prometheus metrics text' } } },
+    },
     '/platform/overview': {
       get: { tags: ['Platform'], summary: 'Super Admin platform overview across all tenants (v_tenant_summary)', responses: { 200: { description: 'Cross-tenant summary' } } },
     },

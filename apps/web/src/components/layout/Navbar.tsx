@@ -18,11 +18,13 @@ import {
   Building2,
   CheckCheck,
   ChevronDown,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../common/StatusBadge';
+import { CommandPalette } from '../common/CommandPalette';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { Notification } from '../../types';
@@ -40,6 +42,46 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Global Ctrl+K / Cmd+K hotkey for Command Palette
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Real-time Server-Sent Events (SSE) notification stream listener
+  useEffect(() => {
+    if (!user) return;
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/notifications/stream', { withCredentials: true });
+      eventSource.addEventListener('notification', (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+          toast.info(payload.message || 'New notification alert');
+        } catch {
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
+      });
+      eventSource.onerror = () => {
+        // EventSource will automatically retry in the background
+      };
+    } catch {
+      // Fallback cleanly to polling
+    }
+
+    return () => {
+      if (eventSource) eventSource.close();
+    };
+  }, [user, queryClient, toast]);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifMenuRef = useRef<HTMLDivElement>(null);
@@ -137,8 +179,33 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
         </div>
       </div>
 
+      {/* Center: Command Palette Trigger Button (Desktop & Tablet) */}
+      <button
+        type="button"
+        onClick={() => setIsSearchOpen(true)}
+        className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/60 rounded-lg border border-slate-200 dark:border-slate-700/60 transition-all w-56 lg:w-72 justify-between"
+      >
+        <span className="flex items-center gap-2 truncate">
+          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span className="truncate">Search workspace...</span>
+        </span>
+        <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded shadow-xs shrink-0">
+          ⌘K
+        </kbd>
+      </button>
+
       {/* Right: Actions (Theme Toggle, Notifications Bell, Profile Menu) */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Mobile Search Button */}
+        <button
+          type="button"
+          onClick={() => setIsSearchOpen(true)}
+          aria-label="Open command search"
+          className="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+
         {/* Dark/Light Theme Toggle */}
         <button
           type="button"
@@ -302,6 +369,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           )}
         </div>
       </div>
+
+      {/* Global Multi-Entity Command Palette Modal */}
+      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </header>
   );
 };

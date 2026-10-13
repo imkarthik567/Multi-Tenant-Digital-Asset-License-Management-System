@@ -7,7 +7,12 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiResponse } from '../types';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
+const rawBase = (import.meta as any).env?.VITE_API_URL;
+const API_BASE_URL = rawBase
+  ? rawBase.endsWith('/api')
+    ? rawBase
+    : `${rawBase.replace(/\/+$/, '')}/api`
+  : '/api';
 
 // In-Memory Token Storage (Strictly NOT stored in localStorage)
 let inMemoryAccessToken: string | null = null;

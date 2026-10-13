@@ -126,13 +126,13 @@ export class AssetService {
           assetId,
           versionNo: nextVersionNo,
           fileUrl: data.fileUrl,
-          fileSize: data.fileSize,
-          checksum: data.checksum,
-          changelog: data.changelog || null,
-          createdById: userId,
+          fileSizeBytes: BigInt(data.fileSizeBytes || data.fileSize || 1024),
+          checksumSha256: data.checksumSha256 || data.checksum || '0'.repeat(64),
+          changeNotes: data.changeNotes || data.changelog || null,
+          uploadedBy: userId,
         },
         include: {
-          createdBy: { select: { id: true, fullName: true, email: true } },
+          uploader: { select: { id: true, fullName: true, email: true } },
         },
       });
 

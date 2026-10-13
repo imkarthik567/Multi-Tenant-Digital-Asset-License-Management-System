@@ -195,7 +195,7 @@ apps/web/
 │       ├── notifications/
 │       │   └── NotificationListPage.tsx # Contract expiry & seat capacity notifications
 │       ├── settings/
-│       │   └── TenantSettingsPage.tsx # Tenant slug, domain, and contact details
+│       │   └── TenantSettingsPage.tsx # Tenant slug, domain, contact details & JSON export
 │       ├── platform/
 │       │   ├── TenantListPage.tsx   # Super Admin cross-tenant governance
 │       │   └── PlanListPage.tsx     # Super Admin tier subscription pricing
@@ -206,7 +206,56 @@ apps/web/
 
 ---
 
-## 6. Screenshots & Visual Verification
+## 6. Advanced Enterprise SaaS UI Capabilities
+
+To meet high-governance and operational demands, the frontend implements 7 advanced modules:
+
+### 6.1 Global Search Command Palette (`Ctrl+K` / `Cmd+K`)
+- **Component:** `apps/web/src/components/common/CommandPalette.tsx`
+- **Trigger:** Accessible anywhere via keyboard shortcut `Ctrl+K` (or `Cmd+K` on macOS) or the global search icon in the top Navbar.
+- **Backend Service:** Powered by PostgreSQL `pg_trgm` similarity search across Assets, Licenses, Vendors, and Tags (`GET /api/search?q=`).
+- **Interaction:** Instant keyboard navigation (Up/Down arrow, Enter to select, Escape to dismiss) with grouped entity badges and highlighted match previews.
+
+### 6.2 Compliance Engine & Dynamic Health Gauge
+- **Component:** Embedded in `DashboardPage.tsx`
+- **Backend Service:** `GET /api/reports/compliance`
+- **Features:** 
+  - Visual circular SVG health gauge displaying compliance score (0–100) and grade (A to F).
+  - Evaluates 4 core risk vectors: licensed asset ratio, over-allocated seats, active assets with expired licenses, and contracts expiring within 30 days.
+  - Interactive "Remediate Issues" trigger opening a drill-down modal with actionable resolution steps for each non-compliant entity.
+
+### 6.3 Cost Optimisation & Dormant Seat Reclaim
+- **Component:** Embedded tab in `ReportsPage.tsx`
+- **Backend Service:** `GET /api/reports/unused-seats`
+- **Features:**
+  - Automated detection of seat allocations with zero access activity in the last 30 days.
+  - Estimates prospective monthly cost savings per seat.
+  - Provides a single-click "Reclaim Seat" action utilizing atomic stored procedure `sp_release_license_seat`.
+  - Vendor cost hierarchy highlighting top SaaS software expenditure.
+
+### 6.4 Branded PDF License Dossier Export
+- **Component:** `LicenseDetailPage.tsx`
+- **Backend Service:** `GET /api/licenses/:id/pdf`
+- **Features:** Direct client-side streaming download of a generated PDF dossier containing contract terms, coverage matrix, active seat holders, and renewal timeline.
+
+### 6.5 RFC 4180 Compliance Audit Log CSV Export
+- **Component:** `AuditLogPage.tsx`
+- **Backend Service:** `GET /api/audit-logs/export`
+- **Features:** Streams current filter-applied audit ledger records as standard CSV, preserving change timestamps, actor identities, IP addresses, and mutation diffs.
+
+### 6.6 Tenant Data Lifecycle Export Archive
+- **Component:** `TenantSettingsPage.tsx`
+- **Backend Service:** `GET /api/tenant/export`
+- **Features:** Enables `TENANT_ADMIN` to trigger an export archive producing a structured JSON document of all tenant digital assets, versions, licenses, seat allocations, categories, and tags.
+
+### 6.7 Real-Time Push: Server-Sent Events (SSE)
+- **Component:** `Navbar.tsx`
+- **Backend Service:** `GET /api/notifications/stream`
+- **Features:** Subscribes to authenticated SSE stream. When server triggers automated expiry notices (`fn_generate_expiry_notifications`), the notification bell updates badge counts instantly without user refresh.
+
+---
+
+## 7. Screenshots & Visual Verification
 
 Automated headless verification was conducted using Puppeteer across Desktop ($1280\text{px}$), Tablet ($768\text{px}$), and Mobile ($375\text{px}$) viewports. Captured artifacts are located in `docs/screenshots/`:
 
@@ -237,8 +286,9 @@ Automated headless verification was conducted using Puppeteer across Desktop ($1
 
 ---
 
-## 7. Verification & Production Build Status
+## 8. Verification & Production Build Status
 
 - **Type Safety:** Verified with `tsc --noEmit` across all modules: **0 errors**.
 - **Production Bundle:** Generated via `vite build`: **0 errors**, minified and code-split chunks in `dist/`.
 - **Runtime Connectivity:** Validated via automated REST health checks (`GET /api/health` $\to$ `200 OK`, PostgreSQL connected).
+- **Automated End-to-End Suite:** All 3 core Playwright user journeys passing with 100% success rate.
