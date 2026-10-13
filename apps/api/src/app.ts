@@ -28,6 +28,9 @@ import {
 
 const app = express();
 
+// Trust reverse proxy (Render, Vercel, Cloudflare, AWS ALB) for client IP and protocol detection
+app.set('trust proxy', 1);
+
 // Enable strong HTTP ETag support for client-side caching & revalidation
 app.set('etag', 'strong');
 
@@ -38,7 +41,7 @@ app.use(requestIdMiddleware);
 configurePassport();
 app.use(passport.initialize());
 
-// 2. Security Headers (Helmet)
+// 2. Security Headers (Helmet with HSTS in production)
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -51,16 +54,41 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
+    hsts:
+      env.NODE_ENV === 'production'
+        ? {
+            maxAge: 31536000,
+            includeSubDomains: true,
+            preload: true,
+          }
+        : false,
   })
 );
 
-// 3. Strict CORS Allow-List from CLIENT_URL
-const allowedOrigins = [env.CLIENT_URL, env.CORS_ORIGIN].filter(Boolean);
+// 3. Strict CORS Allow-List from CLIENT_URL and CORS_ORIGIN (supports comma-separated lists)
+const parseAllowedOrigins = (sources: Array<string | undefined>): string[] => {
+  const origins = new Set<string>();
+  for (const src of sources) {
+    if (!src) continue;
+    for (const item of src.split(',')) {
+      const trimmed = item.trim().replace(/\/$/, '');
+      if (trimmed) origins.add(trimmed);
+    }
+  }
+  return Array.from(origins);
+};
+
+export const allowedOrigins = parseAllowedOrigins([env.CLIENT_URL, env.CORS_ORIGIN]);
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow server-to-server or curl/tests where origin is undefined
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow server-to-server, healthchecks, or tests where origin is undefined
+      if (!origin) {
+        return callback(null, true);
+      }
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      if (allowedOrigins.includes(normalizedOrigin) || env.NODE_ENV === 'development') {
         callback(null, true);
       } else {
         callback(new Error(`CORS blocked: Origin ${origin} not allowed by policy`));

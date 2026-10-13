@@ -14,8 +14,9 @@ const startServer = async () => {
     await prisma.$connect();
     console.log('✅ Connected to PostgreSQL database successfully.');
 
-    // Start background schedulers in API process during local development
-    if (env.RUN_WORKER_IN_API) {
+    // Start background schedulers in API process (controlled by ENABLE_IN_PROCESS_WORKER or RUN_WORKER_IN_API)
+    const enableWorker = env.ENABLE_IN_PROCESS_WORKER ?? env.RUN_WORKER_IN_API;
+    if (enableWorker) {
       jobScheduler.startScheduler();
     }
 
@@ -26,7 +27,7 @@ const startServer = async () => {
 
     const shutdown = async (signal: string) => {
       console.log(`\n🛑 Received ${signal}. Gracefully shutting down AssetVault API...`);
-      if (env.RUN_WORKER_IN_API) {
+      if (enableWorker) {
         jobScheduler.stopScheduler();
       }
       server.close(async () => {

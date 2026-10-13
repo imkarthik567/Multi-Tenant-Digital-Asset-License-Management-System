@@ -1,6 +1,9 @@
 # AssetVault: Multi-Tenant Digital Asset & License Management System
 
 [![CI Pipeline](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/workflows/ci.yml/badge.svg)](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions)
+[![Deploy to Render](https://img.shields.io/badge/Deploy%20to-Render-46E3B7?logo=render&logoColor=white)](https://render.com)
+[![Deploy to Vercel](https://img.shields.io/badge/Deploy%20to-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com)
+[![Monitoring: Prometheus & Grafana](https://img.shields.io/badge/Monitoring-Prometheus%20%2B%20Grafana-F46800?logo=grafana&logoColor=white)](#)
 [![Database: PostgreSQL 16](https://img.shields.io/badge/Database-PostgreSQL%2016-336791?logo=postgresql)](https://www.postgresql.org/)
 [![ORM: Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748?logo=prisma)](https://www.prisma.io/)
 [![Backend: Express TypeScript](https://img.shields.io/badge/Backend-Node.js%2020%20+%20Express-68A063?logo=node.js)](https://nodejs.org/)
@@ -264,14 +267,40 @@ All demo accounts are initialized during `prisma/seed.ts`. Default password: `Pa
 * **OpenAPI 3.0 JSON Specification:** `http://localhost:5000/api/docs.json`
 * **Health & Liveness Probe:** `http://localhost:5000/api/health`
 * **Database Readiness Probe:** `http://localhost:5000/api/ready`
-* **Prometheus Metrics:** `http://localhost:5000/api/metrics`
+* **Prometheus Metrics:** `http://localhost:5000/metrics`
 * **Docker Hub Registry:**
   * API: `docker pull <DOCKERHUB_USERNAME>/assetvault-api:1.0.0`
   * Web: `docker pull <DOCKERHUB_USERNAME>/assetvault-web:1.0.0`
 
 ---
 
-## 12. Monorepo Project Structure
+## 12. Free-Cloud Deployment & Operations
+
+AssetVault is engineered for full-stack, free-tier cloud deployment:
+* **Cloud Database:** [Supabase](https://supabase.com) (PostgreSQL 16 with Transaction Pooler & Direct URL).
+* **Backend API & Cron:** [Render](https://render.com) (Docker Web Service via `render.yaml` Blueprint).
+* **Frontend SPA:** [Vercel](https://vercel.com) (Vite React deployment with `/api/*` reverse-proxy rewrites).
+* **Automated CI/CD:** GitHub Actions workflows for continuous integration, Docker image publishing, Trivy scanning, automated deployments, free-tier keepalive pinging, and nightly database backups.
+* **Telemetry & Monitoring:** Prometheus scraper + Grafana dashboards running locally via `docker compose --profile monitoring up -d`, plus external uptime monitoring via UptimeRobot.
+
+Comprehensive deployment guides:
+* [Production Deployment Guide (Supabase, Render, Vercel)](docs/deployment.md)
+* [Custom Domain, Dynamic DNS (DuckDNS) & SSL Setup](docs/custom-domain.md)
+* [Production Go-Live Verification Checklist](docs/go-live-checklist.md)
+
+### Launching Local Monitoring Stack (Prometheus + Grafana)
+```bash
+# Start API, Web, DB, Prometheus, and Grafana
+docker compose --profile monitoring up -d
+
+# Access Grafana Dashboard (admin / admin):
+# http://localhost:3001
+# Pre-provisioned dashboard: "AssetVault Enterprise Operations & Telemetry"
+```
+
+---
+
+## 13. Monorepo Project Structure
 
 ```text
 .
@@ -297,6 +326,7 @@ All demo accounts are initialized during `prisma/seed.ts`. Default password: `Pa
 │       │   ├── pages/                   # Role-aware dashboard, assets, licenses, reports
 │       │   └── services/api.ts          # Axios interceptor with silent 401 refresh queue
 │       ├── nginx.conf                   # Production Nginx reverse-proxy and SPA routing
+│       ├── vercel.json                  # Vercel SPA rewrites & security headers
 │       └── Dockerfile                   # Multi-stage Vite build + Nginx Alpine
 ├── database/
 │   ├── backup/                          # Native backup, restore, and verify-restore scripts
@@ -304,7 +334,14 @@ All demo accounts are initialized during `prisma/seed.ts`. Default password: `Pa
 │   │   ├── restore.ps1 / restore.sh     # Checksum verification & scratch restore
 │   │   └── verify-restore.ps1 / .sh     # Automated 19-table row parity audit table
 │   └── sql/                             # Schema DDL, views, triggers, and procedures
+│       └── 08_production_bootstrap.sql  # Restricted assetvault_app role provisioning
+├── monitoring/                          # Operational telemetry and dashboard configurations
+│   ├── prometheus/                      # Scrape config with Bearer token authentication
+│   └── grafana/                         # Datasource and dashboard provisioning
 ├── docs/                                # Technical reports and verification evidence
+│   ├── deployment.md                    # Free cloud deployment (Supabase, Render, Vercel)
+│   ├── custom-domain.md                 # DuckDNS, SSL, CORS & OAuth configuration
+│   ├── go-live-checklist.md             # Production sign-off audit checklist
 │   ├── advanced-features.md             # 11 Advanced SaaS capabilities breakdown
 │   ├── backup-recovery.md               # Real disaster recovery drill terminal evidence
 │   ├── docker.md                        # Container build, size reduction, and push steps
@@ -313,15 +350,16 @@ All demo accounts are initialized during `prisma/seed.ts`. Default password: `Pa
 │   └── screenshots/                     # 16 Headless viewport verification screenshots
 ├── tests/
 │   └── e2e/                             # Playwright automated user journey test suite
-├── docker-compose.yml                   # Local container orchestration
+├── render.yaml                          # Render Blueprint infrastructure as code
+├── docker-compose.yml                   # Container orchestration (core + monitoring)
 ├── docker-compose.prod.yml              # Production overrides with resource limits
-├── .github/                             # CI workflow, PR templates, and issue templates
+├── .github/                             # CI, Docker, Deploy, Keepalive, and Backup workflows
 └── package.json                         # Monorepo workspaces definition
 ```
 
 ---
 
-## 13. Visual Verification & Screenshots
+## 14. Visual Verification & Screenshots
 
 Screenshots captured across Desktop ($1280\text{px}$), Tablet ($768\text{px}$), and Mobile ($375\text{px}$) viewports:
 
@@ -333,7 +371,7 @@ Screenshots captured across Desktop ($1280\text{px}$), Tablet ($768\text{px}$), 
 
 ---
 
-## 14. Academic Team & Acknowledgements
+## 15. Academic Team & Acknowledgements
 
 * **Lead Architect & Developer:** Karthikeyan S (Department of Computer Applications, VIT Vellore).
 * **Course Faculty:** Course Coordinator & Lab Faculty for BCSE307L (Database Systems).
