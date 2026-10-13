@@ -47,6 +47,7 @@ router.get('/', authorize('assets:read'), tenantContext, assetController.listAss
 router.get('/:id', authorize('assets:read'), tenantContext, assetController.getAssetById);
 router.post('/', authorize('assets:create'), tenantContext, validate(createAssetSchema), assetController.createAsset);
 router.patch('/:id', authorize('assets:update'), tenantContext, validate(updateAssetSchema), assetController.updateAsset);
+router.put('/:id', authorize('assets:update'), tenantContext, validate(updateAssetSchema), assetController.updateAsset);
 router.delete('/:id', authorize('assets:delete'), tenantContext, assetController.softDeleteAsset);
 router.post('/:id/restore', authorize('assets:delete'), tenantContext, assetController.restoreAsset);
 router.patch('/:id/restore', authorize('assets:delete'), tenantContext, assetController.restoreAsset);

@@ -339,6 +339,11 @@ docker compose --profile monitoring up -d
 │   ├── prometheus/                      # Scrape config with Bearer token authentication
 │   └── grafana/                         # Datasource and dashboard provisioning
 ├── docs/                                # Technical reports and verification evidence
+│   ├── FINAL_AUDIT.md                   # Strict requirement-by-requirement course brief audit (100% PASS)
+│   ├── FINAL_REPORT.md                  # Comprehensive academic project report (15 sections, BCNF proofs)
+│   ├── DEMO_SCRIPT.md                   # 10-minute viva presentation and demo cue cards
+│   ├── VIVA_QA.md                       # 40 project-specific viva questions and detailed technical answers
+│   ├── security-test-report.md          # Adversarial penetration test report (22/22 break-it tests passing)
 │   ├── deployment.md                    # Free cloud deployment (Supabase, Render, Vercel)
 │   ├── custom-domain.md                 # DuckDNS, SSL, CORS & OAuth configuration
 │   ├── go-live-checklist.md             # Production sign-off audit checklist
