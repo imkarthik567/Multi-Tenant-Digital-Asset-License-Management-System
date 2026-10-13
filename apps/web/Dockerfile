@@ -1,41 +1,42 @@
 # ==============================================================================
-# AssetVault Web Dockerfile (React + Vite + Nginx)
+# AssetVault: Production Web Frontend Dockerfile (Vite Build + Nginx Alpine)
 # ==============================================================================
 
+# Stage 1: Build Frontend Assets
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+RUN apk add --no-cache libc6-compat
 
-# Copy root and workspace manifests
+# Copy dependency manifests
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
 
-# Install dependencies
+# Install build dependencies
 RUN npm ci --workspace=@assetvault/web
 
-# Copy web source code
+# Copy web source files
 COPY apps/web ./apps/web
 
-# Compile React TypeScript bundle
 WORKDIR /app/apps/web
-RUN npm run build
+ENV VITE_API_URL=/api
+RUN node ../../node_modules/vite/bin/vite.js build
 
-# Production Nginx Server
+# Stage 2: Ultra-Slim Production Nginx Runtime
 FROM nginx:alpine AS runner
 
+# Remove default nginx HTML templates
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copy compiled static assets from builder
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
-# Nginx Single Page Application configuration
-RUN echo 'server { \
-    listen 80; \
-    server_name localhost; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html index.htm; \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Copy optimized Nginx configuration
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
+
+HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
+  CMD wget -qO- http://localhost:80/healthz || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

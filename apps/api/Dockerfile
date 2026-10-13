@@ -1,43 +1,67 @@
 # ==============================================================================
-# AssetVault API Dockerfile (Node.js 20 Alpine)
+# AssetVault: Production API Dockerfile (Multi-Stage Node.js 20 Alpine)
+# Targets minimal footprint, non-root security, and automated Prisma migrations
 # ==============================================================================
 
-FROM node:20-alpine AS builder
-
+# Stage 1: Dependencies Resolution
+FROM node:20-alpine AS deps
 WORKDIR /app
+RUN apk add --no-cache libc6-compat
 
-# Copy root and workspace manifests
 COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
 COPY apps/api/prisma ./apps/api/prisma/
 
-# Install dependencies
 RUN npm ci --workspace=@assetvault/api
 
-# Copy API source code
+# Stage 2: Compilation & Prisma Generation
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY package*.json ./
 COPY apps/api ./apps/api
 
-# Generate Prisma Client and compile TypeScript
 WORKDIR /app/apps/api
 RUN npx prisma generate
-RUN npm run build
+RUN node ../../node_modules/typescript/bin/tsc -p tsconfig.json
 
-# Production Runner
+# Stage 3: Production Runtime (Non-root user, slim footprint)
 FROM node:20-alpine AS runner
-
 WORKDIR /app/apps/api
 
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# Copy runtime assets from builder
-COPY --from=builder /app/package*.json /app/
-COPY --from=builder /app/apps/api/package*.json ./
-COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/apps/api/node_modules ./node_modules
+# Install runtime utilities (curl/wget for healthcheck)
+RUN apk add --no-cache curl wget libc6-compat
+
+# Create node workspace layout
+COPY package*.json /app/
+COPY apps/api/package*.json ./
+COPY apps/api/prisma ./prisma
+COPY apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+# Install production-only dependencies
+WORKDIR /app
+RUN npm ci --workspace=@assetvault/api --omit=dev && npm cache clean --force
+
+WORKDIR /app/apps/api
+# Copy built artifacts from builder
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/apps/api/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/apps/api/node_modules/@prisma ./node_modules/@prisma
+
+# Security: Non-root execution
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    chown -R node:node /app
+
+USER node
 
 EXPOSE 5000
 
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:5000/api/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/server.js"]
