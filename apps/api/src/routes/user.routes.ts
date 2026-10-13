@@ -34,6 +34,7 @@ router.get('/:id/allocations', authorize('allocations:read'), tenantContext, all
 // User administration (Requires users:manage)
 router.post('/', authorize('users:manage'), tenantContext, validate(createUserSchema), userController.createUser);
 router.patch('/:id', authorize('users:manage'), tenantContext, validate(updateUserSchema), userController.updateUser);
+router.put('/:id', authorize('users:manage'), tenantContext, validate(updateUserSchema), userController.updateUser);
 router.patch('/:id/status', authorize('users:manage'), tenantContext, validate(updateUserStatusSchema), userController.updateStatus);
 router.patch('/:id/role', authorize('users:manage'), tenantContext, validate(changeRoleSchema), userController.changeRole);
 router.post('/:id/reset-password', authorize('users:manage'), tenantContext, validate(resetPasswordSchema), userController.resetPassword);

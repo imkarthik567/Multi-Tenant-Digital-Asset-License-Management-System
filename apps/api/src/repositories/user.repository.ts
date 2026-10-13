@@ -79,14 +79,14 @@ export class UserRepository {
   }
 
   public async findById(prisma: PrismaClient | any, id: string): Promise<any | null> {
-    return prisma.user.findUnique({
+    return prisma.user.findFirst({
       where: { id },
       select: USER_SAFE_SELECT,
     });
   }
 
   public async findByEmail(prisma: PrismaClient | any, email: string): Promise<any | null> {
-    return prisma.user.findUnique({
+    return prisma.user.findFirst({
       where: { email },
       select: USER_SAFE_SELECT,
     });

@@ -41,6 +41,7 @@ router.get('/:id/pdf', authorize('licenses:read'), licenseController.exportPdf);
 
 // 5. Update license
 router.patch('/:id', authorize('licenses:update'), validate(updateLicenseSchema), licenseController.updateLicense);
+router.put('/:id', authorize('licenses:update'), validate(updateLicenseSchema), licenseController.updateLicense);
 
 // 6. Delete license (soft delete)
 router.delete('/:id', authorize('licenses:delete'), licenseController.softDeleteLicense);
