@@ -4,7 +4,8 @@
   "description": "AssetVault REST API - Express + Prisma + TypeScript",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts",
+    "dev": "node ../../node_modules/ts-node/dist/bin.js src/server.ts",
+    "dev:watch": "node ../../node_modules/nodemon/bin/nodemon.js --watch src -e ts --exec \"node ../../node_modules/ts-node/dist/bin.js src/server.ts\"",
     "build": "rimraf dist && tsc",
     "start": "node dist/server.js",
     "prisma:generate": "node ../../node_modules/prisma/build/index.js generate",
