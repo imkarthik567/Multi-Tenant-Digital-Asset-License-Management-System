@@ -28,10 +28,12 @@ out/
 service-account*.json
 
 # Database Dumps and Backups
+/backups/
+backups/
 *.sql.gz
 *.dump
-backups/*.sql
-backups/*.dump
+*.dump.sha256
+*.sha256
 
 # Logs
 npm-debug.log*
@@ -61,3 +63,7 @@ pgdata/
 # Local uploaded files
 uploads/
 /apps/api/uploads/
+
+# E2E Test Reports & Artifacts
+test-results/
+playwright-report/
