@@ -163,9 +163,14 @@ export class AuthController {
    */
   public async googleCallback(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const primaryClientUrl = (env.CLIENT_URL.split(',')[0] || 'http://localhost:5173').trim().replace(/\/$/, '');
+      const requestOrigin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+      const redirectOrigin =
+        requestOrigin && env.CLIENT_URL.includes(requestOrigin) ? requestOrigin : primaryClientUrl;
+
       const user = req.user;
       if (!user) {
-        res.redirect(`${env.CLIENT_URL}/login?error=not_invited`);
+        res.redirect(`${redirectOrigin}/login?error=not_invited`);
         return;
       }
 
@@ -195,7 +200,7 @@ export class AuthController {
       setRefreshTokenCookie(res, refreshData.rawToken);
 
       // Redirect client with access token
-      res.redirect(`${env.CLIENT_URL}/oauth-callback?token=${accessToken}`);
+      res.redirect(`${redirectOrigin}/oauth-callback?token=${accessToken}`);
     } catch (error) {
       next(error);
     }

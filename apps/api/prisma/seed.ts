@@ -87,6 +87,12 @@ async function main() {
     licenseTypesMap.set(licenseType.name, licenseType.id);
   }
 
+  // Dynamic Super Admin credentials from environment (defaults to demo admin if unset)
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@assetvault.io';
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'Password123!';
+  const superAdminName = process.env.SUPER_ADMIN_NAME || 'Global Super Administrator';
+  const superAdminHash = await bcrypt.hash(superAdminPassword, 10);
+
   // Common password hash for test accounts
   const passwordHash = await bcrypt.hash('Password123!', 10);
 
@@ -95,22 +101,32 @@ async function main() {
   // ----------------------------------------------------------------------------
   console.log('  -> Seeding platform super administrator...');
   const superAdmin = await prisma.user.upsert({
-    where: { email: 'superadmin@assetvault.io' },
+    where: { email: superAdminEmail },
     update: {
-      fullName: 'Global Super Administrator',
-      passwordHash,
+      fullName: superAdminName,
+      passwordHash: superAdminHash,
       isActive: true,
     },
     create: {
-      email: 'superadmin@assetvault.io',
-      fullName: 'Global Super Administrator',
-      passwordHash,
+      email: superAdminEmail,
+      fullName: superAdminName,
+      passwordHash: superAdminHash,
       roleId: rolesMap.get('SUPER_ADMIN')!,
       tenantId: null,
       isActive: true,
     },
   });
-  console.log(`    ✓ Super Admin created: ${superAdmin.email}`);
+  console.log(`    ✓ Super Admin configured: ${superAdmin.email}`);
+
+  // Check if demo seed should run (production skips demo entities unless SEED_DEMO=true)
+  const isProduction = process.env.NODE_ENV === 'production';
+  const shouldSeedDemo = process.env.SEED_DEMO === 'true' || !isProduction;
+
+  if (!shouldSeedDemo) {
+    console.log('✨ Production mode detected without SEED_DEMO=true. Skipping demo tenants, vendors, assets, and licenses.');
+    console.log('✅ Core reference tables (roles, plans, license types) and Super Admin seeded successfully.');
+    return;
+  }
 
   // ----------------------------------------------------------------------------
   // 5. TENANTS & USERS
