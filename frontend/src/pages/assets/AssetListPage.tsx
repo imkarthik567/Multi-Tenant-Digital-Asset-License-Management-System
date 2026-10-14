@@ -19,6 +19,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { FormField } from '../../components/common/FormField';
 import { TagInput } from '../../components/common/TagInput';
 import { RoleGate } from '../../components/auth/RoleGate';
+import { FileUrlField } from '../../components/common/FileUrlField';
 import {
   Plus,
   Upload,
@@ -610,15 +611,14 @@ export const AssetListPage: React.FC = () => {
             </select>
           </FormField>
 
-          <FormField label="Initial File URL" required helperText="CDN / Object Storage URL for version 1">
-            <input
-              type="text"
-              value={createForm.fileUrl}
-              onChange={(e) => setCreateForm({ ...createForm, fileUrl: e.target.value })}
-              placeholder="https://cdn.assetvault.io/tokens-v1.json"
-              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono"
-            />
-          </FormField>
+          <FileUrlField
+            label="Initial File URL"
+            required
+            helperText="CDN / Object Storage URL for version 1"
+            value={createForm.fileUrl}
+            onChange={(val) => setCreateForm({ ...createForm, fileUrl: val })}
+            placeholder="https://cdn.assetvault.io/tokens-v1.json"
+          />
 
           <FormField label="Tags">
             <TagInput

@@ -13,6 +13,7 @@ import {
   Clock,
   ShieldAlert,
   Info,
+  AlertTriangle,
   ExternalLink,
 } from 'lucide-react';
 import { api } from '../../services/api';
@@ -75,7 +76,7 @@ export const NotificationListPage: React.FC = () => {
 
   // Run automated license expiry check
   const runExpiryCheckMutation = useMutation({
-    mutationFn: () => api.post('/notifications/run-expiry-check', { daysAhead: 30 }),
+    mutationFn: () => api.post('/notifications/run-expiry-check', { lookaheadDays: 30 }),
     onSuccess: (data: any) => {
       toast({
         title: 'Expiry Check Completed',
@@ -98,10 +99,16 @@ export const NotificationListPage: React.FC = () => {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
+      case 'EXPIRY_30':
+      case 'EXPIRY_15':
       case 'LICENSE_EXPIRY':
         return <Clock className="w-5 h-5 text-amber-500" />;
+      case 'EXPIRY_7':
+      case 'EXPIRED':
+        return <AlertTriangle className="w-5 h-5 text-rose-500" />;
+      case 'OVER_ALLOCATION':
       case 'SEAT_LIMIT':
-        return <ShieldAlert className="w-5 h-5 text-rose-500" />;
+        return <ShieldAlert className="w-5 h-5 text-purple-500" />;
       case 'SYSTEM':
       default:
         return <Info className="w-5 h-5 text-primary-500" />;
@@ -222,7 +229,9 @@ export const NotificationListPage: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{n.title}</h4>
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white capitalize">
+                      {n.title || (n.type ? n.type.replace(/_/g, ' ').toLowerCase() : 'System Notification')}
+                    </h4>
                     {!n.isRead && (
                       <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" title="Unread" />
                     )}

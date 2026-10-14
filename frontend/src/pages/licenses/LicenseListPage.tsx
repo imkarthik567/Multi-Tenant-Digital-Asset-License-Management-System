@@ -24,6 +24,7 @@ import {
   Search,
   ExternalLink,
 } from 'lucide-react';
+import { DatePicker } from '../../components/common/DatePicker';
 
 export const LicenseListPage: React.FC = () => {
   const { user } = useAuth();
@@ -499,26 +500,18 @@ export const LicenseListPage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={createForm.startDate}
-                    onChange={(e) => setCreateForm({ ...createForm, startDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
-                  />
-                </div>
+                <DatePicker
+                  label="Start Date"
+                  required
+                  value={createForm.startDate}
+                  onChange={(val) => setCreateForm({ ...createForm, startDate: val })}
+                />
 
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={createForm.endDate}
-                    onChange={(e) => setCreateForm({ ...createForm, endDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
-                  />
-                </div>
+                <DatePicker
+                  label="End Date"
+                  value={createForm.endDate}
+                  onChange={(val) => setCreateForm({ ...createForm, endDate: val })}
+                />
               </div>
 
               <div>
