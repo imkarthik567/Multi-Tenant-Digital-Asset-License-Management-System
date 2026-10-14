@@ -115,13 +115,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     email: string;
     password: string;
   }): Promise<User> => {
+    const generatedSlug = (payload.tenantSlug || payload.tenantName)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
     const res = await api.post<{
       data: {
         user: User;
         tenant: Tenant;
         accessToken: string;
       };
-    }>('/auth/register-tenant', payload);
+    }>('/auth/register-tenant', {
+      tenantName: payload.tenantName.trim(),
+      slug: generatedSlug.length >= 2 ? generatedSlug : `org-${Date.now()}`,
+      contactEmail: payload.email.trim(),
+      adminFullName: payload.fullName.trim(),
+      adminEmail: payload.email.trim(),
+      fullName: payload.fullName.trim(),
+      email: payload.email.trim(),
+      password: payload.password,
+    });
 
     const { accessToken, user: registeredUser, tenant: registeredTenant } = res.data;
     setAccessToken(accessToken);

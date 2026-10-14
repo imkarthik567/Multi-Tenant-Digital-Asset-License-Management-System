@@ -30,20 +30,45 @@ export const loginSchema = z
   .strip();
 
 export const registerTenantSchema = z
-  .object({
-    tenantName: z.string().min(2, 'Tenant name must be at least 2 characters').max(100).trim(),
-    slug: z
-      .string()
-      .min(2, 'Slug must be at least 2 characters')
-      .max(50)
-      .regex(/^[a-z0-9-]+$/, 'Slug may only contain lowercase alphanumeric characters and hyphens')
-      .trim(),
-    contactEmail: z.string().email('Valid organization contact email is required').toLowerCase().trim(),
-    adminFullName: z.string().min(2, 'Administrator name is required').max(100).trim(),
-    adminEmail: z.string().email('Valid administrator email is required').toLowerCase().trim(),
-    password: passwordSchema,
-  })
-  .strip();
+  .preprocess(
+    (val: any) => {
+      if (typeof val !== 'object' || val === null) return val;
+      const adminFullName = val.adminFullName || val.fullName;
+      const adminEmail = val.adminEmail || val.email;
+      const contactEmail = val.contactEmail || adminEmail;
+      let slug = val.slug || val.tenantSlug;
+      if (!slug && val.tenantName) {
+        slug = val.tenantName
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        if (slug.length < 2) slug = `org-${slug || 'tenant'}`;
+      }
+      return {
+        ...val,
+        adminFullName,
+        adminEmail,
+        contactEmail,
+        slug,
+      };
+    },
+    z
+      .object({
+        tenantName: z.string().min(2, 'Tenant name must be at least 2 characters').max(100).trim(),
+        slug: z
+          .string()
+          .min(2, 'Slug must be at least 2 characters')
+          .max(50)
+          .regex(/^[a-z0-9-]+$/, 'Slug may only contain lowercase alphanumeric characters and hyphens')
+          .trim(),
+        contactEmail: z.string().email('Valid organization contact email is required').toLowerCase().trim(),
+        adminFullName: z.string().min(2, 'Administrator name is required').max(100).trim(),
+        adminEmail: z.string().email('Valid administrator email is required').toLowerCase().trim(),
+        password: passwordSchema,
+      })
+      .strip()
+  );
 
 export const refreshTokenSchema = z
   .object({

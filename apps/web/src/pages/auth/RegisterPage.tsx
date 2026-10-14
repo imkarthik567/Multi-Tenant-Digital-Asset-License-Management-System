@@ -69,8 +69,20 @@ export const RegisterPage: React.FC = () => {
       toast.success('Your organization and admin account have been provisioned.', 'Registration Successful!');
       navigate('/');
     } catch (err: any) {
-      setServerError(err.message || 'Failed to register organization.');
-      toast.error(err.message || 'Registration failed');
+      console.error('[RegisterPage] Registration error:', err);
+      let errorMsg = err.message || 'Failed to register organization.';
+      if (err.details?.fieldErrors) {
+        const fieldKeys = Object.keys(err.details.fieldErrors);
+        if (fieldKeys.length > 0) {
+          const firstKey = fieldKeys[0];
+          const messages = err.details.fieldErrors[firstKey];
+          if (Array.isArray(messages) && messages.length > 0) {
+            errorMsg = `${firstKey}: ${messages[0]}`;
+          }
+        }
+      }
+      setServerError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
