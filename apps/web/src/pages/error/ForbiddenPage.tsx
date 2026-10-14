@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export const ForbiddenPage: React.FC = () => {
   const { user } = useAuth();
+  const roleName = typeof user?.role === 'object' && user?.role !== null ? (user.role as any).name : user?.role;
 
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-6 animate-fade-in">
@@ -23,7 +24,7 @@ export const ForbiddenPage: React.FC = () => {
       </h1>
 
       <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-2 leading-relaxed">
-        Your current role (<strong className="text-slate-700 dark:text-slate-300 font-semibold">{user?.role}</strong>) does not have permission to view or execute operations on this resource.
+        Your current role (<strong className="text-slate-700 dark:text-slate-300 font-semibold">{roleName}</strong>) does not have permission to view or execute operations on this resource.
       </p>
 
       <p className="text-xs text-slate-400 dark:text-slate-500 mb-8">

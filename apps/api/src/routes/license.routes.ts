@@ -26,6 +26,8 @@ router.use(authenticate, loadUser, tenantContext);
 
 // 1. Export licenses to CSV (must come before /:id)
 router.get('/export', authorize('licenses:read'), licenseController.exportCsv);
+router.get('/export.csv', authorize('licenses:read'), licenseController.exportCsv);
+router.get('/export-csv', authorize('licenses:read'), licenseController.exportCsv);
 
 // 2. List licenses
 router.get('/', authorize('licenses:read'), validate({ query: queryLicenseSchema }), licenseController.listLicenses);

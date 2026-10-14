@@ -43,6 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const userRole = typeof user?.role === 'object' && user?.role !== null ? (user.role as any).name : user?.role;
 
   // Global Ctrl+K / Cmd+K hotkey for Command Palette
   useEffect(() => {
@@ -306,7 +307,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
                 {user?.fullName}
               </span>
               <span className="text-[10px] text-slate-400 uppercase font-medium">
-                {user?.role?.replace('_', ' ')}
+                {userRole?.replace('_', ' ')}
               </span>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
@@ -320,7 +321,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
                 </p>
                 <p className="text-slate-400 truncate mt-0.5">{user?.email}</p>
                 <div className="mt-2">
-                  <StatusBadge status={user?.role} size="sm" />
+                  <StatusBadge status={userRole} size="sm" />
                 </div>
               </div>
 
@@ -333,7 +334,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
                   <UserIcon className="w-3.5 h-3.5 text-slate-400" />
                   <span>Profile & Password</span>
                 </Link>
-                {user?.role === 'TENANT_ADMIN' && (
+                {userRole === 'TENANT_ADMIN' && (
                   <Link
                     to="/settings"
                     onClick={() => setIsUserMenuOpen(false)}

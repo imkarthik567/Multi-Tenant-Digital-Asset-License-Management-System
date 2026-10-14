@@ -9,16 +9,22 @@ import { verifyAccessToken } from '../utils/token.util';
 import { UnauthorizedError } from '../errors/AppError';
 
 export const authenticate = (req: Request, _res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
+  let token: string | undefined;
 
-  if (!authHeader) {
-    throw new UnauthorizedError('Authorization header missing');
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const [scheme, val] = authHeader.split(' ');
+    if (scheme && scheme.toLowerCase() === 'bearer' && val) {
+      token = val;
+    } else {
+      throw new UnauthorizedError('Invalid authorization scheme. Format: Bearer <token>');
+    }
+  } else if (req.query?.token && typeof req.query.token === 'string') {
+    token = req.query.token;
   }
 
-  const [scheme, token] = authHeader.split(' ');
-
-  if (!scheme || scheme.toLowerCase() !== 'bearer' || !token) {
-    throw new UnauthorizedError('Invalid authorization scheme. Format: Bearer <token>');
+  if (!token) {
+    throw new UnauthorizedError('Authorization header missing');
   }
 
   const decoded = verifyAccessToken(token);

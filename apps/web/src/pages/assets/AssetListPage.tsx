@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { api } from '../../services/api';
+import { api, apiClient, getAccessToken } from '../../services/api';
 import { Asset, Category, AssetType } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -201,8 +201,27 @@ export const AssetListPage: React.FC = () => {
     reader.readAsText(file);
   };
 
-  const handleExportCsv = () => {
-    window.open('/api/assets/export-csv', '_blank');
+  const handleExportCsv = async () => {
+    try {
+      toast.info('Generating asset CSV export...');
+      const token = getAccessToken();
+      const response = await apiClient.get('/assets/export', {
+        responseType: 'blob',
+        params: token ? { token } : undefined,
+      });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `assets-export-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Asset catalog exported successfully.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to export CSV');
+    }
   };
 
   const assets = (assetsResponse?.data || []) as any[];
