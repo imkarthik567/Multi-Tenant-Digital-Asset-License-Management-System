@@ -11,7 +11,7 @@ jobs:
   deploy-and-verify:
     name: Trigger Render Deploy & Smoke Check
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && secrets.RENDER_DEPLOY_HOOK_URL != '') }}
 
     steps:
       - name: Trigger Render Deployment via Deploy Hook
