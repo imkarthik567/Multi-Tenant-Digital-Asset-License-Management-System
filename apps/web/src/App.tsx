@@ -35,6 +35,7 @@ const PageLoader: React.FC = () => (
 // Lazy Loaded Pages
 const LoginPage = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })));
+const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage').then((m) => ({ default: m.OAuthCallbackPage })));
 const ForbiddenPage = lazy(() => import('./pages/error/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })));
 const NotFoundPage = lazy(() => import('./pages/error/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
@@ -83,6 +84,7 @@ export const App: React.FC = () => {
                   {/* Public Authentication Routes */}
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
 
                   {/* HTTP Error Pages */}
                   <Route path="/403" element={<ForbiddenPage />} />
