@@ -24,7 +24,7 @@ COPY backend ./backend
 
 WORKDIR /app/backend
 RUN npx prisma generate
-RUN node ../../node_modules/typescript/bin/tsc -p tsconfig.json
+RUN node ../node_modules/typescript/bin/tsc -p tsconfig.json
 
 # Stage 3: Production Runtime (Non-root user, slim footprint)
 FROM node:20-alpine AS runner
