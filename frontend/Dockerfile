@@ -21,7 +21,7 @@ COPY frontend ./frontend
 
 WORKDIR /app/frontend
 ENV VITE_API_URL=/api
-RUN node ../../node_modules/vite/bin/vite.js build
+RUN node ../node_modules/vite/bin/vite.js build
 
 # Stage 2: Ultra-Slim Production Nginx Runtime
 FROM nginx:alpine AS runner
