@@ -37,6 +37,26 @@ import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { EmptyState } from '../../components/common/EmptyState';
 import { StatusBadge } from '../../components/common/StatusBadge';
 
+const toNum = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') return parseFloat(val) || 0;
+  if (typeof val === 'object') {
+    if (val.d && Array.isArray(val.d)) {
+      if (typeof val.toString === 'function') {
+        const s = val.toString();
+        if (s !== '[object Object]') return parseFloat(s) || 0;
+      }
+      return val.d[0] ?? 0;
+    }
+    if (typeof val.toString === 'function') {
+      const s = val.toString();
+      if (s !== '[object Object]') return parseFloat(s) || 0;
+    }
+  }
+  return Number(val) || 0;
+};
+
 export const ReportsPage: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<
@@ -55,6 +75,10 @@ export const ReportsPage: React.FC = () => {
         license_id: r.license_id || r.id,
         name: r.license_name || r.name,
         license_name: r.license_name || r.name,
+        total_seats: toNum(r.total_seats),
+        used_seats: toNum(r.used_seats),
+        available_seats: toNum(r.available_seats),
+        utilization_pct: toNum(r.utilization_pct),
       }));
     },
     enabled: activeTab === 'utilization',
@@ -68,10 +92,12 @@ export const ReportsPage: React.FC = () => {
       const list = Array.isArray(res) ? res : (res as any).data || [];
       return list.map((r: any) => ({
         ...r,
-        total_cost: Number(r.grand_total_spend ?? r.total_cost ?? 0),
-        renewal_cost: Number(r.total_renewal_cost ?? r.renewal_cost ?? 0),
-        grand_total_spend: Number(r.grand_total_spend ?? r.total_cost ?? 0),
-        total_renewal_cost: Number(r.total_renewal_cost ?? r.renewal_cost ?? 0),
+        license_count: toNum(r.license_count),
+        total_cost: toNum(r.grand_total_spend ?? r.total_cost),
+        renewal_cost: toNum(r.total_renewal_cost ?? r.renewal_cost),
+        grand_total_spend: toNum(r.grand_total_spend ?? r.total_cost),
+        total_renewal_cost: toNum(r.total_renewal_cost ?? r.renewal_cost),
+        avg_cost_per_seat: toNum(r.avg_cost_per_seat),
       }));
     },
     enabled: activeTab === 'vendor_spend',
@@ -87,9 +113,9 @@ export const ReportsPage: React.FC = () => {
         ...r,
         month: r.month_year || r.month,
         month_year: r.month_year || r.month,
-        running_total: Number(r.running_total_spend ?? r.running_total ?? 0),
-        running_total_spend: Number(r.running_total_spend ?? r.running_total ?? 0),
-        monthly_spend: Number(r.monthly_spend ?? 0),
+        running_total: toNum(r.running_total_spend ?? r.running_total),
+        running_total_spend: toNum(r.running_total_spend ?? r.running_total),
+        monthly_spend: toNum(r.monthly_spend),
       }));
     },
     enabled: activeTab === 'monthly_spend',
@@ -107,8 +133,9 @@ export const ReportsPage: React.FC = () => {
         asset_id: r.asset_id || r.id,
         name: r.asset_name || r.name,
         asset_name: r.asset_name || r.name,
-        rank: r.download_rank || r.rank,
-        download_rank: r.download_rank || r.rank,
+        rank: toNum(r.download_rank || r.rank),
+        download_rank: toNum(r.download_rank || r.rank),
+        download_count: toNum(r.download_count),
       }));
     },
     enabled: activeTab === 'top_assets',
@@ -136,7 +163,12 @@ export const ReportsPage: React.FC = () => {
     queryKey: ['reports', 'access-trend'],
     queryFn: async () => {
       const res = await api.get<any[]>('/reports/access-trend');
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const list = Array.isArray(res) ? res : (res as any).data || [];
+      return list.map((r: any) => ({
+        ...r,
+        downloads: toNum(r.downloads),
+        checkouts: toNum(r.checkouts),
+      }));
     },
     enabled: activeTab === 'trends',
   });
@@ -390,10 +422,10 @@ export const ReportsPage: React.FC = () => {
                         {row.license_name || row.name}
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{row.vendor_name || 'N/A'}</td>
-                      <td className="px-4 py-3 font-mono">{row.total_seats}</td>
-                      <td className="px-4 py-3 font-mono text-primary-600 font-bold">{row.used_seats}</td>
-                      <td className="px-4 py-3 font-mono text-emerald-600 font-bold">{row.available_seats}</td>
-                      <td className="px-4 py-3 font-mono">{row.utilization_pct}%</td>
+                      <td className="px-4 py-3 font-mono">{toNum(row.total_seats)}</td>
+                      <td className="px-4 py-3 font-mono text-primary-600 font-bold">{toNum(row.used_seats)}</td>
+                      <td className="px-4 py-3 font-mono text-emerald-600 font-bold">{toNum(row.available_seats)}</td>
+                      <td className="px-4 py-3 font-mono">{toNum(row.utilization_pct)}%</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={row.status} size="sm" />
                       </td>

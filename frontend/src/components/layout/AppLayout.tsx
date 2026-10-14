@@ -5,12 +5,13 @@
 // ==============================================================================
 
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 
 export const AppLayout: React.FC = () => {
+  const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('assetvault_sidebar_collapsed') === 'true';
   });
@@ -39,7 +40,7 @@ export const AppLayout: React.FC = () => {
         <Navbar onMobileMenuToggle={() => setIsMobileOpen(true)} />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto animate-fade-in">
-          <ErrorBoundary>
+          <ErrorBoundary key={location.pathname}>
             <Outlet />
           </ErrorBoundary>
         </main>

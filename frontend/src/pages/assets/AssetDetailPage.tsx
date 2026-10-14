@@ -158,14 +158,17 @@ export const AssetDetailPage: React.FC = () => {
   });
 
   // 6. Fetch Categories for edit modal
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: rawCategories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => {
-      const res = await api.get<{ data: Category[] }>('/categories');
-      return res.data || [];
+      const res: any = await api.get('/categories');
+      if (Array.isArray(res)) return res;
+      if (Array.isArray(res?.data)) return res.data;
+      return [];
     },
     enabled: isEditOpen,
   });
+  const categories = Array.isArray(rawCategories) ? rawCategories : [];
 
   // 7. Version Comparison Query
   const { data: rawComparisonData, isFetching: isComparing } = useQuery({
@@ -957,7 +960,7 @@ export const AssetDetailPage: React.FC = () => {
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             >
               <option value="">None / Uncategorized</option>
-              {categories.map((c) => (
+              {(categories || []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
