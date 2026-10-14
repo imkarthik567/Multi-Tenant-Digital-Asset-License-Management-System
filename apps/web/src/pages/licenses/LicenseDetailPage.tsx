@@ -795,11 +795,14 @@ export const LicenseDetailPage: React.FC = () => {
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             >
               <option value="">-- Choose User --</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName} ({u.email}) - {u.role}
-                </option>
-              ))}
+              {users.map((u) => {
+                const roleName = typeof u.role === 'object' && u.role !== null ? (u.role as any).name : u.role;
+                return (
+                  <option key={u.id} value={u.id}>
+                    {u.fullName} ({u.email}) - {roleName}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

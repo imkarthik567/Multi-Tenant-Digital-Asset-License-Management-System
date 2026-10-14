@@ -27,6 +27,7 @@ router.use(authenticate, loadUser);
 // 1. Bulk CSV operations (must precede /:id)
 router.get('/export', authorize('assets:read'), tenantContext, assetController.exportCsv);
 router.get('/export.csv', authorize('assets:read'), tenantContext, assetController.exportCsv);
+router.get('/export-csv', authorize('assets:read'), tenantContext, assetController.exportCsv);
 router.post(
   '/import',
   express.text({ type: ['text/csv', 'text/plain'], limit: '10mb' }),

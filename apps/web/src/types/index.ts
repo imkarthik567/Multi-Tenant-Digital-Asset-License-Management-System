@@ -49,7 +49,7 @@ export interface User {
   fullName: string;
   avatarUrl?: string | null;
   roleId: number;
-  role: RoleName;
+  role: RoleName | { id: number; name: RoleName; description?: string };
   isActive: boolean;
   isSuperAdmin?: boolean;
   tenantId?: string | null;

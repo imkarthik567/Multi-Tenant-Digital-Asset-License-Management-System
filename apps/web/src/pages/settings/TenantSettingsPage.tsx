@@ -152,7 +152,7 @@ export const TenantSettingsPage: React.FC = () => {
               <div className="mt-1.5">
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-primary-50 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
                   <Shield className="w-3 h-3 mr-1" />
-                  {user?.role}
+                  {typeof user?.role === 'object' && user?.role !== null ? (user.role as any).name : user?.role}
                 </span>
               </div>
             </div>

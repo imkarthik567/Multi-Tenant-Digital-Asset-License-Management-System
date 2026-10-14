@@ -28,6 +28,13 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { SearchInput } from '../../components/common/SearchInput';
 import { Pagination } from '../../components/common/Pagination';
 
+const getRoleName = (role: any): RoleName => {
+  if (!role) return 'MEMBER';
+  if (typeof role === 'string') return role as RoleName;
+  if (typeof role === 'object' && role.name) return role.name as RoleName;
+  return 'MEMBER';
+};
+
 export const UserListPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
@@ -263,139 +270,145 @@ export const UserListPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                {usersList.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-950/80 text-primary-700 dark:text-primary-300 flex items-center justify-center font-bold text-xs uppercase">
-                          {u.fullName.slice(0, 2)}
+                {usersList.map((u) => {
+                  const roleName = getRoleName(u.role);
+                  return (
+                    <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-950/80 text-primary-700 dark:text-primary-300 flex items-center justify-center font-bold text-xs uppercase">
+                            {u.fullName.slice(0, 2)}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900 dark:text-white">{u.fullName}</p>
+                            <p className="text-[11px] text-slate-400 font-mono">{u.email}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-slate-900 dark:text-white">{u.fullName}</p>
-                          <p className="text-[11px] text-slate-400 font-mono">{u.email}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                            roleName === 'TENANT_ADMIN'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800'
+                              : roleName === 'ASSET_MANAGER'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800'
+                              : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          }`}
+                        >
+                          <Shield className="w-3 h-3 mr-1" />
+                          {roleName}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={u.isActive ? 'ACTIVE' : 'SUSPENDED'} size="sm" />
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                        {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never logged in'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          {/* Change Role Button */}
+                          <button
+                            onClick={() => {
+                              setEditRoleUser(u);
+                              setNewRole(roleName);
+                            }}
+                            className="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                            title="Change Role"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Reset Password Button */}
+                          <button
+                            onClick={() => setResetPasswordUser(u)}
+                            className="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                            title="Reset Password"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Status Toggle Button */}
+                          {currentUser?.id !== u.id && (
+                            <button
+                              onClick={() =>
+                                toggleStatusMutation.mutate({
+                                  userId: u.id,
+                                  isActive: !u.isActive,
+                                })
+                              }
+                              className={`p-1.5 rounded transition-colors ${
+                                u.isActive
+                                  ? 'text-amber-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+                                  : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                              }`}
+                              title={u.isActive ? 'Deactivate User' : 'Activate User'}
+                            >
+                              {u.isActive ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
+
+                          {/* Delete User Button */}
+                          {currentUser?.id !== u.id && (
+                            <button
+                              onClick={() => setDeleteUser(u)}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded"
+                              title="Delete User"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
-                          u.role === 'TENANT_ADMIN'
-                            ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800'
-                            : u.role === 'ASSET_MANAGER'
-                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800'
-                            : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                        }`}
-                      >
-                        <Shield className="w-3 h-3 mr-1" />
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={u.isActive ? 'ACTIVE' : 'SUSPENDED'} size="sm" />
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                      {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never logged in'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        {/* Change Role Button */}
-                        <button
-                          onClick={() => {
-                            setEditRoleUser(u);
-                            setNewRole(u.role);
-                          }}
-                          className="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
-                          title="Change Role"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Reset Password Button */}
-                        <button
-                          onClick={() => setResetPasswordUser(u)}
-                          className="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
-                          title="Reset Password"
-                        >
-                          <KeyRound className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Status Toggle Button */}
-                        {currentUser?.id !== u.id && (
-                          <button
-                            onClick={() =>
-                              toggleStatusMutation.mutate({
-                                userId: u.id,
-                                isActive: !u.isActive,
-                              })
-                            }
-                            className={`p-1.5 rounded transition-colors ${
-                              u.isActive
-                                ? 'text-amber-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40'
-                                : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
-                            }`}
-                            title={u.isActive ? 'Deactivate User' : 'Activate User'}
-                          >
-                            {u.isActive ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
-
-                        {/* Delete User Button */}
-                        {currentUser?.id !== u.id && (
-                          <button
-                            onClick={() => setDeleteUser(u)}
-                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded"
-                            title="Delete User"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile Stacked Card View (< 640px) */}
           <div className="block sm:hidden divide-y divide-slate-200 dark:divide-slate-800">
-            {usersList.map((u) => (
-              <div key={u.id} className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-xs uppercase">
-                      {u.fullName.slice(0, 2)}
+            {usersList.map((u) => {
+              const roleName = getRoleName(u.role);
+              return (
+                <div key={u.id} className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-xs uppercase">
+                        {u.fullName.slice(0, 2)}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white text-xs">{u.fullName}</p>
+                        <p className="text-[11px] text-slate-400 font-mono">{u.email}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-white text-xs">{u.fullName}</p>
-                      <p className="text-[11px] text-slate-400 font-mono">{u.email}</p>
-                    </div>
+                    <StatusBadge status={u.isActive ? 'ACTIVE' : 'SUSPENDED'} size="sm" />
                   </div>
-                  <StatusBadge status={u.isActive ? 'ACTIVE' : 'SUSPENDED'} size="sm" />
-                </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>Role: {u.role}</span>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => {
-                        setEditRoleUser(u);
-                        setNewRole(u.role);
-                      }}
-                      className="text-primary-600 font-medium"
-                    >
-                      Role
-                    </button>
-                    <button
-                      onClick={() => setResetPasswordUser(u)}
-                      className="text-slate-600 dark:text-slate-300 font-medium"
-                    >
-                      Password
-                    </button>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>Role: {roleName}</span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditRoleUser(u);
+                          setNewRole(roleName);
+                        }}
+                        className="text-primary-600 font-medium"
+                      >
+                        Role
+                      </button>
+                      <button
+                        onClick={() => setResetPasswordUser(u)}
+                        className="text-slate-600 dark:text-slate-300 font-medium"
+                      >
+                        Password
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Server-Side Pagination */}
