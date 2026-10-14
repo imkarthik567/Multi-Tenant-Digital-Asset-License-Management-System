@@ -4,140 +4,148 @@
 // Exports comprehensive JSON archive of tenant assets, licenses, vendors & taxonomies
 // ==============================================================================
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { NotFoundError } from '../errors/AppError';
 
 export class TenantExportService {
   public async exportTenantData(tenantId: string) {
-    // 1. Fetch Tenant details
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      include: {
-        plan: true,
-      },
-    });
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
 
-    if (!tenant) {
-      throw new NotFoundError(`Tenant ${tenantId} not found`);
-    }
-
-    // 2. Fetch Users (Exclude password hashes and tokens)
-    const users = await prisma.user.findMany({
-      where: { tenantId },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        isActive: true,
-        role: {
-          select: { name: true, description: true },
+      // 1. Fetch Tenant details
+      const tenant = await tx.tenant.findUnique({
+        where: { id: tenantId },
+        include: {
+          plan: true,
         },
-        createdAt: true,
-        lastLoginAt: true,
-      },
-    });
+      });
 
-    // 3. Fetch Vendors
-    const vendors = await prisma.vendor.findMany({
-      where: { tenantId },
-      include: {
-        licenses: {
-          select: { id: true, name: true, status: true },
+      if (!tenant) {
+        throw new NotFoundError(`Tenant ${tenantId} not found`);
+      }
+
+      // 2. Fetch Users (Exclude password hashes and tokens)
+      const users = await tx.user.findMany({
+        where: { tenantId },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          isActive: true,
+          role: {
+            select: { name: true, description: true },
+          },
+          createdAt: true,
+          lastLoginAt: true,
         },
-      },
-    });
+      });
 
-    // 4. Fetch Categories & Tags
-    const categories = await prisma.category.findMany({
-      where: { tenantId },
-      orderBy: { name: 'asc' },
-    });
-
-    const tags = await prisma.tag.findMany({
-      where: { tenantId },
-    });
-
-    // 5. Fetch Assets with Versions and Tag links
-    const assets = await prisma.asset.findMany({
-      where: { tenantId, deletedAt: null },
-      include: {
-        versions: {
-          select: {
-            id: true,
-            versionNo: true,
-            fileUrl: true,
-            fileSizeBytes: true,
-            checksumSha256: true,
-            changeNotes: true,
-            createdAt: true,
+      // 3. Fetch Vendors
+      const vendors = await tx.vendor.findMany({
+        where: { tenantId },
+        include: {
+          licenses: {
+            select: { id: true, name: true, status: true },
           },
         },
-        assetTags: {
-          include: {
-            tag: true,
+      });
+
+      // 4. Fetch Categories & Tags
+      const categories = await tx.category.findMany({
+        where: { tenantId },
+        orderBy: { name: 'asc' },
+      });
+
+      const tags = await tx.tag.findMany({
+        where: { tenantId },
+      });
+
+      // 5. Fetch Assets with Versions and Tag links
+      const assets = await tx.asset.findMany({
+        where: { tenantId, deletedAt: null },
+        include: {
+          versions: {
+            select: {
+              id: true,
+              versionNo: true,
+              fileUrl: true,
+              fileSizeBytes: true,
+              checksumSha256: true,
+              changeNotes: true,
+              createdAt: true,
+            },
+          },
+          assetTags: {
+            include: {
+              tag: true,
+            },
+          },
+          assetLicenses: {
+            select: {
+              licenseId: true,
+              assignedAt: true,
+            },
           },
         },
-        assetLicenses: {
-          select: {
-            licenseId: true,
-            assignedAt: true,
+      });
+
+      // Format BigInt fileSizeBytes safely for JSON serialization
+      const serializedAssets = assets.map((a) => ({
+        ...a,
+        versions: a.versions.map((v) => ({
+          ...v,
+          fileSizeBytes: v.fileSizeBytes ? v.fileSizeBytes.toString() : '0',
+        })),
+        tags: a.assetTags.map((at) => at.tag.name),
+      }));
+
+      // 6. Fetch Licenses with Allocations and Renewals
+      const licenses = await tx.license.findMany({
+        where: { tenantId, deletedAt: null },
+        include: {
+          licenseType: true,
+          vendor: { select: { id: true, name: true } },
+          allocations: {
+            select: {
+              id: true,
+              userId: true,
+              allocatedAt: true,
+              releasedAt: true,
+              status: true,
+            },
+          },
+          renewals: {
+            select: {
+              id: true,
+              oldEndDate: true,
+              newEndDate: true,
+              cost: true,
+              notes: true,
+              renewedAt: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Format BigInt fileSizeBytes safely for JSON serialization
-    const serializedAssets = assets.map((a) => ({
-      ...a,
-      versions: a.versions.map((v) => ({
-        ...v,
-        fileSizeBytes: v.fileSizeBytes ? v.fileSizeBytes.toString() : '0',
-      })),
-      tags: a.assetTags.map((at) => at.tag.name),
-    }));
-
-    // 6. Fetch Licenses with Allocations and Renewals
-    const licenses = await prisma.license.findMany({
-      where: { tenantId, deletedAt: null },
-      include: {
-        licenseType: true,
-        vendor: { select: { id: true, name: true } },
-        allocations: {
-          select: {
-            id: true,
-            userId: true,
-            allocatedAt: true,
-            releasedAt: true,
-            status: true,
-          },
+      // 7. Fetch License Allocations
+      const allocations = await tx.licenseAllocation.findMany({
+        where: { license: { tenantId } },
+        select: {
+          id: true,
+          licenseId: true,
+          userId: true,
+          allocatedAt: true,
+          releasedAt: true,
+          status: true,
         },
-        renewals: {
-          select: {
-            id: true,
-            oldEndDate: true,
-            newEndDate: true,
-            cost: true,
-            notes: true,
-            renewedAt: true,
-          },
-        },
-      },
-    });
+      });
 
-    // 7. Fetch License Allocations
-    const allocations = await prisma.licenseAllocation.findMany({
-      where: { license: { tenantId } },
-      select: {
-        id: true,
-        licenseId: true,
-        userId: true,
-        allocatedAt: true,
-        releasedAt: true,
-        status: true,
-      },
-    });
-
-    return {
+      return {
       metadata: {
         system: 'AssetVault Enterprise SaaS',
         version: '1.0.0',
@@ -172,6 +180,7 @@ export class TenantExportService {
       licenses,
       allocations,
     };
+    });
   }
 }
 

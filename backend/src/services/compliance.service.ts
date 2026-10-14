@@ -45,54 +45,61 @@ export interface ComplianceReport {
 
 export class ComplianceService {
   public async getTenantCompliance(tenantId: string): Promise<ComplianceReport> {
-    // 1. Query asset catalog compliance distribution
-    const assetStatsResult: any = await prisma.$queryRaw(Prisma.sql`
-      SELECT 
-        COUNT(*)::INT AS total_assets,
-        COUNT(*) FILTER (WHERE compliance_status = 'COMPLIANT')::INT AS compliant_assets,
-        COUNT(*) FILTER (WHERE compliance_status = 'EXPIRED_LICENSE')::INT AS expired_license_assets,
-        COUNT(*) FILTER (WHERE compliance_status = 'UNLICENSED')::INT AS unlicensed_assets
-      FROM v_asset_catalog
-      WHERE tenant_id = ${tenantId}::uuid;
-    `);
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
 
-    const assetStats = assetStatsResult[0] || {
-      total_assets: 0,
-      compliant_assets: 0,
-      expired_license_assets: 0,
-      unlicensed_assets: 0,
-    };
+      // 1. Query asset catalog compliance distribution
+      const assetStatsResult: any = await tx.$queryRaw(Prisma.sql`
+        SELECT 
+          COUNT(*)::INT AS total_assets,
+          COUNT(*) FILTER (WHERE compliance_status = 'COMPLIANT')::INT AS compliant_assets,
+          COUNT(*) FILTER (WHERE compliance_status = 'EXPIRED_LICENSE')::INT AS expired_license_assets,
+          COUNT(*) FILTER (WHERE compliance_status = 'UNLICENSED')::INT AS unlicensed_assets
+        FROM v_asset_catalog
+        WHERE tenant_id = ${tenantId}::uuid;
+      `);
 
-    // 2. Query license capacity and seat health
-    const licenseStatsResult: any = await prisma.$queryRaw(Prisma.sql`
-      SELECT 
-        COUNT(*)::INT AS total_licenses,
-        COUNT(*) FILTER (WHERE available_seats <= 0)::INT AS exhausted_licenses,
-        COUNT(*) FILTER (WHERE used_seats > total_seats)::INT AS over_allocated_licenses
-      FROM v_license_utilization
-      WHERE tenant_id = ${tenantId}::uuid;
-    `);
+      const assetStats = assetStatsResult[0] || {
+        total_assets: 0,
+        compliant_assets: 0,
+        expired_license_assets: 0,
+        unlicensed_assets: 0,
+      };
 
-    const licenseStats = licenseStatsResult[0] || {
-      total_licenses: 0,
-      exhausted_licenses: 0,
-      over_allocated_licenses: 0,
-    };
+      // 2. Query license capacity and seat health
+      const licenseStatsResult: any = await tx.$queryRaw(Prisma.sql`
+        SELECT 
+          COUNT(*)::INT AS total_licenses,
+          COUNT(*) FILTER (WHERE available_seats <= 0)::INT AS exhausted_licenses,
+          COUNT(*) FILTER (WHERE used_seats > total_seats)::INT AS over_allocated_licenses
+        FROM v_license_utilization
+        WHERE tenant_id = ${tenantId}::uuid;
+      `);
 
-    // 3. Query expiring licenses horizon (30 days)
-    const expiringStatsResult: any = await prisma.$queryRaw(Prisma.sql`
-      SELECT 
-        COUNT(*)::INT AS total_expiring,
-        COUNT(*) FILTER (WHERE urgency_bucket = 'CRITICAL')::INT AS critical_expiring,
-        COUNT(*) FILTER (WHERE urgency_bucket = 'WARNING')::INT AS warning_expiring,
-        COUNT(*) FILTER (WHERE urgency_bucket = 'NOTICE')::INT AS notice_expiring
-      FROM v_expiring_licenses
-      WHERE tenant_id = ${tenantId}::uuid;
-    `);
+      const licenseStats = licenseStatsResult[0] || {
+        total_licenses: 0,
+        exhausted_licenses: 0,
+        over_allocated_licenses: 0,
+      };
 
-    const expiringStats = expiringStatsResult[0] || {
-      total_expiring: 0,
-      critical_expiring: 0,
+      // 3. Query expiring licenses horizon (30 days)
+      const expiringStatsResult: any = await tx.$queryRaw(Prisma.sql`
+        SELECT 
+          COUNT(*)::INT AS total_expiring,
+          COUNT(*) FILTER (WHERE urgency_bucket = 'CRITICAL')::INT AS critical_expiring,
+          COUNT(*) FILTER (WHERE urgency_bucket = 'WARNING')::INT AS warning_expiring,
+          COUNT(*) FILTER (WHERE urgency_bucket = 'NOTICE')::INT AS notice_expiring
+        FROM v_expiring_licenses
+        WHERE tenant_id = ${tenantId}::uuid;
+      `);
+
+      const expiringStats = expiringStatsResult[0] || {
+        total_expiring: 0,
+        critical_expiring: 0,
       warning_expiring: 0,
       notice_expiring: 0,
     };
@@ -167,7 +174,7 @@ export class ComplianceService {
 
     // Fetch Unlicensed Assets
     if (unlicensedAssets > 0) {
-      const unlicensedRows: any = await prisma.$queryRaw(Prisma.sql`
+      const unlicensedRows: any = await tx.$queryRaw(Prisma.sql`
         SELECT asset_id, asset_code, asset_name 
         FROM v_asset_catalog 
         WHERE tenant_id = ${tenantId}::uuid AND compliance_status = 'UNLICENSED' 
@@ -190,7 +197,7 @@ export class ComplianceService {
 
     // Fetch Assets with Expired Licenses
     if (expiredLicenseAssets > 0) {
-      const expiredRows: any = await prisma.$queryRaw(Prisma.sql`
+      const expiredRows: any = await tx.$queryRaw(Prisma.sql`
         SELECT asset_id, asset_code, asset_name 
         FROM v_asset_catalog 
         WHERE tenant_id = ${tenantId}::uuid AND compliance_status = 'EXPIRED_LICENSE' 
@@ -213,7 +220,7 @@ export class ComplianceService {
 
     // Fetch Exhausted Licenses
     if (exhaustedLicenses > 0) {
-      const exhaustedRows: any = await prisma.$queryRaw(Prisma.sql`
+      const exhaustedRows: any = await tx.$queryRaw(Prisma.sql`
         SELECT license_id, license_name, vendor_name, total_seats, used_seats 
         FROM v_license_utilization 
         WHERE tenant_id = ${tenantId}::uuid AND available_seats <= 0 
@@ -236,7 +243,7 @@ export class ComplianceService {
 
     // Fetch Expiring Licenses
     if (Number(expiringStats.total_expiring) > 0) {
-      const expiringRows: any = await prisma.$queryRaw(Prisma.sql`
+      const expiringRows: any = await tx.$queryRaw(Prisma.sql`
         SELECT license_id, license_name, vendor_name, days_left, urgency_bucket 
         FROM v_expiring_licenses 
         WHERE tenant_id = ${tenantId}::uuid 
@@ -279,6 +286,7 @@ export class ComplianceService {
       },
       remediationItems,
     };
+    });
   }
 }
 
