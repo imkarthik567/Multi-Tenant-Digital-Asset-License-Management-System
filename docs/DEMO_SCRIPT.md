@@ -40,7 +40,7 @@ flowchart LR
 - **What to say:**
   > "Good morning, respected examiners. Today I am presenting **AssetVault**, an enterprise multi-tenant digital asset and software license management platform. While many student projects are simple CRUD wrappers, AssetVault was architected from the database kernel up on PostgreSQL 16. It handles 19 normalized domain tables in BCNF, enforces dual-layer tenant isolation, and uses stored procedures with row-level locks to solve multi-threaded seat allocation races."
 - **What to show on screen:**
-  - Show the ER Diagram in [`docs/ER_DIAGRAM.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/ER_DIAGRAM.md).
+  - Show the ER Diagram in [`docs/ER_DIAGRAM.md`](./ER_DIAGRAM.md).
   - Point to the 19 domain tables, 34 foreign keys, and 11 check constraints.
   - Explain the 3NF/BCNF factoring: `subscription_plans` factored out of `tenants`, `license_types` factored out of `licenses`, and `roles` factored out of `users`.
 

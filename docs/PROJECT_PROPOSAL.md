@@ -87,10 +87,10 @@ The primary engineering and database objectives of AssetVault are:
 
 # 7. Major Deliverables
 
-1. **Entity-Relationship (ER) Diagram:** Complete Chen and Crow's Foot notation diagrams documenting all 19 entities, attributes, primary/foreign keys, and cardinality constraints ([`/database/er-diagram.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/er-diagram.md)).
-2. **Relational Schema Specification & Normalization Proof:** Formal relational schemas with mathematical proofs demonstrating Third Normal Form (3NF) compliance and zero update/deletion anomalies ([`/database/normalization.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/normalization.md)).
-3. **Comprehensive Data Dictionary:** Detailed attribute specifications covering table names, column descriptions, PostgreSQL data types, nullability, primary/foreign key relationships, default values, and index rationale ([`/database/data-dictionary.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/data-dictionary.md)).
-4. **Complete SQL Script Suite:** Modular, executable PostgreSQL scripts located in [`/database/sql/`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/sql/):
+1. **Entity-Relationship (ER) Diagram:** Complete Chen and Crow's Foot notation diagrams documenting all 19 entities, attributes, primary/foreign keys, and cardinality constraints ([`/database/er-diagram.md`](../database/er-diagram.md)).
+2. **Relational Schema Specification & Normalization Proof:** Formal relational schemas with mathematical proofs demonstrating Third Normal Form (3NF) compliance and zero update/deletion anomalies ([`/database/normalization.md`](../database/normalization.md)).
+3. **Comprehensive Data Dictionary:** Detailed attribute specifications covering table names, column descriptions, PostgreSQL data types, nullability, primary/foreign key relationships, default values, and index rationale ([`/database/data-dictionary.md`](../database/data-dictionary.md)).
+4. **Complete SQL Script Suite:** Modular, executable PostgreSQL scripts located in [`/database/sql/`](../database/sql/):
    - `01_schema.sql` (DDL with all constraints)
    - `02_views.sql` (Analytical & reporting relational views)
    - `03_procedures.sql` (Transactional stored procedures)
@@ -98,15 +98,15 @@ The primary engineering and database objectives of AssetVault are:
    - `05_rls.sql` (Row-Level Security multi-tenant policies)
    - `06_indexes.sql` (B-tree, partial, and GIN trigram indexes)
    - `07_backup_restore.ps1` (Automated dump and restore automation)
-5. **Layered Backend REST API:** Modular Express.js + TypeScript service ([`/apps/api`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/apps/api)) implementing strict layered architecture, Zod validation, centralized error handling, and complete CRUD endpoints for all business domains.
-6. **Responsive React Web Application:** Modern SPA ([`/apps/web`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/apps/web)) built with React 18, Vite, TypeScript, and Tailwind CSS, providing intuitive asset catalogs, interactive license allocation matrices, analytics dashboards, and responsive controls.
+5. **Layered Backend REST API:** Modular Express.js + TypeScript service ([`/apps/api`](../backend)) implementing strict layered architecture, Zod validation, centralized error handling, and complete CRUD endpoints for all business domains.
+6. **Responsive React Web Application:** Modern SPA ([`/apps/web`](../frontend)) built with React 18, Vite, TypeScript, and Tailwind CSS, providing intuitive asset catalogs, interactive license allocation matrices, analytics dashboards, and responsive controls.
 7. **Authentication & RBAC Engine:** Complete identity system supporting Google OAuth 2.0, bcrypt-hashed email/password credentials, short-lived JWT access tokens, SHA-256 hashed refresh tokens, and 5-tier role-based access enforcement.
 8. **Disaster Recovery & Backup/Restore Scripts:** Production-ready PowerShell and Bash scripts providing automated `pg_dump` database export, validation checks, and point-in-time database restoration procedures.
 9. **Docker Image on Docker Hub:** Fully packaged, multi-stage production Docker images published to Docker Hub enabling single-command containerized deployment.
 10. **GitHub Repository:** Monorepo with conventional commit history, branch protections (`main` and `dev`), and GitHub Actions CI/CD workflows for automated linting, type-checking, and testing.
 11. **Live Deployment URLs:** Publicly accessible cloud deployments for both the web frontend (Vercel) and backend API (Render) connected to a hosted PostgreSQL 16 database (Supabase).
 12. **Project README Documentation:** Comprehensive repository documentation detailing project setup, environment configuration, database seeding, test execution, and deployment steps.
-13. **Final Project Report & Viva Notes:** Academic documentation including theoretical foundations, design rationale, SQL execution transcripts, performance benchmarks, and comprehensive viva voce preparation notes ([`/docs/viva-notes.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/viva-notes.md)).
+13. **Final Project Report & Viva Notes:** Academic documentation including theoretical foundations, design rationale, SQL execution transcripts, performance benchmarks, and comprehensive viva voce preparation notes ([`/docs/viva-notes.md`](./VIVA_PRESENTATION_NOTES.md)).
 
 ---
 

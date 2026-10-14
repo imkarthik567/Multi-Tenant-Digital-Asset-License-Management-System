@@ -17,7 +17,7 @@ fi
 
 if [ "$RUN_SEED" = "true" ]; then
   echo "[AssetVault API] Seeding database with baseline data..."
-  node -e "require('./dist/server.js')" || true
+  npx prisma db seed || echo "[AssetVault API] Seed skipped or already applied."
 fi
 
 echo "[AssetVault API] Launching process: $@"

@@ -73,7 +73,7 @@ Update the API base URL in **Project Settings** -> **Environment Variables**:
 ```bash
 VITE_API_BASE_URL="https://assetvault-api.duckdns.org/api"
 ```
-Or, if you use Vercel's reverse proxy rewrites in [`apps/web/vercel.json`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/apps/web/vercel.json), update the rewrite destination:
+Or, if you use Vercel's reverse proxy rewrites in [`frontend/vercel.json`](../frontend/vercel.json), update the rewrite destination:
 ```json
 {
   "source": "/api/(.*)",
