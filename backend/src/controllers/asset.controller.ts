@@ -87,8 +87,8 @@ export class AssetController {
   });
 
   public compareVersions = asyncHandler(async (req: Request, res: Response) => {
-    const from = parseInt(req.query.from as string, 10);
-    const to = parseInt(req.query.to as string, 10);
+    const from = parseInt(((req.query as any).from ?? (req.query as any).v1) as string, 10);
+    const to = parseInt(((req.query as any).to ?? (req.query as any).v2) as string, 10);
     const diff = await assetService.compareVersions(req.prisma, req.params.id as string, from, to);
     sendResponse(res, 200, diff);
   });

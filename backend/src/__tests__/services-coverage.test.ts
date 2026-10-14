@@ -44,7 +44,7 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
     const techcorp = await systemPrisma.tenant.findUnique({
       where: { slug: 'techcorp' },
       include: {
-        users: { take: 1 },
+        users: { where: { email: 'techcorp.admin@techcorp.io' } },
         vendors: { take: 1 },
         assets: { take: 1 },
         licenses: { take: 1 },

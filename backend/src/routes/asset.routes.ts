@@ -16,7 +16,7 @@ import {
   updateAssetSchema,
   attachTagsSchema,
 } from '../validators/asset.validator';
-import { createVersionSchema } from '../validators/version.validator';
+import { createVersionSchema, compareVersionsQuerySchema } from '../validators/version.validator';
 
 import { accessController } from '../controllers/access.controller';
 
@@ -64,7 +64,7 @@ router.post('/:id/tags', authorize('assets:update'), tenantContext, validate(att
 router.delete('/:id/tags/:tagId', authorize('assets:update'), tenantContext, assetController.detachTag);
 
 // 5. Asset Versioning Operations
-router.get('/:id/versions/compare', authorize('versions:read'), tenantContext, assetController.compareVersions);
+router.get('/:id/versions/compare', authorize('versions:read'), tenantContext, validate({ query: compareVersionsQuerySchema }), assetController.compareVersions);
 router.get('/:id/versions', authorize('versions:read'), tenantContext, assetController.listVersions);
 router.get('/:id/versions/:versionNo', authorize('versions:read'), tenantContext, assetController.getVersionByNo);
 router.post('/:id/versions', authorize('versions:create'), tenantContext, validate(createVersionSchema), assetController.createVersion);

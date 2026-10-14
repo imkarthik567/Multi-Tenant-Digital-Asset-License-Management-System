@@ -88,13 +88,13 @@ BEGIN
     -- 4. Determine tenant_id context
     IF TG_TABLE_NAME = 'tenants' THEN
         v_tenant_id := v_record_id;
-    ELSIF TG_TABLE_NAME IN ('users', 'assets', 'licenses') THEN
+    ELSIF TG_TABLE_NAME IN ('users', 'assets', 'licenses', 'vendors') THEN
         IF TG_OP = 'DELETE' THEN
             v_tenant_id := OLD.tenant_id;
         ELSE
             v_tenant_id := NEW.tenant_id;
         END IF;
-    ELSIF TG_TABLE_NAME = 'license_allocations' THEN
+    ELSIF TG_TABLE_NAME IN ('license_allocations', 'license_renewals') THEN
         IF TG_OP = 'DELETE' THEN
             SELECT tenant_id INTO v_tenant_id FROM licenses WHERE id = OLD.license_id;
         ELSE
@@ -115,6 +115,8 @@ BEGIN
             v_user_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.allocated_by ELSE NEW.allocated_by END;
         ELSIF TG_TABLE_NAME = 'assets' THEN
             v_user_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.owner_id ELSE NEW.owner_id END;
+        ELSIF TG_TABLE_NAME = 'license_renewals' THEN
+            v_user_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.renewed_by ELSE NEW.renewed_by END;
         END IF;
     END IF;
 
@@ -170,6 +172,16 @@ FOR EACH ROW EXECUTE FUNCTION fn_audit_row();
 DROP TRIGGER IF EXISTS trg_audit_allocations ON license_allocations;
 CREATE TRIGGER trg_audit_allocations
 AFTER INSERT OR UPDATE OR DELETE ON license_allocations
+FOR EACH ROW EXECUTE FUNCTION fn_audit_row();
+
+DROP TRIGGER IF EXISTS trg_audit_vendors ON vendors;
+CREATE TRIGGER trg_audit_vendors
+AFTER INSERT OR UPDATE OR DELETE ON vendors
+FOR EACH ROW EXECUTE FUNCTION fn_audit_row();
+
+DROP TRIGGER IF EXISTS trg_audit_license_renewals ON license_renewals;
+CREATE TRIGGER trg_audit_license_renewals
+AFTER INSERT OR UPDATE OR DELETE ON license_renewals
 FOR EACH ROW EXECUTE FUNCTION fn_audit_row();
 
 -- ------------------------------------------------------------------------------
@@ -444,3 +456,78 @@ CREATE TRIGGER trg_plan_user_limit
 BEFORE INSERT ON users
 FOR EACH ROW
 EXECUTE FUNCTION fn_plan_user_limit();
+
+-- ------------------------------------------------------------------------------
+-- 10. Cross-Tenant Integrity Enforcement Triggers
+-- ------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION fn_enforce_asset_tenant()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_owner_tenant UUID;
+    v_cat_tenant UUID;
+BEGIN
+    -- Verify asset owner belongs to the same tenant
+    SELECT tenant_id INTO v_owner_tenant
+    FROM users
+    WHERE id = NEW.owner_id;
+
+    IF v_owner_tenant IS DISTINCT FROM NEW.tenant_id THEN
+        RAISE EXCEPTION 'Cross-tenant violation: Asset owner % belongs to tenant %, not asset tenant %',
+            NEW.owner_id, v_owner_tenant, NEW.tenant_id
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    -- Verify category belongs to the same tenant if assigned
+    IF NEW.category_id IS NOT NULL THEN
+        SELECT tenant_id INTO v_cat_tenant
+        FROM categories
+        WHERE id = NEW.category_id;
+
+        IF v_cat_tenant IS DISTINCT FROM NEW.tenant_id THEN
+            RAISE EXCEPTION 'Cross-tenant violation: Category % belongs to tenant %, not asset tenant %',
+                NEW.category_id, v_cat_tenant, NEW.tenant_id
+                USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_asset_tenant ON assets;
+CREATE TRIGGER trg_enforce_asset_tenant
+BEFORE INSERT OR UPDATE ON assets
+FOR EACH ROW
+EXECUTE FUNCTION fn_enforce_asset_tenant();
+
+CREATE OR REPLACE FUNCTION fn_enforce_license_tenant()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_vendor_tenant UUID;
+BEGIN
+    -- Verify vendor belongs to the same tenant
+    SELECT tenant_id INTO v_vendor_tenant
+    FROM vendors
+    WHERE id = NEW.vendor_id;
+
+    IF v_vendor_tenant IS DISTINCT FROM NEW.tenant_id THEN
+        RAISE EXCEPTION 'Cross-tenant violation: Vendor % belongs to tenant %, not license tenant %',
+            NEW.vendor_id, v_vendor_tenant, NEW.tenant_id
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_license_tenant ON licenses;
+CREATE TRIGGER trg_enforce_license_tenant
+BEFORE INSERT OR UPDATE ON licenses
+FOR EACH ROW
+EXECUTE FUNCTION fn_enforce_license_tenant();
+

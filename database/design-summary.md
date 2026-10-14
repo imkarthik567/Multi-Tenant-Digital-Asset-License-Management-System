@@ -103,9 +103,9 @@ would introduce a transitive dependency on the non-prime attribute `asset_id`, v
 
 All five deliverables have been produced and verified in `/database`:
 
-1. **[`/database/er-diagram.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/er-diagram.md):** Complete Mermaid `erDiagram` with 19 entities, crow's-foot cardinality, attribute types, PK/FK/UK tags, and architectural prose.
-2. **[`/database/er-diagram.svg`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/er-diagram.svg):** Standalone SVG vector graphic showing the 19 entities and relational topology.
-3. **[`/database/relational-schema.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/relational-schema.md):** Standard relational notation, complete 34-item referential integrity action table, and ER-to-relational mapping logic.
-4. **[`/database/data-dictionary.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/data-dictionary.md):** Exhaustive column-by-column dictionary for all 19 tables and catalog of 26 performance-tuned database indexes.
-5. **[`/database/normalization.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/normalization.md):** Functional dependency matrices, 1NF/2NF/3NF/BCNF proofs, step-by-step spreadsheet decomposition example, and design justifications.
-6. **[`/database/design-summary.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/design-summary.md):** One-page executive summary with metric counts and compliance checklist.
+1. **[`er-diagram.md`](./er-diagram.md):** Complete Mermaid `erDiagram` with 19 entities, crow's-foot cardinality, attribute types, PK/FK/UK tags, and architectural prose.
+2. **[`er-diagram.svg`](./er-diagram.svg):** Standalone SVG vector graphic showing the 19 entities and relational topology.
+3. **[`relational-schema.md`](./relational-schema.md):** Standard relational notation, complete 34-item referential integrity action table, and ER-to-relational mapping logic.
+4. **[`data-dictionary.md`](./data-dictionary.md):** Exhaustive column-by-column dictionary for all 19 tables and catalog of 26 performance-tuned database indexes.
+5. **[`normalization.md`](./normalization.md):** Functional dependency matrices, 1NF/2NF/3NF/BCNF proofs, step-by-step spreadsheet decomposition example, and design justifications.
+6. **[`design-summary.md`](./design-summary.md):** One-page executive summary with metric counts and compliance checklist.

@@ -37,6 +37,26 @@ import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { EmptyState } from '../../components/common/EmptyState';
 import { StatusBadge } from '../../components/common/StatusBadge';
 
+const toNum = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') return parseFloat(val) || 0;
+  if (typeof val === 'object') {
+    if (val.d && Array.isArray(val.d)) {
+      if (typeof val.toString === 'function') {
+        const s = val.toString();
+        if (s !== '[object Object]') return parseFloat(s) || 0;
+      }
+      return val.d[0] ?? 0;
+    }
+    if (typeof val.toString === 'function') {
+      const s = val.toString();
+      if (s !== '[object Object]') return parseFloat(s) || 0;
+    }
+  }
+  return Number(val) || 0;
+};
+
 export const ReportsPage: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<
@@ -48,7 +68,18 @@ export const ReportsPage: React.FC = () => {
     queryKey: ['reports', 'license-utilization'],
     queryFn: async () => {
       const res = await api.get<any[]>('/reports/license-utilization');
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const list = Array.isArray(res) ? res : (res as any).data || [];
+      return list.map((r: any) => ({
+        ...r,
+        id: r.license_id || r.id,
+        license_id: r.license_id || r.id,
+        name: r.license_name || r.name,
+        license_name: r.license_name || r.name,
+        total_seats: toNum(r.total_seats),
+        used_seats: toNum(r.used_seats),
+        available_seats: toNum(r.available_seats),
+        utilization_pct: toNum(r.utilization_pct),
+      }));
     },
     enabled: activeTab === 'utilization',
   });
@@ -58,7 +89,16 @@ export const ReportsPage: React.FC = () => {
     queryKey: ['reports', 'vendor-spend'],
     queryFn: async () => {
       const res = await api.get<any[]>('/reports/vendor-spend');
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const list = Array.isArray(res) ? res : (res as any).data || [];
+      return list.map((r: any) => ({
+        ...r,
+        license_count: toNum(r.license_count),
+        total_cost: toNum(r.grand_total_spend ?? r.total_cost),
+        renewal_cost: toNum(r.total_renewal_cost ?? r.renewal_cost),
+        grand_total_spend: toNum(r.grand_total_spend ?? r.total_cost),
+        total_renewal_cost: toNum(r.total_renewal_cost ?? r.renewal_cost),
+        avg_cost_per_seat: toNum(r.avg_cost_per_seat),
+      }));
     },
     enabled: activeTab === 'vendor_spend',
   });
@@ -68,7 +108,15 @@ export const ReportsPage: React.FC = () => {
     queryKey: ['reports', 'spend-by-month'],
     queryFn: async () => {
       const res = await api.get<any[]>('/reports/spend-by-month');
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const list = Array.isArray(res) ? res : (res as any).data || [];
+      return list.map((r: any) => ({
+        ...r,
+        month: r.month_year || r.month,
+        month_year: r.month_year || r.month,
+        running_total: toNum(r.running_total_spend ?? r.running_total),
+        running_total_spend: toNum(r.running_total_spend ?? r.running_total),
+        monthly_spend: toNum(r.monthly_spend),
+      }));
     },
     enabled: activeTab === 'monthly_spend',
   });
@@ -78,7 +126,17 @@ export const ReportsPage: React.FC = () => {
     queryKey: ['reports', 'top-assets'],
     queryFn: async () => {
       const res = await api.get<any[]>('/reports/top-assets');
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const list = Array.isArray(res) ? res : (res as any).data || [];
+      return list.map((r: any) => ({
+        ...r,
+        id: r.asset_id || r.id,
+        asset_id: r.asset_id || r.id,
+        name: r.asset_name || r.name,
+        asset_name: r.asset_name || r.name,
+        rank: toNum(r.download_rank || r.rank),
+        download_rank: toNum(r.download_rank || r.rank),
+        download_count: toNum(r.download_count),
+      }));
     },
     enabled: activeTab === 'top_assets',
   });
@@ -88,7 +146,14 @@ export const ReportsPage: React.FC = () => {
     queryKey: ['reports', 'unlicensed-assets'],
     queryFn: async () => {
       const res = await api.get<any[]>('/reports/unlicensed-assets');
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const list = Array.isArray(res) ? res : (res as any).data || [];
+      return list.map((r: any) => ({
+        ...r,
+        id: r.asset_id || r.id,
+        asset_id: r.asset_id || r.id,
+        name: r.asset_name || r.name,
+        asset_name: r.asset_name || r.name,
+      }));
     },
     enabled: activeTab === 'unlicensed',
   });
@@ -98,7 +163,12 @@ export const ReportsPage: React.FC = () => {
     queryKey: ['reports', 'access-trend'],
     queryFn: async () => {
       const res = await api.get<any[]>('/reports/access-trend');
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const list = Array.isArray(res) ? res : (res as any).data || [];
+      return list.map((r: any) => ({
+        ...r,
+        downloads: toNum(r.downloads),
+        checkouts: toNum(r.checkouts),
+      }));
     },
     enabled: activeTab === 'trends',
   });
@@ -310,7 +380,7 @@ export const ReportsPage: React.FC = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={utilizationData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <XAxis dataKey="license_name" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip
                       contentStyle={{
@@ -347,13 +417,15 @@ export const ReportsPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {utilizationData.map((row: any) => (
-                    <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                      <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{row.name}</td>
+                    <tr key={row.license_id || row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
+                        {row.license_name || row.name}
+                      </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{row.vendor_name || 'N/A'}</td>
-                      <td className="px-4 py-3 font-mono">{row.total_seats}</td>
-                      <td className="px-4 py-3 font-mono text-primary-600 font-bold">{row.used_seats}</td>
-                      <td className="px-4 py-3 font-mono text-emerald-600 font-bold">{row.available_seats}</td>
-                      <td className="px-4 py-3 font-mono">{row.utilization_pct}%</td>
+                      <td className="px-4 py-3 font-mono">{toNum(row.total_seats)}</td>
+                      <td className="px-4 py-3 font-mono text-primary-600 font-bold">{toNum(row.used_seats)}</td>
+                      <td className="px-4 py-3 font-mono text-emerald-600 font-bold">{toNum(row.available_seats)}</td>
+                      <td className="px-4 py-3 font-mono">{toNum(row.utilization_pct)}%</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={row.status} size="sm" />
                       </td>
@@ -394,8 +466,8 @@ export const ReportsPage: React.FC = () => {
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    <Bar dataKey="total_cost" name="Total Spend" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="renewal_cost" name="Renewal Cost" fill="#ec4899" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="grand_total_spend" name="Total Spend" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total_renewal_cost" name="Renewal Cost" fill="#ec4899" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -416,16 +488,16 @@ export const ReportsPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {vendorSpendData.map((row: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                    <tr key={row.vendor_id || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
                         {row.vendor_name || 'Independent'}
                       </td>
                       <td className="px-4 py-3 font-mono">{row.license_count}</td>
                       <td className="px-4 py-3 font-mono font-bold text-slate-800 dark:text-slate-200">
-                        ${Number(row.total_cost || 0).toLocaleString()}
+                        ${Number(row.grand_total_spend ?? row.total_cost ?? 0).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 font-mono text-pink-600">
-                        ${Number(row.renewal_cost || 0).toLocaleString()}
+                        ${Number(row.total_renewal_cost ?? row.renewal_cost ?? 0).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 font-mono text-slate-500">
                         ${Number(row.avg_cost_per_seat || 0).toFixed(2)}
@@ -466,7 +538,7 @@ export const ReportsPage: React.FC = () => {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <XAxis dataKey="month_year" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip
                       contentStyle={{
@@ -480,7 +552,7 @@ export const ReportsPage: React.FC = () => {
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Area
                       type="monotone"
-                      dataKey="running_total"
+                      dataKey="running_total_spend"
                       name="Cumulative Running Total ($)"
                       stroke="#6366f1"
                       fillOpacity={1}
@@ -533,10 +605,10 @@ export const ReportsPage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                       {topAssetsData.map((row: any) => (
-                        <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                          <td className="px-4 py-3 font-bold text-primary-600 font-mono">#{row.rank}</td>
+                        <tr key={row.asset_id || row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                          <td className="px-4 py-3 font-bold text-primary-600 font-mono">#{row.download_rank || row.rank}</td>
                           <td className="px-4 py-3 font-mono text-slate-500">{row.asset_code}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{row.name}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{row.asset_name || row.name}</td>
                           <td className="px-4 py-3 text-slate-500">{row.asset_type}</td>
                           <td className="px-4 py-3 font-mono font-bold text-slate-800 dark:text-slate-200">
                             {row.download_count}
@@ -591,9 +663,9 @@ export const ReportsPage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                       {unlicensedData.map((row: any) => (
-                        <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <tr key={row.asset_id || row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                           <td className="px-4 py-3 font-mono text-slate-500">{row.asset_code}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{row.name}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{row.asset_name || row.name}</td>
                           <td className="px-4 py-3 text-slate-500">{row.asset_type}</td>
                           <td className="px-4 py-3 text-slate-500">{row.category_name || 'Uncategorized'}</td>
                           <td className="px-4 py-3">

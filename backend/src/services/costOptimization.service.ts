@@ -46,8 +46,15 @@ export interface CostOptimizationReport {
 
 export class CostOptimizationService {
   public async getUnusedSeatsReport(tenantId: string): Promise<CostOptimizationReport> {
-    // 1. Query seat allocations with no access log on covered assets in the last 30 days
-    const rows: any = await prisma.$queryRaw(Prisma.sql`
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+
+      // 1. Query seat allocations with no access log on covered assets in the last 30 days
+      const rows: any = await tx.$queryRaw(Prisma.sql`
       SELECT 
         la.id AS allocation_id,
         la.license_id,
@@ -118,7 +125,7 @@ export class CostOptimizationService {
       reclaimCandidates.length > 0 ? Math.round((seatCostSum / reclaimCandidates.length) * 100) / 100 : 0;
 
     // 2. Query top expensive vendors directly from the v_vendor_spend view
-    const vendorRows: any = await prisma.$queryRaw(Prisma.sql`
+    const vendorRows: any = await tx.$queryRaw(Prisma.sql`
       SELECT 
         vendor_id,
         vendor_name,
@@ -151,6 +158,7 @@ export class CostOptimizationService {
       reclaimCandidates,
       topExpensiveVendors,
     };
+    });
   }
 }
 

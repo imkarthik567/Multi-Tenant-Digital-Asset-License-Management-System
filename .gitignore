@@ -17,6 +17,8 @@ out/
 .env
 .env.*
 !.env.example
+!backend/.env.example
+!frontend/.env.example
 !apps/api/.env.example
 !apps/web/.env.example
 
@@ -34,6 +36,8 @@ backups/
 *.dump
 *.dump.sha256
 *.sha256
+*.sql.bak
+database/backup/*.sql.bak
 
 # Logs
 npm-debug.log*

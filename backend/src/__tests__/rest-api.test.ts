@@ -422,6 +422,40 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
       });
       expect(checkRow1).toBeNull();
     });
+
+    it('successfully imports a valid 2-row CSV with HTTP 201 and status ACTIVE', async () => {
+      const code1 = `BULK-CSV-OK1-${Date.now()}`;
+      const code2 = `BULK-CSV-OK2-${Date.now()}`;
+
+      const csvGood = `"asset_code","name","asset_type","description"\n` +
+        `"${code1}","Bulk Imported Asset 1","SOFTWARE","Valid asset 1"\n` +
+        `"${code2}","Bulk Imported Asset 2","IMAGE","Valid asset 2"\n`;
+
+      const importRes = await request(app)
+        .post('/api/assets/bulk-import')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Content-Type', 'text/csv')
+        .send(csvGood);
+
+      expect(importRes.status).toBe(201);
+      expect(importRes.body.status).toBe('success');
+      expect(importRes.body.data.importedCount).toBe(2);
+
+      const asset1 = await systemPrisma.asset.findFirst({
+        where: { tenantId, assetCode: code1 },
+      });
+      const asset2 = await systemPrisma.asset.findFirst({
+        where: { tenantId, assetCode: code2 },
+      });
+
+      expect(asset1).toBeDefined();
+      expect(asset1?.status).toBe('ACTIVE');
+      expect(asset1?.name).toBe('Bulk Imported Asset 1');
+
+      expect(asset2).toBeDefined();
+      expect(asset2?.status).toBe('ACTIVE');
+      expect(asset2?.name).toBe('Bulk Imported Asset 2');
+    });
   });
 
   // ----------------------------------------------------------------------------

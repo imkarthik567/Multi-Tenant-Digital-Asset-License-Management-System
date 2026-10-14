@@ -98,7 +98,7 @@ npm run db:seed
 ### Option A: Render Blueprint (Recommended)
 1. Fork or push your AssetVault repository to GitHub.
 2. In [dashboard.render.com](https://dashboard.render.com), click **New** -> **Blueprint**.
-3. Connect your repository. Render automatically reads root [`render.yaml`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/render.yaml).
+3. Connect your repository. Render automatically reads root [`render.yaml`](../render.yaml).
 4. Fill in the prompted secret values (Render will auto-generate strong random strings for `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET`).
 5. Click **Apply**.
 
@@ -125,7 +125,7 @@ npm run db:seed
    - **Output Directory**: `dist`
 4. Set Environment Variables:
    - `VITE_API_BASE_URL`: `https://assetvault-api.onrender.com/api` (or `/api` if using Vercel rewrites)
-5. Deploy. Vercel automatically honors [`apps/web/vercel.json`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/apps/web/vercel.json) for SPA routing and API reverse-proxying.
+5. Deploy. Vercel automatically honors [`frontend/vercel.json`](../frontend/vercel.json) for SPA routing and API reverse-proxying.
 
 ---
 

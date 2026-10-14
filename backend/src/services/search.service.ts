@@ -43,101 +43,109 @@ export class SearchService {
     const likePattern = `%${rawQuery}%`;
 
     try {
-      // 1. Search Assets
-      const assetRows: any = await prisma.$queryRaw(Prisma.sql`
-        SELECT 
-          id, asset_code, name, asset_type, status, description
-        FROM assets
-        WHERE tenant_id = ${tenantId}::uuid
-          AND deleted_at IS NULL
-          AND (name ILIKE ${likePattern} OR asset_code ILIKE ${likePattern} OR description ILIKE ${likePattern})
-        ORDER BY 
-          CASE WHEN name ILIKE ${likePattern} THEN 1 ELSE 2 END,
-          name ASC
-        LIMIT 8;
-      `);
+      return await prisma.$transaction(async (tx: any) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 
+            set_config('app.current_tenant_id', ${tenantId}, true),
+            set_config('app.is_super_admin', 'false', true);`
+        );
 
-      const assets: SearchResultItem[] = assetRows.map((a: any) => ({
-        id: a.id,
-        type: 'asset',
-        title: a.name,
-        subtitle: `${a.asset_code} • ${a.asset_type}`,
-        url: `/assets/${a.id}`,
-        status: a.status,
-      }));
+        // 1. Search Assets
+        const assetRows: any = await tx.$queryRaw(Prisma.sql`
+          SELECT 
+            id, asset_code, name, asset_type, status, description
+          FROM assets
+          WHERE tenant_id = ${tenantId}::uuid
+            AND deleted_at IS NULL
+            AND (name ILIKE ${likePattern} OR asset_code ILIKE ${likePattern} OR description ILIKE ${likePattern})
+          ORDER BY 
+            CASE WHEN name ILIKE ${likePattern} THEN 1 ELSE 2 END,
+            name ASC
+          LIMIT 8;
+        `);
 
-      // 2. Search Licenses
-      const licenseRows: any = await prisma.$queryRaw(Prisma.sql`
-        SELECT 
-          l.id, l.name, l.license_key, l.status, l.total_seats, v.name AS vendor_name
-        FROM licenses l
-        JOIN vendors v ON v.id = l.vendor_id
-        WHERE l.tenant_id = ${tenantId}::uuid
-          AND l.deleted_at IS NULL
-          AND (l.name ILIKE ${likePattern} OR l.license_key ILIKE ${likePattern} OR v.name ILIKE ${likePattern})
-        ORDER BY 
-          CASE WHEN l.name ILIKE ${likePattern} THEN 1 ELSE 2 END,
-          l.name ASC
-        LIMIT 8;
-      `);
+        const assets: SearchResultItem[] = assetRows.map((a: any) => ({
+          id: a.id,
+          type: 'asset',
+          title: a.name,
+          subtitle: `${a.asset_code} • ${a.asset_type}`,
+          url: `/assets/${a.id}`,
+          status: a.status,
+        }));
 
-      const licenses: SearchResultItem[] = licenseRows.map((l: any) => ({
-        id: l.id,
-        type: 'license',
-        title: l.name,
-        subtitle: `${l.vendor_name} • ${l.total_seats} seats • ${l.license_key ? '***' + l.license_key.slice(-4) : ''}`,
-        url: `/licenses/${l.id}`,
-        status: l.status,
-      }));
+        // 2. Search Licenses
+        const licenseRows: any = await tx.$queryRaw(Prisma.sql`
+          SELECT 
+            l.id, l.name, l.license_key, l.status, l.total_seats, v.name AS vendor_name
+          FROM licenses l
+          JOIN vendors v ON v.id = l.vendor_id
+          WHERE l.tenant_id = ${tenantId}::uuid
+            AND l.deleted_at IS NULL
+            AND (l.name ILIKE ${likePattern} OR l.license_key ILIKE ${likePattern} OR v.name ILIKE ${likePattern})
+          ORDER BY 
+            CASE WHEN l.name ILIKE ${likePattern} THEN 1 ELSE 2 END,
+            l.name ASC
+          LIMIT 8;
+        `);
 
-      // 3. Search Vendors
-      const vendorRows: any = await prisma.$queryRaw(Prisma.sql`
-        SELECT 
-          id, name, contact_email
-        FROM vendors
-        WHERE tenant_id = ${tenantId}::uuid
-          AND (name ILIKE ${likePattern} OR contact_email ILIKE ${likePattern})
-        ORDER BY 
-          CASE WHEN name ILIKE ${likePattern} THEN 1 ELSE 2 END,
-          name ASC
-        LIMIT 8;
-      `);
+        const licenses: SearchResultItem[] = licenseRows.map((l: any) => ({
+          id: l.id,
+          type: 'license',
+          title: l.name,
+          subtitle: `${l.vendor_name} • ${l.total_seats} seats • ${l.license_key ? '***' + l.license_key.slice(-4) : ''}`,
+          url: `/licenses/${l.id}`,
+          status: l.status,
+        }));
 
-      const vendors: SearchResultItem[] = vendorRows.map((v: any) => ({
-        id: v.id,
-        type: 'vendor',
-        title: v.name,
-        subtitle: v.contact_email || 'Vendor Contact',
-        url: `/vendors`,
-      }));
+        // 3. Search Vendors
+        const vendorRows: any = await tx.$queryRaw(Prisma.sql`
+          SELECT 
+            id, name, contact_email
+          FROM vendors
+          WHERE tenant_id = ${tenantId}::uuid
+            AND (name ILIKE ${likePattern} OR contact_email ILIKE ${likePattern})
+          ORDER BY 
+            CASE WHEN name ILIKE ${likePattern} THEN 1 ELSE 2 END,
+            name ASC
+          LIMIT 8;
+        `);
 
-      // 4. Search Tags
-      const tagRows: any = await prisma.$queryRaw(Prisma.sql`
-        SELECT 
-          id, name, color
-        FROM tags
-        WHERE tenant_id = ${tenantId}::uuid
-          AND name ILIKE ${likePattern}
-        ORDER BY name ASC
-        LIMIT 8;
-      `);
+        const vendors: SearchResultItem[] = vendorRows.map((v: any) => ({
+          id: v.id,
+          type: 'vendor',
+          title: v.name,
+          subtitle: v.contact_email || 'Vendor Contact',
+          url: `/vendors`,
+        }));
 
-      const tags: SearchResultItem[] = tagRows.map((t: any) => ({
-        id: t.id,
-        type: 'tag',
-        title: `#${t.name}`,
-        subtitle: `Tag Label`,
-        url: `/assets?q=${encodeURIComponent(t.name)}`,
-        meta: { color: t.color },
-      }));
+        // 4. Search Tags
+        const tagRows: any = await tx.$queryRaw(Prisma.sql`
+          SELECT 
+            id, name, color
+          FROM tags
+          WHERE tenant_id = ${tenantId}::uuid
+            AND name ILIKE ${likePattern}
+          ORDER BY name ASC
+          LIMIT 8;
+        `);
 
-      const total = assets.length + licenses.length + vendors.length + tags.length;
+        const tags: SearchResultItem[] = tagRows.map((t: any) => ({
+          id: t.id,
+          type: 'tag',
+          title: `#${t.name}`,
+          subtitle: `Tag Label`,
+          url: `/assets?q=${encodeURIComponent(t.name)}`,
+          meta: { color: t.color },
+        }));
 
-      return {
-        query: rawQuery,
-        results: { assets, licenses, vendors, tags },
-        total,
-      };
+        const total = assets.length + licenses.length + vendors.length + tags.length;
+
+        return {
+          query: rawQuery,
+          results: { assets, licenses, vendors, tags },
+          total,
+        };
+      });
     } catch (err: any) {
       logger.error({ err, q: rawQuery, tenantId }, 'Global search error');
       return {

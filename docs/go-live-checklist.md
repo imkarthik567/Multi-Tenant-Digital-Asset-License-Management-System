@@ -9,7 +9,7 @@
 
 - [x] **Zero Secrets in Repository**: Full history scanned with `npm run check:secrets`. Zero private keys, unignored `.env` files, or production secrets committed.
 - [x] **SQL Injection Prevention**: `npm run check:sqli` passes cleanly with zero instances of `$queryRawUnsafe` or `$executeRawUnsafe`. All dynamic queries utilize parameterized `Prisma.sql` templates or typed methods.
-- [x] **Least Privilege Database Role**: `assetvault_app` runtime role provisioned via [`database/sql/08_production_bootstrap.sql`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/sql/08_production_bootstrap.sql). `CREATE` and `DROP` privileges revoked from public schema.
+- [x] **Least Privilege Database Role**: `assetvault_app` runtime role provisioned via [`database/sql/08_production_bootstrap.sql`](../database/sql/08_production_bootstrap.sql). `CREATE` and `DROP` privileges revoked from public schema.
 - [x] **Reverse Proxy Security**: `app.set('trust proxy', 1)` configured so client IPs are verified correctly behind Render/Vercel reverse proxies.
 - [x] **HTTP Strict Transport Security (HSTS)**: Helmet configured with `maxAge: 31536000`, `includeSubDomains: true`, and `preload: true` in production.
 - [x] **Secure Cookie Flags**: `refreshToken` cookie enforces `httpOnly: true`, `secure: true` (in production), configurable `sameSite: 'lax'|'strict'|'none'`, and path scoping to `/api/auth`.
@@ -54,8 +54,8 @@
 - [x] **Prometheus Scrape Endpoint**: `GET /metrics` protected by `METRICS_BEARER_TOKEN`.
 - [x] **Docker Compose Monitoring Profile**:
   - Prometheus scraping `api:5000/metrics` every 15s.
-  - Grafana pre-provisioned datasource and dashboard at [`monitoring/grafana/dashboards/assetvault-overview.json`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/monitoring/grafana/dashboards/assetvault-overview.json).
-- [x] **Free-Tier Keepalive**: GitHub Actions workflow [`.github/workflows/keepalive.yml`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/.github/workflows/keepalive.yml) pings `/api/health` every 10 minutes to prevent Render free-tier cold starts.
+  - Grafana pre-provisioned datasource and dashboard at [`monitoring/grafana/dashboards/assetvault-overview.json`](../monitoring/grafana/dashboards/assetvault-overview.json).
+- [x] **Free-Tier Keepalive**: GitHub Actions workflow [`.github/workflows/keepalive.yml`](../.github/workflows/keepalive.yml) pings `/api/health` every 10 minutes to prevent Render free-tier cold starts.
 - [x] **UptimeRobot Integration**: Free external ping monitoring configured for `/api/health` at 5-minute intervals.
 
 ---
@@ -65,13 +65,13 @@
 - [x] **Native Backup Tools**: `database/backup/backup.sh` and `backup.ps1` generate custom format (`.dump`) and plain SQL dumps with SHA-256 checksums.
 - [x] **Rotation Policy**: Maintains 7 latest backups locally.
 - [x] **Restoration Drill**: Verified via `database/backup/restore.sh` and `verify-restore.sh`.
-- [x] **Nightly Cloud Backup Workflow**: [`.github/workflows/nightly-backup.yml`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/.github/workflows/nightly-backup.yml) runs `pg_dump` daily at 02:00 UTC and stores artifacts with 7-day retention.
+- [x] **Nightly Cloud Backup Workflow**: [`.github/workflows/nightly-backup.yml`](../.github/workflows/nightly-backup.yml) runs `pg_dump` daily at 02:00 UTC and stores artifacts with 7-day retention.
 
 ---
 
 ## 6. CI/CD Pipeline Verification
 
-- [x] **CI Pipeline ([`.github/workflows/ci.yml`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/.github/workflows/ci.yml))**:
+- [x] **CI Pipeline ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml))**:
   - Secret scan gate (`npm run check:secrets`)
   - SQL injection gate (`npm run check:sqli`)
   - Dependency audit (`npm audit`)
@@ -79,11 +79,11 @@
   - PostgreSQL 16 service container migration & seed
   - Unit and integration test suite (`npm run test -- --coverage`)
   - Monorepo production build (`npm run build`)
-- [x] **Docker Pipeline ([`.github/workflows/docker.yml`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/.github/workflows/docker.yml))**:
+- [x] **Docker Pipeline ([`.github/workflows/docker.yml`](../.github/workflows/docker.yml))**:
   - Buildx multi-stage build for API and Web
   - Image tagging (`:latest`, `:sha-<sha>`, `:semver`)
   - Trivy vulnerability scanning
-- [x] **CD Pipeline ([`.github/workflows/deploy.yml`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/.github/workflows/deploy.yml))**:
+- [x] **CD Pipeline ([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml))**:
   - Triggers Render deploy hook
   - 3-minute timeout health verification polling `/api/health` and `/api/ready`
 

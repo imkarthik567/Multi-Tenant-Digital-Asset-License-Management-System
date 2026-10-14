@@ -203,8 +203,8 @@ export class AssetService {
       if (!assetCode || assetCode.trim().length < 2) {
         errors.push({ row: rowNum, field: 'assetCode', error: 'Asset code is required' });
       }
-      if (!assetType || !['IMAGE', 'VIDEO', 'DOCUMENT', 'SOFTWARE', 'FONT', 'DATASET'].includes(assetType)) {
-        errors.push({ row: rowNum, field: 'assetType', error: 'Invalid assetType (must be IMAGE, VIDEO, DOCUMENT, SOFTWARE, FONT, or DATASET)' });
+      if (!assetType || !['FONT', 'IMAGE', 'VIDEO', 'AUDIO', 'SOFTWARE', 'DATASET', 'DOCUMENT', 'OTHER'].includes(assetType)) {
+        errors.push({ row: rowNum, field: 'assetType', error: 'Invalid assetType (must be FONT, IMAGE, VIDEO, AUDIO, SOFTWARE, DATASET, DOCUMENT, or OTHER)' });
       }
 
       validRows.push({
@@ -250,7 +250,7 @@ export class AssetService {
             assetCode: rowData.assetCode,
             assetType: rowData.assetType,
             description: rowData.description,
-            status: 'AVAILABLE',
+            status: 'ACTIVE',
           },
         });
         createdRecords.push(created);

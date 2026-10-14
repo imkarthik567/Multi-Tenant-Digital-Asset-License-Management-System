@@ -288,4 +288,4 @@ erDiagram
 | `UK` | Unique Key | Unique constraint enforcing column or composite business exclusivity. |
 
 ### Visual Diagram File
-The rendered vector architecture diagram is exported and maintained as [`/database/er-diagram.svg`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/er-diagram.svg).
+The rendered vector architecture diagram is exported and maintained as [`er-diagram.svg`](./er-diagram.svg).

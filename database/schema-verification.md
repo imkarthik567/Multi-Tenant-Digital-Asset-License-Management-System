@@ -31,7 +31,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/api/health" -Method Get | ConvertT
 
 ## 2. Table Catalog (`\dt`)
 
-PostgreSQL `\dt` listing showing all 19 domain and operational tables derived directly from [`/database/er-diagram.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/er-diagram.md) and [`/database/data-dictionary.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/database/data-dictionary.md):
+PostgreSQL `\dt` listing showing all 19 domain and operational tables derived directly from [`er-diagram.md`](./er-diagram.md) and [`data-dictionary.md`](./data-dictionary.md):
 
 ```text
                  List of tables

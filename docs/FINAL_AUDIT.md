@@ -12,21 +12,21 @@
 ### Section 1: Planning & Project Proposal
 | Requirement | Evidence (File Path / Output) | Status | Fix Applied / Details |
 | :--- | :--- | :---: | :--- |
-| **Title & Executive Summary** | [`PROJECT_PROPOSAL.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/PROJECT_PROPOSAL.md#L1-L20) | **PASS** | Clear title: *AssetVault - Enterprise Multi-Tenant Digital Asset & License Management System*. |
-| **Problem Statement** | [`PROJECT_PROPOSAL.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/PROJECT_PROPOSAL.md#L21-L45) | **PASS** | Formulates SaaS compliance, over-allocation license waste, asset sprawl, and tenant isolation risks. |
-| **Objectives & Key Goals** | [`PROJECT_PROPOSAL.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/PROJECT_PROPOSAL.md#L46-L75) | **PASS** | 6 measurable objectives: zero cross-tenant leakage, 100% concurrency safety, automated expiry tracking, compliance score generation. |
-| **Scope (In-Scope & Out-of-Scope)** | [`PROJECT_PROPOSAL.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/PROJECT_PROPOSAL.md#L76-L105) | **PASS** | Clearly demarcates multi-tenant boundaries, RBAC tiers, and explicit exclusions (e.g., custom payment gateways). |
-| **Team Members & Responsibilities** | [`PROJECT_PROPOSAL.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/PROJECT_PROPOSAL.md#L106-L125) | **PASS** | Structured responsibility distribution matrix across Database Architecture, Backend API, Frontend SPA, and DevOps/QA. |
-| **Technology Stack** | [`PROJECT_PROPOSAL.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/PROJECT_PROPOSAL.md#L126-L155) | **PASS** | PostgreSQL 16, Prisma ORM, Node.js/Express TypeScript, React 18/Vite/Tailwind, Docker, Prometheus/Grafana. |
-| **Major Deliverables** | [`PROJECT_PROPOSAL.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/PROJECT_PROPOSAL.md#L156-L180) | **PASS** | Schema DDL, REST API, Web Dashboard, Backup/Restore Tooling, Test Suites, Deployment Blueprints. |
-| **Gantt Chart** | [`docs/gantt-chart.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/gantt-chart.md), [`docs/gantt.svg`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/gantt.svg) | **PASS** | Complete 12-week Gantt timeline in Markdown and vector SVG formats. |
+| **Title & Executive Summary** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L1-L20) | **PASS** | Clear title: *AssetVault - Enterprise Multi-Tenant Digital Asset & License Management System*. |
+| **Problem Statement** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L21-L45) | **PASS** | Formulates SaaS compliance, over-allocation license waste, asset sprawl, and tenant isolation risks. |
+| **Objectives & Key Goals** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L46-L75) | **PASS** | 6 measurable objectives: zero cross-tenant leakage, 100% concurrency safety, automated expiry tracking, compliance score generation. |
+| **Scope (In-Scope & Out-of-Scope)** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L76-L105) | **PASS** | Clearly demarcates multi-tenant boundaries, RBAC tiers, and explicit exclusions (e.g., custom payment gateways). |
+| **Team Members & Responsibilities** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L106-L125) | **PASS** | Structured responsibility distribution matrix across Database Architecture, Backend API, Frontend SPA, and DevOps/QA. |
+| **Technology Stack** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L126-L155) | **PASS** | PostgreSQL 16, Prisma ORM, Node.js/Express TypeScript, React 18/Vite/Tailwind, Docker, Prometheus/Grafana. |
+| **Major Deliverables** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L156-L180) | **PASS** | Schema DDL, REST API, Web Dashboard, Backup/Restore Tooling, Test Suites, Deployment Blueprints. |
+| **Gantt Chart** | [`docs/gantt-chart.md`](./PROJECT_SCHEDULE_GANTT.md), [`docs/gantt.svg`](./gantt.svg) | **PASS** | Complete 12-week Gantt timeline in Markdown and vector SVG formats. |
 
 ---
 
 ### Section 2: Database Design & Normalization
 | Requirement | Evidence (File Path / Output) | Status | Fix Applied / Details |
 | :--- | :--- | :---: | :--- |
-| **ER Diagram Exists & Matches Tables** | [`docs/ER_DIAGRAM.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/ER_DIAGRAM.md), [`schema.prisma`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/apps/api/prisma/schema.prisma) | **PASS** | Mermaid ER diagram exactly matches all 19 domain tables in PostgreSQL catalog. |
+| **ER Diagram Exists & Matches Tables** | [`docs/ER_DIAGRAM.md`](./ER_DIAGRAM.md), [`schema.prisma`](../backend/prisma/schema.prisma) | **PASS** | Mermaid ER diagram exactly matches all 19 domain tables in PostgreSQL catalog. |
 | **Primary Entities ($\ge 4$)** | Catalog query: `tenants`, `users`, `assets`, `licenses` | **PASS** | 4 core entities + 15 supporting domain entities (Vendors, Categories, Tags, Versions, Allocations, Renewals, etc.). |
 | **Relationships ($\ge 3$)** | Catalog query: 34 Foreign Keys | **PASS** | 34 defined relational links across 1:N and M:N relationships. |
 | **Table Count ($\ge 8$ required)** | PostgreSQL Catalog: 19 domain tables | **PASS** | 19 domain tables: `subscription_plans`, `tenants`, `roles`, `users`, `refresh_tokens`, `vendors`, `categories`, `assets`, `asset_versions`, `tags`, `asset_tags`, `license_types`, `licenses`, `asset_licenses`, `license_allocations`, `license_renewals`, `asset_access_logs`, `notifications`, `audit_logs`. |
@@ -37,8 +37,8 @@
 | **CHECK Constraints** | PostgreSQL Catalog: `chk_*` | **PASS** | **11 explicit domain CHECK constraints** (e.g. `chk_asset_versions_size_positive`, `chk_licenses_dates`, `chk_tenants_status`). |
 | **UNIQUE Constraints** | PostgreSQL Catalog | **PASS** | **14 explicit domain UNIQUE constraints/indexes** (e.g. `users_email_key`, `tenants_slug_key`, `asset_tags_pkey`). |
 | **Indexes Created** | PostgreSQL Catalog: `pg_indexes` | **PASS** | **56 active indexes** across foreign keys, tenant scopes, text search, and date filters. |
-| **Normalization to 3NF / BCNF** | Section 3 of [`docs/FINAL_REPORT.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/FINAL_REPORT.md) | **PASS** | 1NF: Atomic attributes; 2NF: No partial key dependencies; 3NF: No transitive dependencies (e.g., plans factored out of tenants, license types factored out of licenses); BCNF: All determinants are candidate keys. |
-| **Relational Schema & Data Dictionary** | [`docs/data-dictionary.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/data-dictionary.md) | **PASS** | Full relational schema and column-by-column data dictionary detailing types, nullability, defaults, and business meaning. |
+| **Normalization to 3NF / BCNF** | Section 3 of [`docs/FINAL_REPORT.md`](./FINAL_REPORT.md) | **PASS** | 1NF: Atomic attributes; 2NF: No partial key dependencies; 3NF: No transitive dependencies (e.g., plans factored out of tenants, license types factored out of licenses); BCNF: All determinants are candidate keys. |
+| **Relational Schema & Data Dictionary** | [`docs/data-dictionary.md`](./data-dictionary.md) | **PASS** | Full relational schema and column-by-column data dictionary detailing types, nullability, defaults, and business meaning. |
 
 ---
 
@@ -109,7 +109,7 @@
 | **Native Backup & Restore Tooling** | `database/backup/` | **PASS** | Native PostgreSQL scripts: `backup.sh` / `backup.ps1` (`pg_dump -Fc` + `-Fp`), `restore.sh` / `restore.ps1` (`pg_restore`), and `verify-restore.sh`. |
 | **SHA-256 Checksum Verification** | `backup.sh`, `restore.sh` | **PASS** | Checksums automatically generated upon backup and verified before any restore operation. |
 | **7-Day Retention Rotation** | `backup.sh` / `backup.ps1` | **PASS** | Automatic pruning keeping strictly the latest 7 daily backups. |
-| **Disaster Recovery Drill Evidence** | [`docs/backup-recovery.md`](file:///c:/Users/karth/OneDrive/Desktop/Multi-Tenant%20Digital%20Asset%20&%20License%20Management%20System/docs/backup-recovery.md) | **PASS** | Fully documented recovery drill: backup taken, rows deleted, restored into scratch DB, row counts verified 100% match. |
+| **Disaster Recovery Drill Evidence** | [`docs/backup-recovery.md`](./backup-recovery.md) | **PASS** | Fully documented recovery drill: backup taken, rows deleted, restored into scratch DB, row counts verified 100% match. |
 | **Docker Multi-Stage Containers** | `apps/api/Dockerfile`, `apps/web/Dockerfile` | **PASS** | Non-root Alpine builds with production-only dependencies and native healthchecks. |
 | **Docker Compose Orchestration** | `docker-compose.yml` | **PASS** | Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies. |
 | **Git Hygiene & Commit History** | `git log --oneline` | **PASS** | Clean history with Conventional Commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `ci:`); dual-branch model (`main`, `dev`). |

@@ -33,6 +33,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { EmptyState } from '../../components/common/EmptyState';
 import { RoleGate } from '../../components/auth/RoleGate';
+import { FileUrlField } from '../../components/common/FileUrlField';
 
 export const AssetDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -157,26 +158,30 @@ export const AssetDetailPage: React.FC = () => {
   });
 
   // 6. Fetch Categories for edit modal
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: rawCategories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => {
-      const res = await api.get<{ data: Category[] }>('/categories');
-      return res.data || [];
+      const res: any = await api.get('/categories');
+      if (Array.isArray(res)) return res;
+      if (Array.isArray(res?.data)) return res.data;
+      return [];
     },
     enabled: isEditOpen,
   });
+  const categories = Array.isArray(rawCategories) ? rawCategories : [];
 
   // 7. Version Comparison Query
-  const { data: comparisonData, isFetching: isComparing } = useQuery({
+  const { data: rawComparisonData, isFetching: isComparing } = useQuery({
     queryKey: ['asset', id, 'compare', compareV1, compareV2],
     queryFn: async () => {
       const res = await api.get(`/assets/${id}/versions/compare`, {
-        params: { v1: compareV1, v2: compareV2 },
+        params: { from: compareV1, to: compareV2 },
       });
-      return res.data;
+      return (res as any)?.data || res;
     },
     enabled: isCompareOpen && compareV1 !== compareV2,
   });
+  const comparisonData = (rawComparisonData as any)?.data || rawComparisonData;
 
   // MUTATIONS
   // Update Asset
@@ -233,14 +238,16 @@ export const AssetDetailPage: React.FC = () => {
   // Download Asset
   const handleDownload = async () => {
     try {
-      const res = await api.get<{ data?: { downloadUrl?: string; message?: string }; downloadUrl?: string }>(
-        `/assets/${id}/download`
-      );
+      const res = await api.get<{
+        data?: { downloadUrl?: string; fileUrl?: string; message?: string };
+        downloadUrl?: string;
+        fileUrl?: string;
+      }>(`/assets/${id}/download`);
       toast({ title: 'Authorized', message: 'Download authorized by license verification', type: 'success' });
       queryClient.invalidateQueries({ queryKey: ['asset', id, 'access-logs'] });
-      const downloadUrl = res.data?.downloadUrl || (res as any).downloadUrl;
-      if (downloadUrl) {
-        window.open(downloadUrl, '_blank');
+      const fileUrl = res.data?.fileUrl || (res as any).fileUrl || res.data?.downloadUrl;
+      if (fileUrl) {
+        window.open(fileUrl, '_blank');
       }
     } catch (err: any) {
       toast({
@@ -253,7 +260,13 @@ export const AssetDetailPage: React.FC = () => {
 
   // Upload Version Mutation
   const uploadVersionMutation = useMutation({
-    mutationFn: (data: typeof versionForm) => api.post(`/assets/${id}/versions`, data),
+    mutationFn: (data: typeof versionForm) =>
+      api.post(`/assets/${id}/versions`, {
+        fileUrl: data.fileUrl,
+        fileSize: Number(data.fileSizeBytes),
+        checksum: data.checksumSha256,
+        changelog: data.changeNotes,
+      }),
     onSuccess: () => {
       toast({ title: 'Version Uploaded', message: 'New asset version created successfully', type: 'success' });
       setIsUploadVersionOpen(false);
@@ -947,7 +960,7 @@ export const AssetDetailPage: React.FC = () => {
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             >
               <option value="">None / Uncategorized</option>
-              {categories.map((c) => (
+              {(categories || []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -1008,17 +1021,12 @@ export const AssetDetailPage: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">File URL</label>
-            <input
-              type="url"
-              required
-              placeholder="https://storage.assetvault.io/..."
-              value={versionForm.fileUrl}
-              onChange={(e) => setVersionForm({ ...versionForm, fileUrl: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-            />
-          </div>
+          <FileUrlField
+            value={versionForm.fileUrl}
+            onChange={(val) => setVersionForm({ ...versionForm, fileUrl: val })}
+            required
+            placeholder="https://storage.assetvault.io/..."
+          />
 
           <div>
             <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
@@ -1181,13 +1189,84 @@ export const AssetDetailPage: React.FC = () => {
             <p className="text-amber-500 italic">Please select two distinct versions to compare.</p>
           ) : isComparing ? (
             <div className="py-6 text-center text-slate-400">Comparing cryptographic checksums...</div>
-          ) : (
-            <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">Comparison Output:</span>
-              <pre className="text-xs font-mono text-slate-600 dark:text-slate-400 overflow-x-auto">
-                {JSON.stringify(comparisonData || { status: 'Different checksums', delta: 'Binary file update' }, null, 2)}
-              </pre>
+          ) : comparisonData ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <div className="font-semibold text-slate-700 dark:text-slate-300">
+                    Base: v{comparisonData.from?.versionNo ?? compareV1}
+                  </div>
+                  <div className="text-slate-500 dark:text-slate-400 truncate">
+                    Size: {formatBytes(comparisonData.from?.fileSizeBytes || 0)}
+                  </div>
+                  <div
+                    className="font-mono text-[10px] text-slate-400 truncate"
+                    title={comparisonData.from?.checksumSha256}
+                  >
+                    SHA: {comparisonData.from?.checksumSha256?.substring(0, 16)}...
+                  </div>
+                </div>
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <div className="font-semibold text-slate-700 dark:text-slate-300">
+                    Target: v{comparisonData.to?.versionNo ?? compareV2}
+                  </div>
+                  <div className="text-slate-500 dark:text-slate-400 truncate">
+                    Size: {formatBytes(comparisonData.to?.fileSizeBytes || 0)}
+                  </div>
+                  <div
+                    className="font-mono text-[10px] text-slate-400 truncate"
+                    title={comparisonData.to?.checksumSha256}
+                  >
+                    SHA: {comparisonData.to?.checksumSha256?.substring(0, 16)}...
+                  </div>
+                </div>
+              </div>
+
+              {comparisonData.comparison && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">Diff Analysis:</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500">Version Delta:</span>{' '}
+                      <span className="font-mono font-bold text-primary-600">
+                        {comparisonData.comparison.versionDelta > 0
+                          ? `+${comparisonData.comparison.versionDelta}`
+                          : comparisonData.comparison.versionDelta}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Size Delta:</span>{' '}
+                      <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {comparisonData.comparison.sizeDeltaBytes > 0 ? '+' : ''}
+                        {formatBytes(comparisonData.comparison.sizeDeltaBytes)}
+                      </span>
+                    </div>
+                    <div className="col-span-2 flex items-center gap-2">
+                      <span className="text-slate-500">Checksum Status:</span>
+                      {comparisonData.comparison.checksumIdentical ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          Identical Binaries
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                          Modified Content
+                        </span>
+                      )}
+                    </div>
+                    {comparisonData.comparison.changeNotes && (
+                      <div className="col-span-2 pt-1 border-t border-slate-200 dark:border-slate-800">
+                        <span className="text-slate-500">Change Notes:</span>{' '}
+                        <p className="text-slate-700 dark:text-slate-300 italic mt-0.5">
+                          "{comparisonData.comparison.changeNotes}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
+          ) : (
+            <p className="text-slate-500">No comparison data available.</p>
           )}
 
           <div className="flex justify-end pt-3 border-t border-slate-200 dark:border-slate-800">
