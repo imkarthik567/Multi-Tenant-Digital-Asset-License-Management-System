@@ -133,8 +133,8 @@ cd assetvault
 Copy the template files into active environment files:
 ```bash
 cp .env.example .env
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 ```
 
 ### Step 3: Generate Cryptographic Secrets

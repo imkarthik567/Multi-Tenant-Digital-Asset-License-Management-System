@@ -1,6 +1,6 @@
 # ==============================================================================
 # AssetVault: Render Blueprint Specification
-# Service: Docker Web Service (apps/api)
+# Service: Docker Web Service (backend)
 # Docs: https://render.com/docs/blueprint-spec
 # ==============================================================================
 
@@ -8,7 +8,7 @@ services:
   - type: web
     name: assetvault-api
     runtime: docker
-    dockerfilePath: apps/api/Dockerfile
+    dockerfilePath: backend/Dockerfile
     dockerContext: .
     plan: free
     region: oregon

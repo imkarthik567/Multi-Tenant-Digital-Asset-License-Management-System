@@ -47,7 +47,10 @@ function Load-EnvFile([string]$path) {
 if (-not $env:DATABASE_URL) {
     Load-EnvFile (Join-Path $ProjectRoot ".env")
     if (-not $env:DATABASE_URL) {
-        Load-EnvFile (Join-Path $ProjectRoot "apps\api\.env")
+        Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
+        if (-not $env:DATABASE_URL) {
+            Load-EnvFile (Join-Path $ProjectRoot "apps\api\.env")
+        }
     }
 }
 
