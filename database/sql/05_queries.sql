@@ -20,9 +20,9 @@ INSERT INTO assets (
     status
 )
 VALUES (
-    '11111111-1111-1111-1111-111111111111',
-    (SELECT id FROM categories WHERE name = 'Brand Assets' LIMIT 1),
-    (SELECT id FROM users WHERE email = 'techcorp.admin@assetvault.io' LIMIT 1),
+    (SELECT id FROM tenants WHERE slug = 'techcorp' LIMIT 1),
+    (SELECT id FROM categories WHERE tenant_id = (SELECT id FROM tenants WHERE slug = 'techcorp' LIMIT 1) LIMIT 1),
+    (SELECT id FROM users WHERE email = 'techcorp.admin@techcorp.io' LIMIT 1),
     'AST-BRAND-2026-001',
     'Global Corporate Brand Guidelines 2026',
     'Comprehensive identity standards, typography hierarchy, and color palettes.',

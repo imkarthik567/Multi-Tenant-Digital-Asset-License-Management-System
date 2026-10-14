@@ -13,7 +13,7 @@ BEGIN;
 
 DO $$
 DECLARE
-    v_tenant_id UUID := '11111111-1111-1111-1111-111111111111';
+    v_tenant_id UUID := (SELECT id FROM tenants WHERE slug = 'techcorp' LIMIT 1);
     v_owner_id UUID;
     v_category_id UUID;
     v_asset_id UUID;
@@ -135,8 +135,8 @@ INSERT INTO assets (
 )
 VALUES (
     gen_random_uuid(),
-    '11111111-1111-1111-1111-111111111111',
-    (SELECT id FROM users WHERE email = 'techcorp.admin@assetvault.io'),
+    (SELECT id FROM tenants WHERE slug = 'techcorp' LIMIT 1),
+    (SELECT id FROM users WHERE email = 'techcorp.admin@techcorp.io' LIMIT 1),
     'AST-TXN-FAIL-001',
     'Doomed Uncommitted Asset',
     'This record will disappear completely upon ROLLBACK.',
@@ -175,8 +175,8 @@ INSERT INTO assets (
 )
 VALUES (
     'a0000000-0000-0000-0000-000000000099',
-    '11111111-1111-1111-1111-111111111111',
-    (SELECT id FROM users WHERE email = 'techcorp.admin@assetvault.io'),
+    (SELECT id FROM tenants WHERE slug = 'techcorp' LIMIT 1),
+    (SELECT id FROM users WHERE email = 'techcorp.admin@techcorp.io' LIMIT 1),
     'AST-TXN-SAVEPOINT-001',
     'Core Architecture Spec Document',
     'Primary entity must survive the savepoint rollback.',

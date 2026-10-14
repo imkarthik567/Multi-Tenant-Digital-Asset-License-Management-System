@@ -28,6 +28,11 @@ DECLARE
     v_used_seats INT;
     v_existing_alloc INT;
 BEGIN
+    -- Ensure session context for actor so audit triggers capture user_id
+    IF p_allocated_by IS NOT NULL THEN
+        PERFORM set_config('app.current_user_id', p_allocated_by::TEXT, true);
+    END IF;
+
     -- 1. Lock the license row to guarantee serialized seat counter checks
     SELECT id, tenant_id, name, total_seats, status, end_date, deleted_at
     INTO v_license
@@ -116,36 +121,6 @@ BEGIN
         'ACTIVE'
     )
     RETURNING id INTO p_allocation_id;
-
-    -- 7. Audit log insertion
-    INSERT INTO audit_logs (
-        tenant_id,
-        user_id,
-        table_name,
-        record_id,
-        action,
-        old_data,
-        new_data,
-        performed_at
-    )
-    VALUES (
-        v_license.tenant_id,
-        p_allocated_by,
-        'license_allocations',
-        p_allocation_id,
-        'INSERT',
-        NULL,
-        jsonb_build_object(
-            'id', p_allocation_id,
-            'license_id', p_license_id,
-            'user_id', p_user_id,
-            'allocated_by', p_allocated_by,
-            'status', 'ACTIVE',
-            'seat_index', v_used_seats + 1,
-            'total_seats', v_license.total_seats
-        ),
-        NOW()
-    );
 END;
 $$;
 
@@ -164,6 +139,11 @@ DECLARE
     v_alloc RECORD;
     v_tenant_id UUID;
 BEGIN
+    -- Ensure session context for actor so audit triggers capture user_id
+    IF p_revoked_by IS NOT NULL THEN
+        PERFORM set_config('app.current_user_id', p_revoked_by::TEXT, true);
+    END IF;
+
     -- 1. Lock allocation row
     SELECT la.*, l.tenant_id AS lic_tenant_id, l.name AS license_name
     INTO v_alloc
@@ -189,38 +169,6 @@ BEGIN
     SET status = 'REVOKED',
         released_at = NOW()
     WHERE id = p_allocation_id;
-
-    -- 3. Audit log entry
-    INSERT INTO audit_logs (
-        tenant_id,
-        user_id,
-        table_name,
-        record_id,
-        action,
-        old_data,
-        new_data,
-        performed_at
-    )
-    VALUES (
-        v_tenant_id,
-        p_revoked_by,
-        'license_allocations',
-        p_allocation_id,
-        'UPDATE',
-        jsonb_build_object(
-            'id', v_alloc.id,
-            'status', v_alloc.status,
-            'released_at', v_alloc.released_at
-        ),
-        jsonb_build_object(
-            'id', p_allocation_id,
-            'status', 'REVOKED',
-            'released_at', NOW(),
-            'revoked_by', p_revoked_by,
-            'reason', p_reason
-        ),
-        NOW()
-    );
 END;
 $$;
 
@@ -244,6 +192,11 @@ DECLARE
     v_old_end_date DATE;
     v_old_status license_status;
 BEGIN
+    -- Ensure session context for actor so audit triggers capture user_id
+    IF p_performed_by IS NOT NULL THEN
+        PERFORM set_config('app.current_user_id', p_performed_by::TEXT, true);
+    END IF;
+
     -- 1. Lock license row
     SELECT *
     INTO v_license
@@ -317,37 +270,6 @@ BEGIN
         status = 'ACTIVE',
         updated_at = NOW()
     WHERE id = p_license_id;
-
-    -- 6. Insert audit log entry
-    INSERT INTO audit_logs (
-        tenant_id,
-        user_id,
-        table_name,
-        record_id,
-        action,
-        old_data,
-        new_data,
-        performed_at
-    )
-    VALUES (
-        v_license.tenant_id,
-        p_performed_by,
-        'licenses',
-        p_license_id,
-        'UPDATE',
-        jsonb_build_object(
-            'end_date', v_old_end_date,
-            'status', v_old_status
-        ),
-        jsonb_build_object(
-            'end_date', p_new_end_date,
-            'status', 'ACTIVE',
-            'renewal_id', p_renewal_id,
-            'renewal_cost', p_cost,
-            'notes', p_notes
-        ),
-        NOW()
-    );
 END;
 $$;
 

@@ -236,6 +236,11 @@ DECLARE
     v_used_seats INT;
     v_existing_alloc INT;
 BEGIN
+    -- Ensure session context for actor so audit triggers capture user_id
+    IF p_allocated_by IS NOT NULL THEN
+        PERFORM set_config('app.current_user_id', p_allocated_by::TEXT, true);
+    END IF;
+
     SELECT id, tenant_id, name, total_seats, status, end_date, deleted_at
     INTO v_license
     FROM licenses
@@ -318,35 +323,6 @@ BEGIN
         'ACTIVE'
     )
     RETURNING id INTO p_allocation_id;
-
-    INSERT INTO audit_logs (
-        tenant_id,
-        user_id,
-        table_name,
-        record_id,
-        action,
-        old_data,
-        new_data,
-        performed_at
-    )
-    VALUES (
-        v_license.tenant_id,
-        p_allocated_by,
-        'license_allocations',
-        p_allocation_id,
-        'INSERT',
-        NULL,
-        jsonb_build_object(
-            'id', p_allocation_id,
-            'license_id', p_license_id,
-            'user_id', p_user_id,
-            'allocated_by', p_allocated_by,
-            'status', 'ACTIVE',
-            'seat_index', v_used_seats + 1,
-            'total_seats', v_license.total_seats
-        ),
-        NOW()
-    );
 END;
 $$;
 
@@ -362,6 +338,11 @@ DECLARE
     v_alloc RECORD;
     v_tenant_id UUID;
 BEGIN
+    -- Ensure session context for actor so audit triggers capture user_id
+    IF p_revoked_by IS NOT NULL THEN
+        PERFORM set_config('app.current_user_id', p_revoked_by::TEXT, true);
+    END IF;
+
     SELECT la.*, l.tenant_id AS lic_tenant_id, l.name AS license_name
     INTO v_alloc
     FROM license_allocations la
@@ -385,37 +366,6 @@ BEGIN
     SET status = 'REVOKED',
         released_at = NOW()
     WHERE id = p_allocation_id;
-
-    INSERT INTO audit_logs (
-        tenant_id,
-        user_id,
-        table_name,
-        record_id,
-        action,
-        old_data,
-        new_data,
-        performed_at
-    )
-    VALUES (
-        v_tenant_id,
-        p_revoked_by,
-        'license_allocations',
-        p_allocation_id,
-        'UPDATE',
-        jsonb_build_object(
-            'id', v_alloc.id,
-            'status', v_alloc.status,
-            'released_at', v_alloc.released_at
-        ),
-        jsonb_build_object(
-            'id', p_allocation_id,
-            'status', 'REVOKED',
-            'released_at', NOW(),
-            'revoked_by', p_revoked_by,
-            'reason', p_reason
-        ),
-        NOW()
-    );
 END;
 $$;
 
@@ -436,6 +386,11 @@ DECLARE
     v_old_end_date DATE;
     v_old_status license_status;
 BEGIN
+    -- Ensure session context for actor so audit triggers capture user_id
+    IF p_performed_by IS NOT NULL THEN
+        PERFORM set_config('app.current_user_id', p_performed_by::TEXT, true);
+    END IF;
+
     SELECT *
     INTO v_license
     FROM licenses
@@ -504,36 +459,6 @@ BEGIN
         status = 'ACTIVE',
         updated_at = NOW()
     WHERE id = p_license_id;
-
-    INSERT INTO audit_logs (
-        tenant_id,
-        user_id,
-        table_name,
-        record_id,
-        action,
-        old_data,
-        new_data,
-        performed_at
-    )
-    VALUES (
-        v_license.tenant_id,
-        p_performed_by,
-        'licenses',
-        p_license_id,
-        'UPDATE',
-        jsonb_build_object(
-            'end_date', v_old_end_date,
-            'status', v_old_status
-        ),
-        jsonb_build_object(
-            'end_date', p_new_end_date,
-            'status', 'ACTIVE',
-            'renewal_id', p_renewal_id,
-            'renewal_cost', p_cost,
-            'notes', p_notes
-        ),
-        NOW()
-    );
 END;
 $$;
 
@@ -838,13 +763,13 @@ BEGIN
 
     IF TG_TABLE_NAME = 'tenants' THEN
         v_tenant_id := v_record_id;
-    ELSIF TG_TABLE_NAME IN ('users', 'assets', 'licenses') THEN
+    ELSIF TG_TABLE_NAME IN ('users', 'assets', 'licenses', 'vendors') THEN
         IF TG_OP = 'DELETE' THEN
             v_tenant_id := OLD.tenant_id;
         ELSE
             v_tenant_id := NEW.tenant_id;
         END IF;
-    ELSIF TG_TABLE_NAME = 'license_allocations' THEN
+    ELSIF TG_TABLE_NAME IN ('license_allocations', 'license_renewals') THEN
         IF TG_OP = 'DELETE' THEN
             SELECT tenant_id INTO v_tenant_id FROM licenses WHERE id = OLD.license_id;
         ELSE
@@ -863,6 +788,8 @@ BEGIN
             v_user_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.allocated_by ELSE NEW.allocated_by END;
         ELSIF TG_TABLE_NAME = 'assets' THEN
             v_user_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.owner_id ELSE NEW.owner_id END;
+        ELSIF TG_TABLE_NAME = 'license_renewals' THEN
+            v_user_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.renewed_by ELSE NEW.renewed_by END;
         END IF;
     END IF;
 
@@ -917,6 +844,16 @@ FOR EACH ROW EXECUTE FUNCTION fn_audit_row();
 DROP TRIGGER IF EXISTS trg_audit_allocations ON license_allocations;
 CREATE TRIGGER trg_audit_allocations
 AFTER INSERT OR UPDATE OR DELETE ON license_allocations
+FOR EACH ROW EXECUTE FUNCTION fn_audit_row();
+
+DROP TRIGGER IF EXISTS trg_audit_vendors ON vendors;
+CREATE TRIGGER trg_audit_vendors
+AFTER INSERT OR UPDATE OR DELETE ON vendors
+FOR EACH ROW EXECUTE FUNCTION fn_audit_row();
+
+DROP TRIGGER IF EXISTS trg_audit_license_renewals ON license_renewals;
+CREATE TRIGGER trg_audit_license_renewals
+AFTER INSERT OR UPDATE OR DELETE ON license_renewals
 FOR EACH ROW EXECUTE FUNCTION fn_audit_row();
 
 -- 3.3 Immutable Audit Logs Trigger
@@ -1161,6 +1098,74 @@ BEFORE INSERT ON users
 FOR EACH ROW
 EXECUTE FUNCTION fn_plan_user_limit();
 
+-- Cross-Tenant Integrity Enforcement Triggers
+CREATE OR REPLACE FUNCTION fn_enforce_asset_tenant()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_owner_tenant UUID;
+    v_cat_tenant UUID;
+BEGIN
+    SELECT tenant_id INTO v_owner_tenant
+    FROM users
+    WHERE id = NEW.owner_id;
+
+    IF v_owner_tenant IS DISTINCT FROM NEW.tenant_id THEN
+        RAISE EXCEPTION 'Cross-tenant violation: Asset owner % belongs to tenant %, not asset tenant %',
+            NEW.owner_id, v_owner_tenant, NEW.tenant_id
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF NEW.category_id IS NOT NULL THEN
+        SELECT tenant_id INTO v_cat_tenant
+        FROM categories
+        WHERE id = NEW.category_id;
+
+        IF v_cat_tenant IS DISTINCT FROM NEW.tenant_id THEN
+            RAISE EXCEPTION 'Cross-tenant violation: Category % belongs to tenant %, not asset tenant %',
+                NEW.category_id, v_cat_tenant, NEW.tenant_id
+                USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_asset_tenant ON assets;
+CREATE TRIGGER trg_enforce_asset_tenant
+BEFORE INSERT OR UPDATE ON assets
+FOR EACH ROW
+EXECUTE FUNCTION fn_enforce_asset_tenant();
+
+CREATE OR REPLACE FUNCTION fn_enforce_license_tenant()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_vendor_tenant UUID;
+BEGIN
+    SELECT tenant_id INTO v_vendor_tenant
+    FROM vendors
+    WHERE id = NEW.vendor_id;
+
+    IF v_vendor_tenant IS DISTINCT FROM NEW.tenant_id THEN
+        RAISE EXCEPTION 'Cross-tenant violation: Vendor % belongs to tenant %, not license tenant %',
+            NEW.vendor_id, v_vendor_tenant, NEW.tenant_id
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_license_tenant ON licenses;
+CREATE TRIGGER trg_enforce_license_tenant
+BEFORE INSERT OR UPDATE ON licenses
+FOR EACH ROW
+EXECUTE FUNCTION fn_enforce_license_tenant();
+
 
 -- ==============================================================================
 -- 4. ROW-LEVEL SECURITY & APPLICATION ROLE
@@ -1198,22 +1203,38 @@ AS $$
 $$;
 
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenants FORCE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users FORCE ROW LEVEL SECURITY;
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vendors FORCE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assets FORCE ROW LEVEL SECURITY;
 ALTER TABLE licenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE licenses FORCE ROW LEVEL SECURITY;
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tags FORCE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE asset_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE asset_versions FORCE ROW LEVEL SECURITY;
 ALTER TABLE asset_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE asset_tags FORCE ROW LEVEL SECURITY;
 ALTER TABLE asset_licenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE asset_licenses FORCE ROW LEVEL SECURITY;
 ALTER TABLE license_allocations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE license_allocations FORCE ROW LEVEL SECURITY;
 ALTER TABLE license_renewals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE license_renewals FORCE ROW LEVEL SECURITY;
 ALTER TABLE asset_access_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE asset_access_logs FORCE ROW LEVEL SECURITY;
 ALTER TABLE refresh_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE refresh_tokens FORCE ROW LEVEL SECURITY;
 
 -- Top-Level Table Policies
 DROP POLICY IF EXISTS rls_tenants_isolation ON tenants;
