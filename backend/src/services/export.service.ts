@@ -260,7 +260,7 @@ export class ExportService {
       take: 1000,
     });
 
-    const rows = auditLogs.map((al) => ({
+    const rows = auditLogs.map((al: any) => ({
       id: al.id.toString(),
       performed_at: al.performedAt.toISOString(),
       action: al.action,

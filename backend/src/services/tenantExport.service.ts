@@ -95,13 +95,13 @@ export class TenantExportService {
       });
 
       // Format BigInt fileSizeBytes safely for JSON serialization
-      const serializedAssets = assets.map((a) => ({
+      const serializedAssets = assets.map((a: any) => ({
         ...a,
-        versions: a.versions.map((v) => ({
+        versions: a.versions.map((v: any) => ({
           ...v,
           fileSizeBytes: v.fileSizeBytes ? v.fileSizeBytes.toString() : '0',
         })),
-        tags: a.assetTags.map((at) => at.tag.name),
+        tags: a.assetTags.map((at: any) => at.tag.name),
       }));
 
       // 6. Fetch Licenses with Allocations and Renewals
