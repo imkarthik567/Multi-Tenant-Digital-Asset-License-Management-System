@@ -23,13 +23,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'node node_modules/ts-node/dist/bin.js apps/api/src/server.ts',
+      command: 'node node_modules/ts-node/dist/bin.js backend/src/server.ts',
       url: 'http://localhost:5000/api/health',
       reuseExistingServer: true,
       timeout: 30000,
     },
     {
-      command: 'node node_modules/vite/bin/vite.js apps/web --port 5173',
+      command: 'node node_modules/vite/bin/vite.js frontend --port 5173',
       url: 'http://localhost:5173',
       reuseExistingServer: true,
       timeout: 30000,

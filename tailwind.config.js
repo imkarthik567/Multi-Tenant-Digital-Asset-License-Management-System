@@ -1,6 +1,6 @@
-import webConfig from './apps/web/tailwind.config.js';
+import webConfig from './frontend/tailwind.config.js';
 
 export default {
   ...webConfig,
-  content: ['./apps/web/index.html', './apps/web/src/**/*.{js,ts,jsx,tsx}'],
+  content: ['./frontend/index.html', './frontend/src/**/*.{js,ts,jsx,tsx}'],
 };

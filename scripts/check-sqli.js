@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const TARGET_DIR = path.resolve(__dirname, '../apps/api/src');
+const TARGET_DIR = path.resolve(__dirname, '../backend/src');
 const FORBIDDEN_PATTERNS = [
   /\$queryRawUnsafe/g,
   /\$executeRawUnsafe/g,
@@ -41,7 +41,7 @@ function scanDirectory(dir) {
   }
 }
 
-console.log('🔍 Running SQL Injection static analysis over apps/api/src...');
+console.log('🔍 Running SQL Injection static analysis over backend/src...');
 scanDirectory(TARGET_DIR);
 
 if (violations.length > 0) {

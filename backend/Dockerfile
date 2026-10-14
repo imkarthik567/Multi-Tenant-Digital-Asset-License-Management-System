@@ -9,9 +9,9 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 COPY package*.json ./
-COPY apps/api/package*.json ./apps/api/
-COPY apps/web/package*.json ./apps/web/
-COPY apps/api/prisma ./apps/api/prisma/
+COPY backend/package*.json ./backend/
+COPY frontend/package*.json ./frontend/
+COPY backend/prisma ./backend/prisma/
 
 RUN npm ci --workspace=@assetvault/api
 
@@ -20,15 +20,15 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
-COPY apps/api ./apps/api
+COPY backend ./backend
 
-WORKDIR /app/apps/api
+WORKDIR /app/backend
 RUN npx prisma generate
 RUN node ../../node_modules/typescript/bin/tsc -p tsconfig.json
 
 # Stage 3: Production Runtime (Non-root user, slim footprint)
 FROM node:20-alpine AS runner
-WORKDIR /app/apps/api
+WORKDIR /app/backend
 
 ENV NODE_ENV=production
 ENV PORT=5000
@@ -38,18 +38,18 @@ RUN apk add --no-cache curl wget libc6-compat
 
 # Create node workspace layout
 COPY package*.json /app/
-COPY apps/api/package*.json ./
-COPY apps/web/package*.json /app/apps/web/
-COPY apps/api/prisma ./prisma
-COPY apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY backend/package*.json ./
+COPY frontend/package*.json /app/frontend/
+COPY backend/prisma ./prisma
+COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Install production-only dependencies
 WORKDIR /app
 RUN npm ci --workspace=@assetvault/api --omit=dev && npm cache clean --force
 
-WORKDIR /app/apps/api
+WORKDIR /app/backend
 # Copy built artifacts from builder
-COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/node_modules/.prisma /app/node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma /app/node_modules/@prisma
 

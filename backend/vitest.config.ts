@@ -6,12 +6,12 @@ export default defineConfig({
     environment: 'node',
     testTimeout: 30000,
     hookTimeout: 30000,
-    include: ['apps/api/src/__tests__/**/*.test.ts', 'src/__tests__/**/*.test.ts'],
+    include: ['backend/src/__tests__/**/*.test.ts', 'src/__tests__/**/*.test.ts'],
     fileParallelism: false, // Run integration tests sequentially to avoid DB race conditions
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['apps/api/src/services/**/*.ts', 'src/services/**/*.ts'],
+      include: ['backend/src/services/**/*.ts', 'src/services/**/*.ts'],
     },
   },
 });

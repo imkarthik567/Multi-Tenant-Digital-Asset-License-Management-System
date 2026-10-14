@@ -31,7 +31,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: backend/Dockerfile
     container_name: assetvault-api
     restart: unless-stopped
     depends_on:
@@ -52,7 +52,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: backend/Dockerfile
     container_name: assetvault-worker
     restart: unless-stopped
     depends_on:
@@ -73,7 +73,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: frontend/Dockerfile
     container_name: assetvault-web
     restart: unless-stopped
     depends_on:

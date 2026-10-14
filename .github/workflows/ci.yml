@@ -2,9 +2,9 @@ name: AssetVault Continuous Integration
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, dev, frontend, backend ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, dev, frontend, backend ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -44,7 +44,7 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma Client Types
-        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+        run: npx prisma generate --schema backend/prisma/schema.prisma
 
       - name: Security Gate - Scan for Exposed Secrets
         run: npm run check:secrets
@@ -63,7 +63,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
           DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
         run: |
-          npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
+          npx prisma migrate deploy --schema backend/prisma/schema.prisma
           npm run db:seed
 
       - name: Execute Vitest Suite with Code Coverage

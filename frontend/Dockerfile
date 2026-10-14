@@ -10,16 +10,16 @@ RUN apk add --no-cache libc6-compat
 
 # Copy dependency manifests
 COPY package*.json ./
-COPY apps/api/package*.json ./apps/api/
-COPY apps/web/package*.json ./apps/web/
+COPY backend/package*.json ./backend/
+COPY frontend/package*.json ./frontend/
 
 # Install build dependencies
 RUN npm ci --workspace=@assetvault/web
 
 # Copy web source files
-COPY apps/web ./apps/web
+COPY frontend ./frontend
 
-WORKDIR /app/apps/web
+WORKDIR /app/frontend
 ENV VITE_API_URL=/api
 RUN node ../../node_modules/vite/bin/vite.js build
 
@@ -30,10 +30,10 @@ FROM nginx:alpine AS runner
 RUN rm -rf /usr/share/nginx/html/*
 
 # Copy compiled static assets from builder
-COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
 # Copy optimized Nginx configuration
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
