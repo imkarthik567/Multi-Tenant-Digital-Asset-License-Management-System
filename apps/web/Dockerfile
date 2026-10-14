@@ -10,6 +10,7 @@ RUN apk add --no-cache libc6-compat
 
 # Copy dependency manifests
 COPY package*.json ./
+COPY apps/api/package*.json ./apps/api/
 COPY apps/web/package*.json ./apps/web/
 
 # Install build dependencies

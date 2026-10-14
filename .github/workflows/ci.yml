@@ -43,6 +43,9 @@ jobs:
       - name: Install Monorepo Dependencies
         run: npm ci
 
+      - name: Generate Prisma Client Types
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+
       - name: Security Gate - Scan for Exposed Secrets
         run: npm run check:secrets
 

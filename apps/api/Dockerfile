@@ -10,6 +10,7 @@ RUN apk add --no-cache libc6-compat
 
 COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
+COPY apps/web/package*.json ./apps/web/
 COPY apps/api/prisma ./apps/api/prisma/
 
 RUN npm ci --workspace=@assetvault/api
@@ -39,6 +40,7 @@ RUN apk add --no-cache curl wget libc6-compat
 # Create node workspace layout
 COPY package*.json /app/
 COPY apps/api/package*.json ./
+COPY apps/web/package*.json /app/apps/web/
 COPY apps/api/prisma ./prisma
 COPY apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 

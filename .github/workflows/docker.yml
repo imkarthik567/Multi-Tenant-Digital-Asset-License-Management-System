@@ -47,9 +47,7 @@ jobs:
         id: meta-api
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository_owner }}/assetvault-api
-            ${{ secrets.DOCKERHUB_USERNAME }}/assetvault-api
+          images: ghcr.io/${{ github.repository_owner }}/assetvault-api
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,prefix=sha-,format=short
@@ -72,9 +70,7 @@ jobs:
         id: meta-web
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository_owner }}/assetvault-web
-            ${{ secrets.DOCKERHUB_USERNAME }}/assetvault-web
+          images: ghcr.io/${{ github.repository_owner }}/assetvault-web
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,prefix=sha-,format=short
