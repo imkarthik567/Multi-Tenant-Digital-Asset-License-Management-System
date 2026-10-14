@@ -11,7 +11,7 @@ jobs:
   deploy-and-verify:
     name: Trigger Render Deploy & Smoke Check
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && secrets.RENDER_DEPLOY_HOOK_URL != '') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Trigger Render Deployment via Deploy Hook
@@ -24,7 +24,9 @@ jobs:
           echo "✅ Deployment trigger accepted by Render."
 
       - name: Poll Health & Readiness Endpoints (3-minute Timeout)
+        if: "${{ env.RENDER_DEPLOY_HOOK_URL != '' }}"
         env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
           API_URL: ${{ secrets.RENDER_API_URL || 'https://assetvault-api.onrender.com' }}
         run: |
           echo "⏳ Monitoring deployment startup on $API_URL..."
