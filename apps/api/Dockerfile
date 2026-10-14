@@ -19,7 +19,6 @@ RUN npm ci --workspace=@assetvault/api
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY package*.json ./
 COPY apps/api ./apps/api
 
@@ -51,8 +50,8 @@ RUN npm ci --workspace=@assetvault/api --omit=dev && npm cache clean --force
 WORKDIR /app/apps/api
 # Copy built artifacts from builder
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/apps/api/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/.prisma /app/node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma /app/node_modules/@prisma
 
 # Security: Non-root execution
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
