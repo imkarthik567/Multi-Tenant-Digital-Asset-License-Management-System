@@ -127,9 +127,9 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       });
 
       expect(auditLogs.length).toBe(1);
-      expect(auditLogs[0].action).toBe('INSERT');
-      expect(auditLogs[0].tenantId).toBe(tenantAId);
-      expect(auditLogs[0].userId).toBe(userAAdminId);
+      expect(auditLogs[0]!.action).toBe('INSERT');
+      expect(auditLogs[0]!.tenantId).toBe(tenantAId);
+      expect(auditLogs[0]!.userId).toBe(userAAdminId);
     });
 
     it('sp_release_license_seat revokes seat, appends reason to notes, and emits exactly ONE audit log row', async () => {
@@ -168,10 +168,10 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       });
 
       expect(auditLogs.length).toBe(2);
-      expect(auditLogs[0].action).toBe('INSERT');
-      expect(auditLogs[1].action).toBe('UPDATE');
-      expect(auditLogs[1].userId).toBe(userAAdminId);
-      expect(auditLogs[1].tenantId).toBe(tenantAId);
+      expect(auditLogs[0]!.action).toBe('INSERT');
+      expect(auditLogs[1]!.action).toBe('UPDATE');
+      expect(auditLogs[1]!.userId).toBe(userAAdminId);
+      expect(auditLogs[1]!.tenantId).toBe(tenantAId);
     });
 
     it('sp_allocate_license_seat rejects allocation when seats are exhausted', async () => {

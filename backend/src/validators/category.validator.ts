@@ -8,7 +8,6 @@ import { z } from 'zod';
 export const createCategorySchema = z
   .object({
     name: z.string().min(2).max(100).trim(),
-    slug: z.string().optional().nullable(),
     description: z.string().max(500).optional().nullable(),
     parentId: z.string().uuid().optional().nullable(),
   })
@@ -17,13 +16,6 @@ export const createCategorySchema = z
 export const updateCategorySchema = z
   .object({
     name: z.string().min(2).max(100).trim().optional(),
-    slug: z
-      .string()
-      .min(2)
-      .max(100)
-      .regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase alphanumeric characters and hyphens')
-      .trim()
-      .optional(),
     description: z.string().max(500).optional().nullable(),
     parentId: z.string().uuid().optional().nullable(),
   })

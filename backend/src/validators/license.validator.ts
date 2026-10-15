@@ -24,11 +24,11 @@ export const createLicenseSchema = z
   .refine(
     (data) => {
       if (data.endDate && data.startDate) {
-        return data.endDate >= data.startDate;
+        return data.endDate > data.startDate;
       }
       return true;
     },
-    { message: 'endDate must be greater than or equal to startDate', path: ['endDate'] }
+    { message: 'End date must be after start date', path: ['endDate'] }
   );
 
 export const updateLicenseSchema = z
@@ -45,7 +45,11 @@ export const updateLicenseSchema = z
     status: z.nativeEnum(LicenseStatus).optional(),
     autoRenew: z.boolean().optional(),
   })
-  .strip();
+  .strip()
+  .refine(
+    (data) => !data.startDate || !data.endDate || data.endDate > data.startDate,
+    { message: 'End date must be after start date', path: ['endDate'] }
+  );
 
 export const renewLicenseSchema = z
   .object({

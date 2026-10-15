@@ -48,12 +48,11 @@ export class NotificationController {
   });
 
   public streamNotifications = (req: Request, res: Response): void => {
-    const clientId = `${req.user!.id}-${Date.now()}`;
-    notificationStreamService.registerClient(
-      clientId,
+    notificationStreamService.addClient(
       req.user!.id,
       req.user!.tenantId || null,
-      res
+      res,
+      req.user!.role
     );
   };
 }

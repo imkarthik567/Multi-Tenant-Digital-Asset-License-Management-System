@@ -36,12 +36,15 @@ export const createVersionSchema = z.preprocess(
       fileSize: z.number().int().positive('fileSize must be a positive integer in bytes'),
       checksum: z
         .string()
-        .min(8, 'checksum must be at least 8 characters')
-        .max(128, 'checksum cannot exceed 128 characters')
+        .length(64, 'SHA-256 checksum must be exactly 64 hex characters')
         .trim(),
       changelog: z.string().max(1000).optional().nullable(),
       fileSizeBytes: z.number().int().positive().optional(),
-      checksumSha256: z.string().min(8).max(128).trim().optional(),
+      checksumSha256: z
+        .string()
+        .length(64, 'SHA-256 checksum must be exactly 64 hex characters')
+        .trim()
+        .optional(),
       changeNotes: z.string().max(1000).optional().nullable(),
     })
     .passthrough()
