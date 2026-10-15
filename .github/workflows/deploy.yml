@@ -13,11 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
+    env:
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      API_URL: ${{ secrets.RENDER_API_URL || 'https://assetvault-api.onrender.com' }}
+
     steps:
       - name: Trigger Render Deployment via Deploy Hook
         if: "${{ env.RENDER_DEPLOY_HOOK_URL != '' }}"
-        env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           echo "🚀 Triggering Render Web Service deployment..."
           curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
@@ -25,9 +27,6 @@ jobs:
 
       - name: Poll Health & Readiness Endpoints (3-minute Timeout)
         if: "${{ env.RENDER_DEPLOY_HOOK_URL != '' }}"
-        env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-          API_URL: ${{ secrets.RENDER_API_URL || 'https://assetvault-api.onrender.com' }}
         run: |
           echo "⏳ Monitoring deployment startup on $API_URL..."
           TIMEOUT_SECONDS=180

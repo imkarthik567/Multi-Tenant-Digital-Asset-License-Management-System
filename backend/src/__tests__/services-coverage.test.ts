@@ -4,7 +4,7 @@
 // Comprehensive testing across all application domain services to ensure >=70% coverage
 // ==============================================================================
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prismaForRequest } from '../config/prisma';
 import { tenantService } from '../services/tenant.service';
 import { userService } from '../services/user.service';
@@ -142,6 +142,8 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
 
       const activated = await tenantService.suspendOrActivateTenant(created.id, 'ACTIVE');
       expect(activated.status).toBe('ACTIVE');
+
+      await tenantService.deleteTenant(created.id);
     });
   });
 
@@ -187,6 +189,8 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
 
       const reactivated = await userService.updateUserStatus(systemPrisma, created.id, true);
       expect(reactivated.isActive).toBe(true);
+
+      await userService.deleteUser(systemPrisma, created.id);
     });
   });
 
@@ -288,6 +292,8 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
         description: 'Updated category description',
       });
       expect(updated.description).toBe('Updated category description');
+
+      await categoryService.deleteCategory(systemPrisma, created.id);
     });
   });
 
@@ -532,6 +538,42 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
         const vendor = await vendorService.getVendorById(systemPrisma, vendorId);
         expect(vendor.id).toBe(vendorId);
       }
+    });
+  });
+
+  afterAll(async () => {
+    // Delete any leftover cov-tenant-% tenants
+    const leftoverTenants = await systemPrisma.tenant.findMany({
+      where: { slug: { startsWith: 'cov-tenant-' } },
+      select: { id: true },
+    });
+    for (const t of leftoverTenants) {
+      try {
+        await tenantService.deleteTenant(t.id);
+      } catch {
+        // ignore
+      }
+    }
+
+    // Delete any leftover coverage.test.% users
+    const leftoverUsers = await systemPrisma.user.findMany({
+      where: { email: { startsWith: 'coverage.test.' } },
+      select: { id: true },
+    });
+    if (leftoverUsers.length > 0) {
+      const userIds = leftoverUsers.map((u) => u.id);
+      await systemPrisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+      await systemPrisma.user.deleteMany({ where: { id: { in: userIds } } });
+    }
+
+    // Delete any leftover Category-% categories
+    await systemPrisma.category.deleteMany({
+      where: { name: { startsWith: 'Category-' } },
+    });
+
+    // Delete any leftover v2.png test asset versions
+    await systemPrisma.assetVersion.deleteMany({
+      where: { fileUrl: 'https://storage.assetvault.io/v2.png' },
     });
   });
 });
