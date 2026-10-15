@@ -14,7 +14,7 @@ In enterprise SaaS, a database-per-tenant approach introduces severe operational
 ### Q2: Prove that the AssetVault schema satisfies Third Normal Form (3NF).
 **Answer:**  
 A schema is in 3NF if it is in 2NF and no non-prime attribute is transitively dependent on the primary key ($X \rightarrow Y \rightarrow Z$). We eliminated potential transitive dependencies by factoring out lookup and metadata entities:
-1. `subscription_plans` is factored out of `tenants` (otherwise: $\text{tenant\_id} \rightarrow \text{plan\_name} \rightarrow \{\text{max\_users}, \text{price}\}$).
+1. `plans` is factored out of `tenants` (otherwise: $\text{tenant\_id} \rightarrow \text{plan\_name} \rightarrow \{\text{max\_users}, \text{price}\}$).
 2. `license_types` is factored out of `licenses` (otherwise: $\text{license\_id} \rightarrow \text{type\_name} \rightarrow \text{description}$).
 3. `roles` is factored out of `users` (otherwise: $\text{user\_id} \rightarrow \text{role\_name} \rightarrow \text{description}$).
 Every non-prime attribute in all 19 relations depends directly and solely on its candidate keys.
@@ -67,11 +67,23 @@ In PostgreSQL, Stored Procedures (`CREATE PROCEDURE ... CALL`) were introduced i
 
 ### Q10: How does `sp_allocate_license_seat` prevent concurrent over-allocation?
 **Answer:**  
-It uses PostgreSQL's row-level locking construct `SELECT total_seats, used_seats, status FROM licenses WHERE id = p_license_id FOR UPDATE`. This row lock forces all concurrent transactions targeting the same license to queue sequentially. The procedure verifies that `used_seats < total_seats`. If seats are full, it raises exception code `23514` (`check_violation`). If available, it inserts the allocation and increments `used_seats` within the same transaction before releasing the lock.
+In strict accordance with **Third Normal Form (3NF)** (`database/normalization.md` Section 4.3), `used_seats` is **not** stored as a physical column on `licenses`—storing it would introduce an update anomaly and a transitive functional dependency ($\text{license\_id} \rightarrow \text{allocations} \rightarrow \text{used\_seats}$).
+
+Instead, `sp_allocate_license_seat` resolves concurrency and seat tracking as follows:
+1. **Pessimistic Row-Level Lock:** It executes `SELECT id, tenant_id, name, total_seats, status, end_date, deleted_at FROM licenses WHERE id = p_license_id FOR UPDATE`. This exclusive row lock forces all concurrent transactions targeting the same license to queue sequentially at the database engine level.
+2. **Dynamic Active Seat Count:** Under the protection of the lock, it computes used seats directly from the source of truth:
+   ```sql
+   SELECT COUNT(*)::INT INTO v_used_seats
+   FROM license_allocations
+   WHERE license_id = p_license_id AND status = 'ACTIVE';
+   ```
+3. **Capacity Validation:** It verifies `v_used_seats < v_license.total_seats`. If seats are exhausted (`v_used_seats >= v_license.total_seats`), it immediately raises SQL exception code `23514` (`check_violation`).
+4. **Atomic Insertion:** If available, it inserts the new record into `license_allocations` with `status = 'ACTIVE'` within the same serialized transaction.
+This guarantees zero over-allocation under concurrent load while keeping the relational schema fully normalized in 3NF.
 
 ### Q11: Why is an application-level check like `if (license.usedSeats < license.totalSeats)` insufficient under high concurrency?
 **Answer:**  
-Due to the classic **Time-of-Check to Time-of-Use (TOCTOU)** race condition. If 10 requests hit 10 concurrent Node.js threads when 1 seat remains, all 10 threads read `usedSeats = 9` simultaneously from the database. All 10 evaluate the condition as `true`, and all 10 issue `INSERT INTO allocations`. As a result, 19 seats are assigned for a 10-seat license. Only database-level row locks (`FOR UPDATE`) serialize access at the data storage layer.
+Due to the classic **Time-of-Check to Time-of-Use (TOCTOU)** race condition. If 10 requests hit 10 concurrent Node.js threads when 1 seat remains, all 10 threads query `license_allocations` simultaneously and read `activeSeats = 9` before any thread commits its insert. All 10 evaluate the condition as `true`, and all 10 issue `INSERT INTO license_allocations`. As a result, 19 seats are assigned for a 10-seat license. Only database-level row locks (`FOR UPDATE` on the parent `licenses` row inside `sp_allocate_license_seat`) serialize access at the data storage layer, ensuring each thread evaluates `COUNT(*)` only after the preceding thread has either committed its insertion or rolled back.
 
 ### Q12: What does the trigger `trg_audit_log_immutable` do, and why is it important?
 **Answer:**  
@@ -106,9 +118,9 @@ We utilize **PostgreSQL Advisory Locks** via `pg_try_advisory_lock(bigint)`. Unl
 
 ### Q17: Explain how the 4 ACID properties are maintained in AssetVault.
 **Answer:**  
-- **Atomicity:** Ensured via PostgreSQL transactions and Prisma `$transaction`. In `changeUserRole`, updating the user role, writing the audit log, and revoking active refresh tokens all succeed together or rollback completely.
-- **Consistency:** Enforced by PostgreSQL declarative check constraints (`chk_*`), foreign key references with referential integrity, and NOT NULL column rules.
-- **Isolation:** Managed via PostgreSQL Read Committed and Repeatable Read isolation levels, supplemented by explicit `FOR UPDATE` row locks to prevent non-repeatable reads and phantom updates during seat allocation.
+- **Atomicity:** Ensured via PostgreSQL transactions and Prisma `$transaction`. In `changeUserRole`, updating the user role, writing the audit log, and revoking active refresh tokens all succeed together or rollback completely. In `sp_allocate_license_seat`, capacity verification and allocation insertion occur in a single atomic unit.
+- **Consistency:** Enforced by PostgreSQL declarative check constraints (`chk_*`), foreign key references with referential integrity, trigger-based invariants (`fn_check_seat_availability`), NOT NULL column rules, and 3NF normalization (e.g., dynamically computing `used_seats` via `COUNT(*)` on `license_allocations` to prevent aggregate drift).
+- **Isolation:** Managed via PostgreSQL Read Committed and Repeatable Read isolation levels, supplemented by explicit `FOR UPDATE` row locks on `licenses` to prevent non-repeatable reads and race conditions during seat allocation.
 - **Durability:** Guaranteed by PostgreSQL Write-Ahead Logging (WAL) and synchronous disk flushes before transactions report success to the application.
 
 ### Q18: What is a "phantom read", and how do database isolation levels address it?

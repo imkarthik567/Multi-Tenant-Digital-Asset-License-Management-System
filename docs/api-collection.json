@@ -264,13 +264,13 @@
             "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "text/csv" }
+              { "key": "Content-Type", "value": "text/csv" }
             ],
             "body": {
               "mode": "raw",
               "raw": "\"asset_code\",\"name\",\"asset_type\",\"description\"\n\"FNT-001\",\"Roboto OTF\",\"FONT\",\"Google font package\"\n\"IMG-001\",\"Brand Hero SVG\",\"IMAGE\",\"Main banner illustration\""
             },
-            "url": "{{baseUrl}}/assets/import"
+            "url": "{{baseUrl}}/assets/bulk-import"
           }
         },
         {
@@ -279,7 +279,7 @@
             "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "application/json" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -339,7 +339,7 @@
             "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "application/json" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -362,7 +362,7 @@
             "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "application/json" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -377,7 +377,7 @@
             "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "application/json" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -392,7 +392,7 @@
             "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "application/json" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -436,13 +436,13 @@
             "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "application/json" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"lookaheadDays\": 30\n}"
             },
-            "url": "{{baseUrl}}/admin/run-expiry-check"
+            "url": "{{baseUrl}}/notifications/run-expiry-check"
           }
         }
       ]
