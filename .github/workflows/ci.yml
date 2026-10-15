@@ -95,6 +95,9 @@ jobs:
           path: coverage/
           retention-days: 14
 
+      - name: Compile Production Database Seed
+        run: node node_modules/typescript/bin/tsc -p backend/tsconfig.seed.json
+
       - name: Production Monorepo Build
         run: npm run build
 
