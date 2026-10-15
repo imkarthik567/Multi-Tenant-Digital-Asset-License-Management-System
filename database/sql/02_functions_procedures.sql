@@ -131,7 +131,7 @@ $$;
 CREATE OR REPLACE PROCEDURE sp_release_license_seat(
     p_allocation_id UUID,
     p_revoked_by UUID,
-    p_reason TEXT DEFAULT 'Administrative seat release'
+    p_reason TEXT DEFAULT NULL
 )
 LANGUAGE plpgsql
 AS $$
@@ -143,6 +143,9 @@ BEGIN
     IF p_revoked_by IS NOT NULL THEN
         PERFORM set_config('app.current_user_id', p_revoked_by::TEXT, true);
     END IF;
+
+    -- Pass the reason into the session context
+    PERFORM set_config('app.audit_reason', COALESCE(p_reason, ''), true);
 
     -- 1. Lock allocation row
     SELECT la.*, l.tenant_id AS lic_tenant_id, l.name AS license_name
@@ -164,10 +167,15 @@ BEGIN
 
     v_tenant_id := v_alloc.lic_tenant_id;
 
-    -- 2. Update status to REVOKED
+    -- 2. Update status to REVOKED and append reason to notes
     UPDATE license_allocations
     SET status = 'REVOKED',
-        released_at = NOW()
+        released_at = NOW(),
+        notes = CASE
+            WHEN p_reason IS NOT NULL AND p_reason <> ''
+            THEN COALESCE(notes || ' | ', '') || 'Revoked: ' || p_reason
+            ELSE notes
+        END
     WHERE id = p_allocation_id;
 END;
 $$;
