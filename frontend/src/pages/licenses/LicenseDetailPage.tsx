@@ -38,7 +38,8 @@ export const LicenseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const isMember = user?.role === 'MEMBER';
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'allocations' | 'renewals'>('overview');
@@ -438,33 +439,35 @@ export const LicenseDetailPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={handleRevealKey}
-            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-          >
-            {isKeyRevealed ? (
-              <>
-                <EyeOff className="w-3.5 h-3.5 mr-1.5" />
-                Mask Key
-              </>
-            ) : (
-              <>
-                <Eye className="w-3.5 h-3.5 mr-1.5" />
-                Reveal Key
-              </>
-            )}
-          </button>
-          {isKeyRevealed && (
+        {!isMember && (
+          <div className="flex items-center space-x-2">
             <button
-              onClick={() => copyLicenseKey(license.licenseKey)}
+              onClick={handleRevealKey}
               className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             >
-              {copiedKey ? <Check className="w-3.5 h-3.5 mr-1.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
-              Copy
+              {isKeyRevealed ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 mr-1.5" />
+                  Mask Key
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 mr-1.5" />
+                  Reveal Key
+                </>
+              )}
             </button>
-          )}
-        </div>
+            {isKeyRevealed && (
+              <button
+                onClick={() => copyLicenseKey(license.licenseKey)}
+                className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                {copiedKey ? <Check className="w-3.5 h-3.5 mr-1.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
+                Copy
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tabs Bar */}
@@ -703,7 +706,7 @@ export const LicenseDetailPage: React.FC = () => {
                           {a.releasedAt ? new Date(a.releasedAt).toLocaleDateString() : '—'}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {a.status === 'ACTIVE' && (
+                          {!isMember && a.status === 'ACTIVE' && (
                             <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
                               <button
                                 onClick={() => setReleaseAllocationId(a.id)}

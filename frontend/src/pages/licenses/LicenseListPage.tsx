@@ -42,7 +42,7 @@ export const LicenseListPage: React.FC = () => {
   const [createForm, setCreateForm] = useState({
     name: '',
     vendorId: '',
-    licenseTypeId: 1,
+    licenseTypeId: 3,
     licenseKey: '',
     totalSeats: 10,
     cost: 499.0,
@@ -101,7 +101,7 @@ export const LicenseListPage: React.FC = () => {
       setCreateForm({
         name: '',
         vendorId: '',
-        licenseTypeId: 1,
+        licenseTypeId: 3,
         licenseKey: '',
         totalSeats: 10,
         cost: 499.0,
@@ -465,11 +465,11 @@ export const LicenseListPage: React.FC = () => {
                     onChange={(e) => setCreateForm({ ...createForm, licenseTypeId: parseInt(e.target.value, 10) })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                   >
-                    <option value={1}>Proprietary Commercial (Per-Seat)</option>
-                    <option value={2}>Open Source (Unlimited)</option>
-                    <option value={3}>Site License (Unlimited Enterprise)</option>
-                    <option value={4}>Perpetual (Fixed Cap)</option>
-                    <option value={5}>SaaS Subscription</option>
+                    <option value={3}>Seat-Based Commercial (Per-Seat)</option>
+                    <option value={2}>SaaS Subscription</option>
+                    <option value={1}>Perpetual License</option>
+                    <option value={4}>Usage-Based / Metered</option>
+                    <option value={5}>Open Source</option>
                   </select>
                 </div>
               </div>
