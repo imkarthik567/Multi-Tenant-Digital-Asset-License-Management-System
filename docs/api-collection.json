@@ -67,7 +67,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"organizationName\": \"DesignCraft Studios\",\n  \"adminName\": \"Karthik Admin\",\n  \"email\": \"admin@designcraft.internal\",\n  \"password\": \"SecurePass123!#\"\n}"
+              "raw": "{\n  \"tenantName\": \"DesignCraft Studios\",\n  \"slug\": \"designcraft\",\n  \"contactEmail\": \"admin@designcraft.internal\",\n  \"adminFullName\": \"Karthik Admin\",\n  \"adminEmail\": \"admin@designcraft.internal\",\n  \"password\": \"SecurePass123!#\"\n}"
             },
             "url": "{{baseUrl}}/auth/register-tenant"
           }
