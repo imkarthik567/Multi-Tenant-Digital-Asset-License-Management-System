@@ -95,7 +95,17 @@ export const LicenseDetailPage: React.FC = () => {
     queryKey: ['license', id, 'assets'],
     queryFn: async () => {
       const res = await api.get<Asset[] | { data: Asset[] }>(`/licenses/${id}/assets`);
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const raw = Array.isArray(res) ? res : (res as any).data || [];
+      return raw.map((item: any) => {
+        const a = item.asset ? item.asset : item;
+        return {
+          ...a,
+          id: a.id || a.asset_id,
+          name: a.name || a.asset_name,
+          assetCode: a.assetCode || a.asset_code,
+          assetType: a.assetType || a.asset_type,
+        };
+      });
     },
     enabled: !!id && activeTab === 'assets',
   });
@@ -138,7 +148,14 @@ export const LicenseDetailPage: React.FC = () => {
     queryKey: ['assets', 'linkable'],
     queryFn: async () => {
       const res = await api.get<{ data: Asset[] }>('/assets', { params: { limit: 100 } });
-      return res.data || [];
+      const raw = res.data || [];
+      return raw.map((a: any) => ({
+        ...a,
+        id: a.id || a.asset_id,
+        name: a.name || a.asset_name,
+        assetCode: a.assetCode || a.asset_code,
+        assetType: a.assetType || a.asset_type,
+      }));
     },
     enabled: isLinkAssetModalOpen,
   });

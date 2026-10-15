@@ -8,11 +8,11 @@ export type RoleName = 'SUPER_ADMIN' | 'TENANT_ADMIN' | 'ASSET_MANAGER' | 'MEMBE
 
 export type TenantStatus = 'TRIAL' | 'ACTIVE' | 'SUSPENDED';
 
-export type AssetType = 'FONT' | 'IMAGE' | 'SOFTWARE' | 'DATASET' | 'VIDEO' | 'DOCUMENT';
+export type AssetType = 'FONT' | 'IMAGE' | 'SOFTWARE' | 'DATASET' | 'VIDEO' | 'DOCUMENT' | 'AUDIO' | 'OTHER';
 
 export type AssetStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
-export type LicenseStatus = 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
+export type LicenseStatus = 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED';
 
 export type AllocationStatus = 'ACTIVE' | 'RELEASED' | 'REVOKED';
 

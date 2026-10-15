@@ -143,7 +143,7 @@ flowchart LR
 
 ### Minute 9:45 – 10:00 | Conclusion & Q&A Transition
 - **What to say:**
-  > "In summary: AssetVault delivers 19 BCNF-normalized tables, dual-layer multi-tenant isolation, row-locked concurrency safety, automated background jobs with advisory locks, real-time SSE alerts, and 103 passing automated tests. Thank you, and I look forward to your questions."
+  > "In summary: AssetVault delivers 19 BCNF-normalized tables, dual-layer multi-tenant isolation, row-locked concurrency safety, automated background jobs with advisory locks, real-time SSE alerts, and 126 passing automated tests across 6 test suites. Thank you, and I look forward to your questions."
 
 ---
 
