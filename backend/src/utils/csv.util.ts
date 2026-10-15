@@ -93,10 +93,14 @@ export function toCsv<T extends Record<string, any>>(records: T[], columns: (key
         if (val === null || val === undefined) {
           return '""';
         }
-        if (typeof val === 'object') {
-          return `"${JSON.stringify(val).replace(/"/g, '""')}"`;
-        }
-        return `"${String(val).replace(/"/g, '""')}"`;
+        const serialized = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        // Quoting protects CSV structure; prefixing formula-like text protects spreadsheet users.
+        // Restrict this to strings so legitimate negative numeric values remain numeric.
+        const safeValue =
+          typeof val === 'string' && /^[\\t\\r\\n ]*[=+@-]/.test(serialized)
+            ? `'${serialized}`
+            : serialized;
+        return `"${safeValue.replace(/"/g, '""')}"`;
       })
       .join(',');
   });
