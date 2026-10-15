@@ -115,6 +115,25 @@ export const NotificationListPage: React.FC = () => {
     }
   };
 
+  const getNotificationTitle = (n: Notification) => {
+    if (n.title) return n.title;
+    switch (n.type) {
+      case 'EXPIRY_7':
+        return 'Critical: License Expiring Within 7 Days';
+      case 'EXPIRY_15':
+        return 'Warning: License Expiring Within 15 Days';
+      case 'EXPIRY_30':
+        return 'Notice: License Expiring Within 30 Days';
+      case 'EXPIRED':
+        return 'Alert: License Expired';
+      case 'OVER_ALLOCATION':
+        return 'Seat Capacity Alert';
+      case 'SYSTEM':
+      default:
+        return 'System Notification';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -229,8 +248,8 @@ export const NotificationListPage: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white capitalize">
-                      {n.title || (n.type ? n.type.replace(/_/g, ' ').toLowerCase() : 'System Notification')}
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                      {getNotificationTitle(n)}
                     </h4>
                     {!n.isRead && (
                       <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" title="Unread" />
