@@ -411,6 +411,7 @@ model LicenseAllocation {
   allocatedAt DateTime         @default(now()) @map("allocated_at") @db.Timestamptz
   releasedAt  DateTime?        @map("released_at") @db.Timestamptz
   status      AllocationStatus @default(ACTIVE)
+  notes       String?          @db.Text
 
   license   License @relation(fields: [licenseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   user      User    @relation("UserAllocations", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
