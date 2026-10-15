@@ -24,11 +24,11 @@ jobs:
           cache: npm
 
       - name: Refresh monorepo lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit
+        run: npm install --ignore-scripts --no-audit --workspaces=true
 
       - name: Refresh standalone backend lockfile
         working-directory: backend
-        run: npm install --package-lock-only --ignore-scripts --no-audit
+        run: npm install --ignore-scripts --no-audit --workspaces=false
 
       - name: Commit refreshed lockfiles
         env:
