@@ -14,6 +14,9 @@ import { loginSchema, registerTenantSchema, refreshTokenSchema } from '../valida
 import { env } from '../config/env';
 
 const router = Router();
+const primaryClientUrl = (env.CLIENT_URL.split(',')[0] || 'http://localhost:5173')
+  .trim()
+  .replace(/\/$/, '');
 
 // 1. Password Login
 router.post('/login', authRateLimiter, validate(loginSchema), authController.login);
@@ -50,7 +53,7 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
     '/google/callback',
     passport.authenticate('google', {
       session: false,
-      failureRedirect: `${env.CLIENT_URL}/login?error=not_invited`,
+      failureRedirect: `${primaryClientUrl}/login?error=not_invited`,
     }),
     authController.googleCallback
   );
