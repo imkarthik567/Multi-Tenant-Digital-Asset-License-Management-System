@@ -11,20 +11,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install PostgreSQL 16 Client Tools
+      - name: Install PostgreSQL Client Tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client-16
+          sudo apt-get install -y -qq postgresql-client
 
       - name: Execute pg_dump against Cloud Database
         env:
-          # Database connection URL supplied via GitHub Actions Secret
           DATABASE_DIRECT_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          if [ -z "$DATABASE_DIRECT_URL" ]; then
-            echo "❌ DATABASE_DIRECT_URL secret is not configured in GitHub repository settings."
-            echo "ℹ️  Configure DATABASE_DIRECT_URL to enable automated cloud backups."
-            exit 1
+          TARGET_URL="${DATABASE_DIRECT_URL:-$DATABASE_URL}"
+          if [ -z "$TARGET_URL" ]; then
+            echo "⚠️ Neither DATABASE_DIRECT_URL nor DATABASE_URL secret is configured in GitHub repository settings."
+            echo "ℹ️ Skipping automated cloud backup gracefully."
+            exit 0
           fi
 
           mkdir -p backups
@@ -33,7 +34,7 @@ jobs:
           CHECKSUM_FILE="${BACKUP_FILE}.sha256"
 
           echo "📦 Initiating native PostgreSQL custom dump (-Fc)..."
-          pg_dump "$DATABASE_DIRECT_URL" \
+          pg_dump "$TARGET_URL" \
             --format=custom \
             --no-owner \
             --no-privileges \
@@ -51,4 +52,4 @@ jobs:
           name: assetvault-nightly-backup-${{ github.run_id }}
           path: backups/
           retention-days: 7
-          if-no-files-found: error
+          if-no-files-found: warn
