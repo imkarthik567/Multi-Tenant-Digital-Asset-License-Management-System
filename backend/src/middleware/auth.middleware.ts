@@ -13,14 +13,13 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction): 
 
   const authHeader = req.headers.authorization;
   if (authHeader) {
-    const [scheme, val] = authHeader.split(' ');
-    if (scheme && scheme.toLowerCase() === 'bearer' && val) {
+    const parts = authHeader.trim().split(/\s+/);
+    const [scheme, val] = parts;
+    if (parts.length === 2 && scheme?.toLowerCase() === 'bearer' && val) {
       token = val;
     } else {
       throw new UnauthorizedError('Invalid authorization scheme. Format: Bearer <token>');
     }
-  } else if (req.query?.token && typeof req.query.token === 'string') {
-    token = req.query.token;
   }
 
   if (!token) {
