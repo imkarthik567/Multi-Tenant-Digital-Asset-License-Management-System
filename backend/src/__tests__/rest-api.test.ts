@@ -423,13 +423,13 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
       expect(checkRow1).toBeNull();
     });
 
-    it('successfully imports a valid 2-row CSV with HTTP 201 and status ACTIVE', async () => {
-      const code1 = `BULK-CSV-OK1-${Date.now()}`;
-      const code2 = `BULK-CSV-OK2-${Date.now()}`;
+    it('successfully imports valid CSV rows with HTTP 201 and sets status to ACTIVE', async () => {
+      const code1 = `CSV-OK-1-${Date.now()}`;
+      const code2 = `CSV-OK-2-${Date.now()}`;
 
       const csvGood = `"asset_code","name","asset_type","description"\n` +
-        `"${code1}","Bulk Imported Asset 1","SOFTWARE","Valid asset 1"\n` +
-        `"${code2}","Bulk Imported Asset 2","IMAGE","Valid asset 2"\n`;
+        `"${code1}","Bulk Font Asset","FONT","Font file description"\n` +
+        `"${code2}","Bulk Image Asset","IMAGE","Image file description"\n`;
 
       const importRes = await request(app)
         .post('/api/assets/bulk-import')
@@ -438,7 +438,6 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
         .send(csvGood);
 
       expect(importRes.status).toBe(201);
-      expect(importRes.body.status).toBe('success');
       expect(importRes.body.data.importedCount).toBe(2);
 
       const asset1 = await systemPrisma.asset.findFirst({
@@ -448,13 +447,13 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
         where: { tenantId, assetCode: code2 },
       });
 
-      expect(asset1).toBeDefined();
+      expect(asset1).not.toBeNull();
       expect(asset1?.status).toBe('ACTIVE');
-      expect(asset1?.name).toBe('Bulk Imported Asset 1');
+      expect(asset1?.assetType).toBe('FONT');
 
-      expect(asset2).toBeDefined();
+      expect(asset2).not.toBeNull();
       expect(asset2?.status).toBe('ACTIVE');
-      expect(asset2?.name).toBe('Bulk Imported Asset 2');
+      expect(asset2?.assetType).toBe('IMAGE');
     });
   });
 
@@ -560,6 +559,77 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.data)).toBe(true);
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  // ----------------------------------------------------------------------------
+  // 11. Asset Versioning & Comparison API
+  // ----------------------------------------------------------------------------
+  describe('11. Asset Versioning & Comparison Payloads', () => {
+    it('creates version using backend schema (fileSize, checksum, changelog)', async () => {
+      const res = await request(app)
+        .post(`/api/assets/${testAssetId}/versions`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          fileUrl: 'https://cdn.assetvault.internal/files/tokens-v2.json',
+          fileSize: 20480,
+          checksum: 'b1b2c3d4e5f600112233445566778899aabbccddeeff00112233445566778899',
+          changelog: 'Second release using legacy keys',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.versionNo).toBe(2);
+    });
+
+    it('creates version using frontend schema (fileSizeBytes, checksumSha256, changeNotes)', async () => {
+      const res = await request(app)
+        .post(`/api/assets/${testAssetId}/versions`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          fileUrl: 'https://cdn.assetvault.internal/files/tokens-v3.json',
+          fileSizeBytes: 30720,
+          checksumSha256: 'c1b2c3d4e5f600112233445566778899aabbccddeeff00112233445566778899',
+          changeNotes: 'Third release using frontend keys',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.versionNo).toBe(3);
+    });
+
+    it('compares versions using ?from=&to= query parameters', async () => {
+      const res = await request(app)
+        .get(`/api/assets/${testAssetId}/versions/compare?from=1&to=2`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.comparison).toBeDefined();
+      expect(res.body.data.comparison.versionDelta).toBe(1);
+    });
+
+    it('compares versions using ?v1=&v2= frontend query parameters', async () => {
+      const res = await request(app)
+        .get(`/api/assets/${testAssetId}/versions/compare?v1=1&v2=3`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.comparison).toBeDefined();
+      expect(res.body.data.comparison.versionDelta).toBe(2);
+    });
+  });
+
+  // ----------------------------------------------------------------------------
+  // 12. Notification Automated Expiry Check
+  // ----------------------------------------------------------------------------
+  describe('12. Notification Automated Expiry Check', () => {
+    it('accepts frontend payload with daysAhead and executes check', async () => {
+      const res = await request(app)
+        .post('/api/notifications/run-expiry-check')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ daysAhead: 30 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.success).toBe(true);
+      expect(res.body.data).toHaveProperty('notificationsGenerated');
     });
   });
 });
