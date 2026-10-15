@@ -7,11 +7,11 @@
 * @imkarthik567
 
 # Backend & Database Services
-/apps/api/ @imkarthik567
+/backend/ @imkarthik567
 /database/ @imkarthik567
 
 # Frontend Applications
-/apps/web/ @imkarthik567
+/frontend/ @imkarthik567
 
 # DevOps & Infrastructure
 /.github/ @imkarthik567

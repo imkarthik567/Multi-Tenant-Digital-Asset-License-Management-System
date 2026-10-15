@@ -118,9 +118,9 @@ flowchart LR
 - **What to do:**
   1. Point to the **Notification Bell** in the top navigation bar.
   2. Show that real-time notifications are delivered via Server-Sent Events (`GET /api/notifications/stream`) without continuous polling.
-  3. Briefly open `apps/api/src/worker.ts` in the editor.
+  3. Briefly open `backend/src/worker.ts` in the editor.
 - **What to say:**
-  > "For background tasks, we built a dedicated worker in `apps/api/src/worker.ts`. It runs node-cron jobs that check for expiring licenses daily at 02:00, auto-renew licenses where `auto_renew = true`, and refresh our materialized view `mv_monthly_access_stats`. To guarantee safety in multi-instance cloud deployments, every job acquires a PostgreSQL advisory lock (`pg_try_advisory_lock`), ensuring no duplicate work occurs."
+  > "For background tasks, we built a dedicated worker in `backend/src/worker.ts`. It runs node-cron jobs that check for expiring licenses daily at 02:00, auto-renew licenses where `auto_renew = true`, and refresh our materialized view `mv_monthly_access_stats`. To guarantee safety in multi-instance cloud deployments, every job acquires a PostgreSQL advisory lock (`pg_try_advisory_lock`), ensuring no duplicate work occurs."
 
 ---
 

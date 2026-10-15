@@ -2,7 +2,7 @@
 
 > **Course:** BCSE307L Database Systems (Fall 2026-27)  
 > **System:** Multi-Tenant Digital Asset & License Management System (AssetVault)  
-> **Package:** `apps/web` (React 18 + TypeScript + Vite + Tailwind CSS)
+> **Package:** `frontend` (React 18 + TypeScript + Vite + Tailwind CSS)
 
 ---
 
@@ -131,7 +131,7 @@ The interface is engineered with enterprise ergonomics across all viewport width
 ## 5. Frontend Directory Structure
 
 ```
-apps/web/
+frontend/
 ├── index.html                   # HTML entry point with Inter & JetBrains Mono fonts
 ├── vite.config.ts               # Vite bundler config with /api reverse proxy
 ├── tailwind.config.js           # Design tokens, color system, and animations
@@ -211,7 +211,7 @@ apps/web/
 To meet high-governance and operational demands, the frontend implements 7 advanced modules:
 
 ### 6.1 Global Search Command Palette (`Ctrl+K` / `Cmd+K`)
-- **Component:** `apps/web/src/components/common/CommandPalette.tsx`
+- **Component:** `frontend/src/components/common/CommandPalette.tsx`
 - **Trigger:** Accessible anywhere via keyboard shortcut `Ctrl+K` (or `Cmd+K` on macOS) or the global search icon in the top Navbar.
 - **Backend Service:** Powered by PostgreSQL `pg_trgm` similarity search across Assets, Licenses, Vendors, and Tags (`GET /api/search?q=`).
 - **Interaction:** Instant keyboard navigation (Up/Down arrow, Enter to select, Escape to dismiss) with grouped entity badges and highlighted match previews.

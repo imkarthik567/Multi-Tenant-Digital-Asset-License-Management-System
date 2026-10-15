@@ -210,7 +210,7 @@ AssetVault implements three stored procedures in PL/pgSQL:
 ## 7. Concurrency Control & Empirical Verification
 
 ### 7.1 The 20-Thread Race Condition Penetration Test
-To demonstrate concurrency safety, the test suite (`apps/api/src/__tests__/break-it-security.test.ts`) executed an adversarial race condition exploit:
+To demonstrate concurrency safety, the test suite (`backend/src/__tests__/break-it-security.test.ts`) executed an adversarial race condition exploit:
 - A license with `total_seats = 3` and `used_seats = 0` was targeted.
 - 20 distinct user threads simultaneously fired seat allocation requests via `Promise.all`:
 ```
@@ -268,8 +268,8 @@ In accordance with production enterprise standards, AssetVault utilizes native d
   - Automatically compares table row counts between production and restored scratch databases, outputting a verification PASS/FAIL matrix.
 
 ### 9.2 Containerization & Orchestration
-- **API Container (`apps/api/Dockerfile`):** Multi-stage Node 20 Alpine container running as a non-privileged `node` user with production dependencies only and built-in Docker healthcheck (`GET /api/health`).
-- **Web Container (`apps/web/Dockerfile`):** Multi-stage build producing static production bundles served via NGINX Alpine with HTTP/2 and gzip compression.
+- **API Container (`backend/Dockerfile`):** Multi-stage Node 20 Alpine container running as a non-privileged `node` user with production dependencies only and built-in Docker healthcheck (`GET /api/health`).
+- **Web Container (`frontend/Dockerfile`):** Multi-stage build producing static production bundles served via NGINX Alpine with HTTP/2 and gzip compression.
 - **Docker Compose (`docker-compose.yml`):** Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies.
 
 ### 9.3 CI/CD Automation (GitHub Actions)
@@ -288,11 +288,11 @@ The automated test suite (`npm test`) executes across five distinct suites:
 
 ```
 Test Suite Execution Results:
-✓ apps/api/src/__tests__/break-it-security.test.ts (22 tests) - 100% PASS
-✓ apps/api/src/__tests__/rest-api.test.ts (18 tests) - 100% PASS
-✓ apps/api/src/__tests__/services-coverage.test.ts (34 tests) - 100% PASS
-✓ apps/api/src/__tests__/auth-rbac-isolation.test.ts (10 tests) - 100% PASS
-✓ apps/api/src/__tests__/advanced-features.test.ts (19 tests) - 100% PASS
+✓ backend/src/__tests__/break-it-security.test.ts (22 tests) - 100% PASS
+✓ backend/src/__tests__/rest-api.test.ts (18 tests) - 100% PASS
+✓ backend/src/__tests__/services-coverage.test.ts (34 tests) - 100% PASS
+✓ backend/src/__tests__/auth-rbac-isolation.test.ts (10 tests) - 100% PASS
+✓ backend/src/__tests__/advanced-features.test.ts (19 tests) - 100% PASS
 
 Total: 5 Test Files, 103 Tests Passed, 0 Failed (100% Pass Rate)
 Static SQL Injection Check (check:sqli): 0 Violations
