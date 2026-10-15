@@ -4,9 +4,9 @@
 # ==============================================================================
 
 # Stage 1: Dependencies Resolution
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
-RUN apk add --no-cache libc6-compat
+RUN apk upgrade --no-cache && apk add --no-cache libc6-compat
 
 COPY package*.json ./
 COPY backend/package*.json ./backend/
@@ -16,7 +16,7 @@ COPY backend/prisma ./backend/prisma/
 RUN npm ci --workspace=@assetvault/api
 
 # Stage 2: Compilation & Prisma Generation
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
@@ -27,14 +27,14 @@ RUN npx prisma generate
 RUN node ../node_modules/typescript/bin/tsc -p tsconfig.build.json
 
 # Stage 3: Production Runtime (Non-root user, slim footprint)
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app/backend
 
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# Install runtime utilities (curl/wget for healthcheck)
-RUN apk add --no-cache curl wget libc6-compat
+# Install runtime utilities (curl/wget for healthcheck) and refresh npm's bundled dependency tree.
+RUN apk upgrade --no-cache && apk add --no-cache curl wget libc6-compat && npm install --global npm@11 && npm cache clean --force
 
 # Create node workspace layout
 COPY package*.json /app/
