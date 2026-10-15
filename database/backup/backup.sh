@@ -60,9 +60,6 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   load_env "${PROJECT_ROOT}/.env"
   if [[ -z "${DATABASE_URL:-}" ]]; then
     load_env "${PROJECT_ROOT}/backend/.env"
-    if [[ -z "${DATABASE_URL:-}" ]]; then
-      load_env "${PROJECT_ROOT}/apps/api/.env"
-    fi
   fi
 fi
 

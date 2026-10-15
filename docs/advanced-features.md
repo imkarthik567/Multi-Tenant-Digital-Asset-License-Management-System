@@ -29,7 +29,7 @@
 ---
 
 ### Feature 1: Distributed Scheduled Background Jobs
-* **Entry Point:** `apps/api/src/worker.ts` (supports standalone worker process or inline execution via `RUN_WORKER=true`).
+* **Entry Point:** `backend/src/worker.ts` (supports standalone worker process or inline execution via `RUN_WORKER=true`).
 * **Cron Schedules & Advisory Lock IDs:**
   1. `0 2 * * *` (Daily 02:00 AM) — Expiry Check: Calls `fn_generate_expiry_notifications()`. Protected by Advisory Lock `1001`.
   2. `0 * * * *` (Hourly) — Materialized View Refresh: Executes `REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;`. Protected by Advisory Lock `1002`.
@@ -45,7 +45,7 @@
 ---
 
 ### Feature 2: Transactional Expiry Email Notifications
-* **Service:** `apps/api/src/services/email.service.ts` (Nodemailer with Ethereal / Mailtrap / SMTP transport).
+* **Service:** `backend/src/services/email.service.ts` (Nodemailer with Ethereal / Mailtrap / SMTP transport).
 * **Delivery Strategy:** Expiry emails are decoupled from HTTP request loops and triggered directly from the daily scheduler or admin trigger.
 * **Email Templates:**
   - `30 Days Remaining` (Notice): Friendly notification with renewal terms.
