@@ -200,7 +200,7 @@ export class AuthController {
       setRefreshTokenCookie(res, refreshData.rawToken);
 
       // Redirect client with access token
-      res.redirect(`${redirectOrigin}/oauth-callback?token=${accessToken}`);
+      res.redirect(`${redirectOrigin}/oauth-callback#token=${encodeURIComponent(accessToken)}`);
     } catch (error) {
       next(error);
     }
