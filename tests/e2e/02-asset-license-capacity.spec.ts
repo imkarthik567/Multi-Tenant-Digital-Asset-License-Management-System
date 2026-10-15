@@ -126,6 +126,11 @@ test.describe('E2E Journey 2: Asset Management, License Provisioning & Capacity 
         const overMsg = overBody.error?.message || overBody.message || '';
         expect(overMsg).toMatch(/License seats exhausted|already has an active seat/i);
         reachedLimit = true;
+
+        // Clean up test license to avoid DB pollution
+        await request.delete(`http://localhost:5000/api/licenses/${testLic.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
     }
     expect(reachedLimit).toBe(true);
