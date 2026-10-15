@@ -91,7 +91,7 @@ jobs:
 
       # --- Vulnerability Scanning with Trivy ---
       - name: Run Trivy Security Vulnerability Scan on API
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         continue-on-error: false
         env:
           TRIVY_USERNAME: ${{ github.actor }}
@@ -105,7 +105,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Run Trivy Security Vulnerability Scan on Web
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         continue-on-error: false
         env:
           TRIVY_USERNAME: ${{ github.actor }}
