@@ -8,11 +8,15 @@
 -- 1. View: v_license_utilization
 -- Calculates active allocations, remaining capacity, percentage utilization,
 -- days until expiration, and contractual status.
+-- Includes vendor_id and license_type_id for backend filtering.
 -- ------------------------------------------------------------------------------
+DROP VIEW IF EXISTS v_license_utilization CASCADE;
 CREATE OR REPLACE VIEW v_license_utilization AS
 SELECT 
     l.id AS license_id,
     l.tenant_id,
+    l.vendor_id,
+    l.license_type_id,
     l.name AS license_name,
     v.name AS vendor_name,
     lt.name AS license_type,
@@ -37,7 +41,7 @@ JOIN vendors v ON v.id = l.vendor_id
 JOIN license_types lt ON lt.id = l.license_type_id
 LEFT JOIN license_allocations la ON la.license_id = l.id
 WHERE l.deleted_at IS NULL
-GROUP BY l.id, l.tenant_id, l.name, v.name, lt.name, l.total_seats, l.end_date, l.status, l.start_date, l.cost, l.currency;
+GROUP BY l.id, l.tenant_id, l.vendor_id, l.license_type_id, l.name, v.name, lt.name, l.total_seats, l.end_date, l.status, l.start_date, l.cost, l.currency;
 
 -- ------------------------------------------------------------------------------
 -- 2. View: v_expiring_licenses
@@ -79,7 +83,9 @@ GROUP BY l.id, l.tenant_id, l.name, v.name, l.license_key, l.total_seats, l.star
 -- Enriched asset repository view combining taxonomic category, custodian,
 -- latest version number, aggregated tags array, covering licenses count,
 -- and license compliance classification.
+-- Includes category_id and owner_id for backend filtering.
 -- ------------------------------------------------------------------------------
+DROP VIEW IF EXISTS v_asset_catalog CASCADE;
 CREATE OR REPLACE VIEW v_asset_catalog AS
 WITH latest_versions AS (
     SELECT 
@@ -113,6 +119,8 @@ active_covering_licenses AS (
 SELECT 
     a.id AS asset_id,
     a.tenant_id,
+    a.category_id,
+    a.owner_id,
     a.asset_code,
     a.name AS asset_name,
     a.description,

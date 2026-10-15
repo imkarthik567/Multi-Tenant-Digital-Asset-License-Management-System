@@ -18,10 +18,13 @@ CREATE INDEX IF NOT EXISTS "idx_licenses_name_trgm" ON "licenses" USING gin ("na
 -- ==============================================================================
 
 -- 1.1 View: v_license_utilization
+DROP VIEW IF EXISTS v_license_utilization CASCADE;
 CREATE OR REPLACE VIEW v_license_utilization AS
 SELECT 
     l.id AS license_id,
     l.tenant_id,
+    l.vendor_id,
+    l.license_type_id,
     l.name AS license_name,
     v.name AS vendor_name,
     lt.name AS license_type,
@@ -46,7 +49,7 @@ JOIN vendors v ON v.id = l.vendor_id
 JOIN license_types lt ON lt.id = l.license_type_id
 LEFT JOIN license_allocations la ON la.license_id = l.id
 WHERE l.deleted_at IS NULL
-GROUP BY l.id, l.tenant_id, l.name, v.name, lt.name, l.total_seats, l.end_date, l.status, l.start_date, l.cost, l.currency;
+GROUP BY l.id, l.tenant_id, l.vendor_id, l.license_type_id, l.name, v.name, lt.name, l.total_seats, l.end_date, l.status, l.start_date, l.cost, l.currency;
 
 -- 1.2 View: v_expiring_licenses
 CREATE OR REPLACE VIEW v_expiring_licenses AS
@@ -80,6 +83,7 @@ WHERE l.deleted_at IS NULL
 GROUP BY l.id, l.tenant_id, l.name, v.name, l.license_key, l.total_seats, l.start_date, l.end_date, l.cost, l.currency, l.auto_renew;
 
 -- 1.3 View: v_asset_catalog
+DROP VIEW IF EXISTS v_asset_catalog CASCADE;
 CREATE OR REPLACE VIEW v_asset_catalog AS
 WITH latest_versions AS (
     SELECT 
@@ -113,6 +117,8 @@ active_covering_licenses AS (
 SELECT 
     a.id AS asset_id,
     a.tenant_id,
+    a.category_id,
+    a.owner_id,
     a.asset_code,
     a.name AS asset_name,
     a.description,
@@ -617,7 +623,26 @@ BEGIN
             FROM asset_versions av
             JOIN assets a ON a.id = av.asset_id
             WHERE a.tenant_id = p_tenant_id AND a.deleted_at IS NULL
-        ), 0)
+        ), 0),
+        'user_count', COALESCE((
+            SELECT COUNT(*)
+            FROM users
+            WHERE tenant_id = p_tenant_id AND is_active = TRUE
+        ), 0),
+        'unlicensed_assets_count', COALESCE((
+            SELECT COUNT(*)
+            FROM v_asset_catalog
+            WHERE tenant_id = p_tenant_id AND compliance_status = 'UNLICENSED'
+        ), 0),
+        'asset_type_breakdown', COALESCE((
+            SELECT jsonb_object_agg(asset_type, cnt)
+            FROM (
+                SELECT asset_type::TEXT, COUNT(*)::INT AS cnt
+                FROM assets
+                WHERE tenant_id = p_tenant_id AND deleted_at IS NULL
+                GROUP BY asset_type
+            ) sub
+        ), '{}'::jsonb)
     ) INTO v_stats;
 
     RETURN v_stats;
