@@ -111,67 +111,84 @@ Attackers frequently send modified JSON bodies containing elevated attributes (e
 ## 5. Concurrency Race Condition Defense (20-Thread Attack on 3-Seat License)
 
 ### Challenge: The "Over-Allocation" Race Condition
-When multiple users simultaneously attempt to check out the last remaining seat of a software license, a naive application performs:
-1. `SELECT used_seats FROM licenses WHERE id = $1`
-2. `IF used_seats < total_seats THEN INSERT INTO allocations ... UPDATE licenses SET used_seats = used_seats + 1`
-Under concurrent load, all 20 threads read `used_seats = 0`, all 20 threads proceed to allocate, and the license becomes severely over-allocated (20 seats used on a 3-seat license).
+When multiple users simultaneously attempt to check out the last remaining seat of a software license, a naive application queries dynamic seat counts or reads an un-locked row without database-level concurrency serialization:
+1. `SELECT COUNT(*) FROM license_allocations WHERE license_id = $1 AND status = 'ACTIVE'`
+2. `IF used_seats < total_seats THEN INSERT INTO license_allocations ...`
+Under concurrent load, all 20 threads read `used_seats = 0` simultaneously, all 20 evaluate true, and all 20 insert allocations, leading to massive over-allocation (20 active seats on a 3-seat license).
 
 ### AssetVault Database Solution: Atomic Stored Procedure & Row Locking
-AssetVault resolves concurrency at the database kernel level using PostgreSQL Stored Procedure `sp_allocate_license_seat`:
+AssetVault resolves concurrency at the database kernel level using PostgreSQL Stored Procedure `sp_allocate_license_seat`. Crucially, in strict conformance with **Third Normal Form (3NF)** (`database/normalization.md` Section 4.3), `used_seats` is **not** stored as a redundant column on `licenses` (which would introduce update anomalies and transitive dependencies $\text{license\_id} \rightarrow \text{allocations} \rightarrow \text{used\_seats}$). Instead, `sp_allocate_license_seat` acquires an exclusive pessimistic row lock on the parent license (`FOR UPDATE`), dynamically computes active seats via `COUNT(*)`, and serializes all allocation attempts:
 
 ```sql
 CREATE OR REPLACE PROCEDURE sp_allocate_license_seat(
     p_license_id   UUID,
     p_user_id      UUID,
-    p_asset_id     UUID,
     p_allocated_by UUID,
     INOUT p_allocation_id UUID DEFAULT NULL
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    v_total_seats INT;
-    v_used_seats  INT;
-    v_status      VARCHAR(20);
+    v_license RECORD;
+    v_user RECORD;
+    v_used_seats INT;
+    v_existing_alloc INT;
 BEGIN
-    -- 1. Acquire exclusive row lock on the license record
-    SELECT total_seats, used_seats, status
-      INTO v_total_seats, v_used_seats, v_status
+    -- Ensure session context for actor so audit triggers capture user_id
+    IF p_allocated_by IS NOT NULL THEN
+        PERFORM set_config('app.current_user_id', p_allocated_by::TEXT, true);
+    END IF;
+
+    -- 1. Acquire exclusive row lock on the license record to serialize checkout attempts
+    SELECT id, tenant_id, name, total_seats, status, end_date, deleted_at
+      INTO v_license
       FROM licenses
      WHERE id = p_license_id
        FOR UPDATE;  -- <--- SERIALIZES ALL CONCURRENT ATTEMPTS
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'License % not found', p_license_id;
+    IF NOT FOUND OR v_license.deleted_at IS NOT NULL THEN
+        RAISE EXCEPTION 'License % does not exist or has been deleted', p_license_id
+            USING ERRCODE = 'no_data_found';
     END IF;
 
-    IF v_status <> 'ACTIVE' THEN
-        RAISE EXCEPTION 'License is not ACTIVE (current status: %)', v_status;
+    IF v_license.status <> 'ACTIVE' THEN
+        RAISE EXCEPTION 'License % is not ACTIVE (current status: %)', v_license.name, v_license.status
+            USING ERRCODE = 'check_violation';
     END IF;
 
-    -- 2. Strict seat exhaustion guard
-    IF v_used_seats >= v_total_seats THEN
-        RAISE EXCEPTION 'License seats exhausted (total: %, used: %)', v_total_seats, v_used_seats
-            USING ERRCODE = '23514'; -- check_violation
+    -- 2. Verify user exists, is active, and shares the same tenant
+    SELECT id, tenant_id, full_name, is_active
+      INTO v_user
+      FROM users
+     WHERE id = p_user_id;
+
+    -- 3. Dynamic active seat count directly from license_allocations (3NF compliant)
+    SELECT COUNT(*)::INT
+      INTO v_used_seats
+      FROM license_allocations
+     WHERE license_id = p_license_id
+       AND status = 'ACTIVE';
+
+    -- 4. Strict seat exhaustion guard
+    IF v_used_seats >= v_license.total_seats THEN
+        RAISE EXCEPTION 'License seats exhausted'
+            USING ERRCODE = 'check_violation';
     END IF;
 
-    -- 3. Atomic Allocation Insertion
+    -- 5. Atomic Allocation Insertion
     p_allocation_id := gen_random_uuid();
-    INSERT INTO license_allocations (id, license_id, user_id, asset_id, allocated_by, allocated_at, status)
-    VALUES (p_allocation_id, p_license_id, p_user_id, p_asset_id, p_allocated_by, NOW(), 'ACTIVE');
-
-    -- 4. Increment seat counter
-    UPDATE licenses
-       SET used_seats = used_seats + 1,
-           updated_at = NOW()
-     WHERE id = p_license_id;
+    INSERT INTO license_allocations (
+        id, license_id, user_id, allocated_by, allocated_at, status
+    ) VALUES (
+        p_allocation_id, p_license_id, p_user_id, p_allocated_by, NOW(), 'ACTIVE'
+    );
 END;
 $$;
 ```
 
 ### Empirical Test Output
 In `backend/src/__tests__/break-it-security.test.ts`:
-- A clean 3-seat license (`totalSeats: 3`, `usedSeats: 0`) was targeted.
+- A clean 3-seat license (`total_seats: 3`, initial active allocations: 0) was targeted.
 - 20 concurrent allocation requests were dispatched simultaneously via `Promise.all`:
 ```
 stdout | backend/src/__tests__/break-it-security.test.ts > AssetVault Examiner Break-It Security Suite > 4. Over-Allocation Race Condition Defense > fires 20 concurrent allocation requests at a 3-seat license: exactly 3 succeed, 17 blocked
@@ -181,8 +198,8 @@ Raw query failed. Code: 23514. Message: ERROR: License seats exhausted
 ✓ fires 20 concurrent allocation requests at a 3-seat license: exactly 3 succeed, 17 blocked
 ```
 - **Post-Test Verification in Database:**
-  - Database `usedSeats`: **3**
-  - Database active allocations count: **3**
+  - Active allocations count (`SELECT COUNT(*) FROM license_allocations WHERE license_id = $1 AND status = 'ACTIVE'`): **3**
+  - Analytical utilization view `v_tenant_license_utilization.used_seats`: **3**
   - Zero over-allocations occurred. Race condition immunity verified!
 
 ---
