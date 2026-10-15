@@ -11,7 +11,7 @@
 | :--- | :--- | :--- | :--- |
 | **System Operator** | `SUPER_ADMIN` | `superadmin@assetvault.io` | `Password123!` |
 | **TechCorp Solutions (Tenant A)** | `TENANT_ADMIN` | `techcorp.admin@techcorp.io` | `Password123!` |
-| **TechCorp Solutions (Tenant A)** | `ASSET_MANAGER`| `techcorp.manager@techcorp.io`| `Password123!` |
+| **TechCorp Solutions (Tenant A)** | `ASSET_MANAGER`| `techcorp.mgr1@techcorp.io`| `Password123!` |
 | **TechCorp Solutions (Tenant A)** | `MEMBER` | `techcorp.dev1@techcorp.io` | `Password123!` |
 | **InnovateLabs (Tenant B)** | `TENANT_ADMIN` | `innovatelabs.admin@innovatelabs.io`| `Password123!` |
 
@@ -42,7 +42,7 @@ flowchart LR
 - **What to show on screen:**
   - Show the ER Diagram in [`docs/ER_DIAGRAM.md`](./ER_DIAGRAM.md).
   - Point to the 19 domain tables, 34 foreign keys, and 11 check constraints.
-  - Explain the 3NF/BCNF factoring: `subscription_plans` factored out of `tenants`, `license_types` factored out of `licenses`, and `roles` factored out of `users`.
+  - Explain the 3NF/BCNF factoring: `plans` factored out of `tenants`, `license_types` factored out of `licenses`, and `roles` factored out of `users`.
 
 ---
 

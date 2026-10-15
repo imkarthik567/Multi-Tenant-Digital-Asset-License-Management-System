@@ -62,9 +62,9 @@ The primary engineering and database objectives of AssetVault are:
 
 | Name | Register No. | Role | Responsibilities |
 | :--- | :--- | :--- | :--- |
-| `<MEMBER 1>` | `<REG_NO_1>` | Database Architect & Backend Lead | Conceptual and logical ER modeling, relational 3NF normalization proofs, SQL DDL scripts, PL/pgSQL triggers, stored procedures, Row-Level Security policies, indexing strategy, Prisma ORM schema integration, and core backend REST API services (Asset, License, Seat Allocation). |
-| `<MEMBER 2>` | `<REG_NO_2>` | Frontend Architect & UI/UX Lead | React 18 + Vite SPA architecture, Tailwind CSS design system, responsive component engineering, TanStack Query caching and state synchronization, React Hook Form + Zod client validation, seat matrix user interface, and analytical reporting views. |
-| `<MEMBER 3>` | `<REG_NO_3>` | DevOps Engineer, Security & QA Lead | Authentication engine (Google OAuth 2.0, JWT, bcrypt), security middleware (Helmet, rate limiting, CORS), Docker Compose configuration, GitHub Actions CI/CD workflows, automated backup/restore scripts, end-to-end testing, and project documentation. |
+| `KARTHIKEYAN S` | `24BCT0332` | Database Architect & Backend Lead | Conceptual and logical ER modeling, relational 3NF normalization proofs, SQL DDL scripts, PL/pgSQL triggers, stored procedures, Row-Level Security policies, indexing strategy, Prisma ORM schema integration, and core backend REST API services (Asset, License, Seat Allocation). |
+| `SUDIR NIRANJ R` | `24BDS0267` | Frontend Architect & UI/UX Lead | React 18 + Vite SPA architecture, Tailwind CSS design system, responsive component engineering, TanStack Query caching and state synchronization, React Hook Form + Zod client validation, seat matrix user interface, and analytical reporting views. |
+| `PRAVEEN P` | `24BAI0119` | DevOps Engineer, Security & QA Lead | Authentication engine (Google OAuth 2.0, JWT, bcrypt), security middleware (Helmet, rate limiting, CORS), Docker Compose configuration, GitHub Actions CI/CD workflows, automated backup/restore scripts, end-to-end testing, and project documentation. |
 
 ---
 
@@ -145,13 +145,13 @@ gantt
 
 | Task | Start | End | Owner |
 | :--- | :---: | :---: | :--- |
-| **Proposal** | 2026-10-19 | 2026-10-25 | `<MEMBER 1>`, `<MEMBER 2>`, `<MEMBER 3>` |
-| **ER & Schema** | 2026-10-23 | 2026-10-31 | `<MEMBER 1>` |
-| **Database Implementation** | 2026-10-29 | 2026-11-06 | `<MEMBER 1>` |
-| **Auth & RBAC** | 2026-11-04 | 2026-11-12 | `<MEMBER 1>`, `<MEMBER 3>` |
-| **Backend API** | 2026-11-10 | 2026-11-20 | `<MEMBER 1>` |
-| **Frontend** | 2026-11-17 | 2026-11-27 | `<MEMBER 2>` |
-| **Advanced Features** | 2026-11-24 | 2026-12-03 | `<MEMBER 1>`, `<MEMBER 2>` |
-| **Backup & Docker** | 2026-11-29 | 2026-12-05 | `<MEMBER 3>` |
-| **Deployment & CI/CD** | 2026-12-02 | 2026-12-08 | `<MEMBER 3>` |
-| **Testing & Documentation** | 2026-12-06 | 2026-12-13 | `<MEMBER 2>`, `<MEMBER 3>` |
+| **Proposal** | 2026-10-19 | 2026-10-25 | `KARTHIKEYAN S`, `SUDIR NIRANJ R`, `PRAVEEN P` |
+| **ER & Schema** | 2026-10-23 | 2026-10-31 | `KARTHIKEYAN S` |
+| **Database Implementation** | 2026-10-29 | 2026-11-06 | `KARTHIKEYAN S` |
+| **Auth & RBAC** | 2026-11-04 | 2026-11-12 | `KARTHIKEYAN S`, `PRAVEEN P` |
+| **Backend API** | 2026-11-10 | 2026-11-20 | `KARTHIKEYAN S` |
+| **Frontend** | 2026-11-17 | 2026-11-27 | `SUDIR NIRANJ R` |
+| **Advanced Features** | 2026-11-24 | 2026-12-03 | `KARTHIKEYAN S`, `SUDIR NIRANJ R` |
+| **Backup & Docker** | 2026-11-29 | 2026-12-05 | `PRAVEEN P` |
+| **Deployment & CI/CD** | 2026-12-02 | 2026-12-08 | `PRAVEEN P` |
+| **Testing & Documentation** | 2026-12-06 | 2026-12-13 | `SUDIR NIRANJ R`, `PRAVEEN P` |
