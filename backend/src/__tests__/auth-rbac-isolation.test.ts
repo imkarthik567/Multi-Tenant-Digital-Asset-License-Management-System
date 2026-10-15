@@ -14,7 +14,7 @@
 //  10. SQL injection immunity on query params
 // ==============================================================================
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../app';
 import { prismaForRequest } from '../config/prisma';
@@ -380,5 +380,36 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
     expect(res.body.status).toBe('success');
     // Result must be safely parameterized; returns 0 or only assets literally matching "' OR '1'='1"
     expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  afterAll(async () => {
+    const testAssets = await systemPrisma.asset.findMany({
+      where: {
+        OR: [
+          { assetCode: { startsWith: 'SEC-SCAN-' } },
+          { assetCode: { startsWith: 'TEST-AST-' } },
+        ],
+      },
+      select: { id: true },
+    });
+    const testAssetIds = testAssets.map((a) => a.id);
+
+    if (testAssetIds.length > 0) {
+      await systemPrisma.assetLicense.deleteMany({
+        where: { assetId: { in: testAssetIds } },
+      });
+      await systemPrisma.assetAccessLog.deleteMany({
+        where: { assetId: { in: testAssetIds } },
+      });
+      await systemPrisma.assetVersion.deleteMany({
+        where: { assetId: { in: testAssetIds } },
+      });
+      await systemPrisma.assetTag.deleteMany({
+        where: { assetId: { in: testAssetIds } },
+      });
+      await systemPrisma.asset.deleteMany({
+        where: { id: { in: testAssetIds } },
+      });
+    }
   });
 });

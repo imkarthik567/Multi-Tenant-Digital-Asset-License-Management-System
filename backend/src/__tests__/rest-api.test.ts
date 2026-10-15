@@ -14,7 +14,7 @@
 //  10. Real-time PostgreSQL reporting views and window functions
 // ==============================================================================
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../app';
 import { prismaForRequest } from '../config/prisma';
@@ -631,5 +631,70 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
       expect(res.body.data.success).toBe(true);
       expect(res.body.data).toHaveProperty('notificationsGenerated');
     });
+  });
+
+  afterAll(async () => {
+    // 1. Clean up test licenses and related records
+    const testLicenses = await systemPrisma.license.findMany({
+      where: {
+        licenseKey: { startsWith: 'INTELLI-KEY-' },
+      },
+      select: { id: true },
+    });
+    const testLicenseIds = testLicenses.map((l) => l.id);
+
+    if (testLicenseIds.length > 0) {
+      await systemPrisma.assetLicense.deleteMany({
+        where: { licenseId: { in: testLicenseIds } },
+      });
+      await systemPrisma.licenseAllocation.deleteMany({
+        where: { licenseId: { in: testLicenseIds } },
+      });
+      await systemPrisma.licenseRenewal.deleteMany({
+        where: { licenseId: { in: testLicenseIds } },
+      });
+      await systemPrisma.assetAccessLog.deleteMany({
+        where: { licenseId: { in: testLicenseIds } },
+      });
+      await systemPrisma.notification.deleteMany({
+        where: { licenseId: { in: testLicenseIds } },
+      });
+      await systemPrisma.license.deleteMany({
+        where: { id: { in: testLicenseIds } },
+      });
+    }
+
+    // 2. Clean up test assets and related records
+    const testAssets = await systemPrisma.asset.findMany({
+      where: {
+        OR: [
+          { assetCode: { startsWith: 'TEST-AST-' } },
+          { assetCode: { startsWith: 'SHD-' } },
+          { assetCode: { startsWith: 'DUP-CODE-' } },
+          { assetCode: { startsWith: 'SEC-SCAN-' } },
+          { assetCode: { startsWith: 'CSV-OK-' } },
+        ],
+      },
+      select: { id: true },
+    });
+    const testAssetIds = testAssets.map((a) => a.id);
+
+    if (testAssetIds.length > 0) {
+      await systemPrisma.assetLicense.deleteMany({
+        where: { assetId: { in: testAssetIds } },
+      });
+      await systemPrisma.assetAccessLog.deleteMany({
+        where: { assetId: { in: testAssetIds } },
+      });
+      await systemPrisma.assetVersion.deleteMany({
+        where: { assetId: { in: testAssetIds } },
+      });
+      await systemPrisma.assetTag.deleteMany({
+        where: { assetId: { in: testAssetIds } },
+      });
+      await systemPrisma.asset.deleteMany({
+        where: { id: { in: testAssetIds } },
+      });
+    }
   });
 });

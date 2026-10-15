@@ -14,6 +14,7 @@ interface SSEClient {
   userId: string;
   tenantId: string | null;
   res: Response;
+  role: string;
 }
 
 class NotificationStreamService extends EventEmitter {
@@ -39,9 +40,11 @@ class NotificationStreamService extends EventEmitter {
   }
 
   /**
-   * Registers an authenticated SSE connection
+   * Registers an authenticated SSE connection with user role
    */
-  public registerClient(clientId: string, userId: string, tenantId: string | null, res: Response): void {
+  public addClient(userId: string, tenantId: string | null, res: Response, role = 'MEMBER'): void {
+    const clientId = `${userId}-${Date.now()}`;
+
     // Write SSE headers
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -53,13 +56,20 @@ class NotificationStreamService extends EventEmitter {
     // Send connection established event
     res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', timestamp: new Date().toISOString() })}\n\n`);
 
-    this.clients.set(clientId, { id: clientId, userId, tenantId, res });
+    this.clients.set(clientId, { id: clientId, userId, tenantId, res, role });
     sseActiveConnectionsGauge.set(this.clients.size);
-    logger.info({ clientId, userId, tenantId, totalConnected: this.clients.size }, 'SSE client connected to notification stream');
+    logger.info({ clientId, userId, tenantId, role, totalConnected: this.clients.size }, 'SSE client connected to notification stream');
 
     res.on('close', () => {
       this.removeClient(clientId);
     });
+  }
+
+  /**
+   * Backward-compatible alias for addClient
+   */
+  public registerClient(_clientId: string, userId: string, tenantId: string | null, res: Response, role = 'MEMBER'): void {
+    this.addClient(userId, tenantId, res, role);
   }
 
   /**
@@ -74,20 +84,26 @@ class NotificationStreamService extends EventEmitter {
   }
 
   /**
-   * Broadcasts real-time notification to matching user or tenant
+   * Broadcasts real-time notification with strict tenant and role isolation
    */
   public broadcastNotification(payload: {
-    tenantId: string | null;
-    userId?: string;
-    notification: any;
+    tenantId?: string | null;
+    userId?: string | null;
+    roles?: string[];
+    notification: unknown;
   }): void {
-    const { tenantId, userId, notification } = payload;
+    const { tenantId, userId, roles, notification } = payload;
     const ssePayload = `event: notification\ndata: ${JSON.stringify(notification)}\n\n`;
 
     let deliveredCount = 0;
     for (const client of this.clients.values()) {
-      const tenantMatch = !client.tenantId || !tenantId || client.tenantId === tenantId;
-      const userMatch = !userId || client.userId === userId;
+      const tenantMatch = tenantId
+        ? client.tenantId === tenantId
+        : client.tenantId === null;
+
+      const userMatch = userId
+        ? client.userId === userId
+        : (roles ? roles.includes(client.role) : ['TENANT_ADMIN', 'ASSET_MANAGER'].includes(client.role));
 
       if (tenantMatch && userMatch) {
         try {

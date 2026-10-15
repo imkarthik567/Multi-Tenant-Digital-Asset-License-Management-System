@@ -12,12 +12,16 @@ import { tenantContext } from '../middleware/tenantScope.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { queryNotificationSchema, runExpiryCheckSchema } from '../validators/notification.validator';
 
+import { notificationStreamService } from '../services/notificationStream.service';
+
 const router = Router();
 
 router.use(authenticate, loadUser, tenantContext);
 
 // Real-time Server-Sent Events stream for instant notification updates
-router.get('/stream', authorize('notifications:read'), notificationController.streamNotifications);
+router.get('/stream', authorize('notifications:read'), (req, res) => {
+  notificationStreamService.addClient(req.user!.id, req.user!.tenantId || null, res, req.user!.role);
+});
 
 // Read-all patch route (must precede /:id/read)
 router.patch('/read-all', authorize('notifications:read'), notificationController.markAllAsRead);
