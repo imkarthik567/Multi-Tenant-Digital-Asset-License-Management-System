@@ -127,7 +127,7 @@ export const App: React.FC = () => {
                     <Route
                       path="/licenses/:id"
                       element={
-                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER']}>
+                        <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'ASSET_MANAGER', 'MEMBER']}>
                           <LicenseDetailPage />
                         </ProtectedRoute>
                       }
