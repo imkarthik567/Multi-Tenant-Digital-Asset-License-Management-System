@@ -17,8 +17,15 @@ if [ -n "$DATABASE_URL" ]; then
 fi
 
 if [ "$RUN_SEED" = "true" ]; then
-  echo "[AssetVault API] Seeding database with baseline data..."
-  npx prisma db seed || echo "[AssetVault API] Seed skipped or already applied."
+  echo "[AssetVault API] Seeding baseline roles, plans, license types, and initial administrator..."
+  if [ ! -f "./dist-seed/prisma/seed.js" ]; then
+    echo "[AssetVault API] FATAL: Compiled production seed script is missing."
+    exit 1
+  fi
+  node ./dist-seed/prisma/seed.js || {
+    echo "[AssetVault API] FATAL: Database seed failed. Exiting container."
+    exit 1
+  }
 fi
 
 echo "[AssetVault API] Launching process: $@"
