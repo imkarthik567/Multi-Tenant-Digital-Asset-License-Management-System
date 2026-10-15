@@ -97,7 +97,7 @@ export function toCsv<T extends Record<string, any>>(records: T[], columns: (key
         // Quoting protects CSV structure; prefixing formula-like text protects spreadsheet users.
         // Restrict this to strings so legitimate negative numeric values remain numeric.
         const safeValue =
-          typeof val === 'string' && /^[\\t\\r\\n ]*[=+@-]/.test(serialized)
+          typeof val === 'string' && /^[\t\r\n ]*[=+@-]/.test(serialized)
             ? `'${serialized}`
             : serialized;
         return `"${safeValue.replace(/"/g, '""')}"`;
