@@ -5,8 +5,7 @@
 // ==============================================================================
 
 import PDFDocument from 'pdfkit';
-import { Prisma } from '@prisma/client';
-import { prisma } from '../config/prisma';
+import { prismaForRequest } from '../config/prisma';
 import { NotFoundError } from '../errors/AppError';
 
 export class ExportService {
@@ -14,46 +13,41 @@ export class ExportService {
    * Generates a styled PDF license dossier
    */
   public async generateLicensePdf(licenseId: string, tenantId: string): Promise<PDFKit.PDFDocument> {
-    return prisma.$transaction(async (tx: any) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT 
-          set_config('app.current_tenant_id', ${tenantId}, true),
-          set_config('app.is_super_admin', 'false', true);`
-      );
+    const scopedPrisma = prismaForRequest({ tenantId });
 
-      // 1. Fetch license with related vendor, covered assets, allocations, and renewals
-      const license = await tx.license.findFirst({
-        where: {
-          id: licenseId,
-          tenantId,
-          deletedAt: null,
-        },
-        include: {
-          vendor: true,
-          licenseType: true,
-          assetLicenses: {
-            include: {
-              asset: true,
-            },
-          },
-          allocations: {
-            where: { status: 'ACTIVE' },
-            include: {
-              user: true,
-            },
-          },
-          renewals: {
-            orderBy: { renewedAt: 'desc' },
-            include: {
-              renewer: true,
-            },
+    // 1. Fetch license with related vendor, covered assets, allocations, and renewals
+    const license = await scopedPrisma.license.findFirst({
+      where: {
+        id: licenseId,
+        tenantId,
+        deletedAt: null,
+      },
+      include: {
+        vendor: true,
+        licenseType: true,
+        assetLicenses: {
+          include: {
+            asset: true,
           },
         },
-      });
+        allocations: {
+          where: { status: 'ACTIVE' },
+          include: {
+            user: true,
+          },
+        },
+        renewals: {
+          orderBy: { renewedAt: 'desc' },
+          include: {
+            renewer: true,
+          },
+        },
+      },
+    });
 
-      if (!license) {
-        throw new NotFoundError(`License with ID ${licenseId} not found`);
-      }
+    if (!license) {
+      throw new NotFoundError(`License with ID ${licenseId} not found`);
+    }
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
 
@@ -201,7 +195,6 @@ export class ExportService {
     });
 
     return doc;
-    });
   }
 
   /**
@@ -217,36 +210,30 @@ export class ExportService {
       userId?: string;
     }
   ): Promise<string> {
-    return prisma.$transaction(async (tx: any) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT 
-          set_config('app.current_tenant_id', ${tenantId}, true),
-          set_config('app.is_super_admin', 'false', true);`
-      );
+    const where: any = { tenantId };
 
-      const where: any = { tenantId };
+    const validAuditActions = ['INSERT', 'UPDATE', 'DELETE'];
+    if (filters.action) {
+      if (validAuditActions.includes(filters.action)) {
+        where.action = filters.action;
+      } else {
+        where.id = BigInt(-1);
+      }
+    }
+    if (filters.tableName) {
+      where.tableName = filters.tableName;
+    }
+    if (filters.userId) {
+      where.userId = filters.userId;
+    }
+    if (filters.startDate || filters.endDate) {
+      where.performedAt = {};
+      if (filters.startDate) where.performedAt.gte = new Date(filters.startDate);
+      if (filters.endDate) where.performedAt.lte = new Date(filters.endDate);
+    }
 
-      const validAuditActions = ['INSERT', 'UPDATE', 'DELETE'];
-      if (filters.action) {
-        if (validAuditActions.includes(filters.action)) {
-          where.action = filters.action;
-        } else {
-          where.id = BigInt(-1);
-        }
-      }
-      if (filters.tableName) {
-        where.tableName = filters.tableName;
-      }
-      if (filters.userId) {
-        where.userId = filters.userId;
-      }
-      if (filters.startDate || filters.endDate) {
-        where.performedAt = {};
-        if (filters.startDate) where.performedAt.gte = new Date(filters.startDate);
-        if (filters.endDate) where.performedAt.lte = new Date(filters.endDate);
-      }
-
-      const auditLogs = await tx.auditLog.findMany({
+    const scopedPrisma = prismaForRequest({ tenantId });
+    const auditLogs = await scopedPrisma.auditLog.findMany({
       where,
       include: {
         user: {
@@ -260,7 +247,7 @@ export class ExportService {
       take: 1000,
     });
 
-    const rows = auditLogs.map((al: any) => ({
+    const rows = auditLogs.map((al) => ({
       id: al.id.toString(),
       performed_at: al.performedAt.toISOString(),
       action: al.action,
@@ -310,8 +297,7 @@ export class ExportService {
       csvLines.push(line.join(','));
     }
 
-      return csvLines.join('\r\n');
-    });
+    return csvLines.join('\r\n');
   }
 }
 

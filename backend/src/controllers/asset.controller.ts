@@ -9,6 +9,7 @@ import { getPaginationParams } from '../utils/pagination.util';
 import { sendResponse } from '../utils/response.util';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AssetType, AssetStatus } from '@prisma/client';
+import { compareVersionsQuerySchema } from '../validators/version.validator';
 
 export class AssetController {
   public listAssets = asyncHandler(async (req: Request, res: Response) => {
@@ -87,9 +88,8 @@ export class AssetController {
   });
 
   public compareVersions = asyncHandler(async (req: Request, res: Response) => {
-    const from = parseInt(((req.query as any).from ?? (req.query as any).v1) as string, 10);
-    const to = parseInt(((req.query as any).to ?? (req.query as any).v2) as string, 10);
-    const diff = await assetService.compareVersions(req.prisma, req.params.id as string, from, to);
+    const parsed = compareVersionsQuerySchema.parse(req.query);
+    const diff = await assetService.compareVersions(req.prisma, req.params.id as string, parsed.from, parsed.to);
     sendResponse(res, 200, diff);
   });
 
