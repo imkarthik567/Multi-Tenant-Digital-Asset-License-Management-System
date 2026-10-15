@@ -87,7 +87,11 @@ BEGIN
 
     -- 4. Determine tenant_id context
     IF TG_TABLE_NAME = 'tenants' THEN
-        v_tenant_id := v_record_id;
+        IF TG_OP = 'DELETE' THEN
+            v_tenant_id := NULL;
+        ELSE
+            v_tenant_id := v_record_id;
+        END IF;
     ELSIF TG_TABLE_NAME IN ('users', 'assets', 'licenses', 'vendors') THEN
         IF TG_OP = 'DELETE' THEN
             v_tenant_id := OLD.tenant_id;
@@ -194,6 +198,9 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    IF current_setting('app.allow_audit_delete', true) = 'true' THEN
+        RETURN OLD;
+    END IF;
     RAISE EXCEPTION 'audit_logs is append-only'
         USING ERRCODE = 'invalid_transaction_state';
 END;
