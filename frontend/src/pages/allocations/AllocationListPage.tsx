@@ -136,7 +136,7 @@ export const AllocationListPage: React.FC = () => {
         >
           <option value="">All Statuses</option>
           <option value="ACTIVE">Active Allocations</option>
-          <option value="RELEASED">Released Seats</option>
+          <option value="REVOKED">Released / Revoked Seats</option>
         </select>
       </div>
 

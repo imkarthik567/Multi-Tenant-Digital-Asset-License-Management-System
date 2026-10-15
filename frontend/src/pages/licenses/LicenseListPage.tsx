@@ -129,8 +129,9 @@ export const LicenseListPage: React.FC = () => {
   const handleAllocateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLicense || !selectedUserId) return;
+    const targetLicId = selectedLicense.id || (selectedLicense as any).license_id;
     allocateSeatMutation.mutate({
-      licenseId: selectedLicense.id,
+      licenseId: targetLicId,
       userId: selectedUserId,
       notes: allocationNotes,
     });
@@ -332,8 +333,8 @@ export const LicenseListPage: React.FC = () => {
                     {canManage && (
                       <button
                         onClick={() => {
-                          if (window.confirm(`Soft-delete license "${lic.name}"?`)) {
-                            deleteMutation.mutate(lic.id);
+                          if (window.confirm(`Soft-delete license "${licName}"?`)) {
+                            deleteMutation.mutate(licId);
                           }
                         }}
                         className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
@@ -363,7 +364,7 @@ export const LicenseListPage: React.FC = () => {
 
             <h2 className="text-base font-bold text-slate-900 dark:text-white">Allocate Seat</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Assign a license seat for <strong className="text-slate-900 dark:text-white">{selectedLicense.name}</strong>
+              Assign a license seat for <strong className="text-slate-900 dark:text-white">{selectedLicense.name || (selectedLicense as any).license_name}</strong>
             </p>
 
             <form onSubmit={handleAllocateSubmit} className="space-y-4 mt-4 text-xs">

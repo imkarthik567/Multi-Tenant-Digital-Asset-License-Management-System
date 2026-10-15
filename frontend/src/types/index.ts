@@ -14,7 +14,7 @@ export type AssetStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export type LicenseStatus = 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
 
-export type AllocationStatus = 'ACTIVE' | 'RELEASED';
+export type AllocationStatus = 'ACTIVE' | 'RELEASED' | 'REVOKED';
 
 export type AccessAction = 'VIEW' | 'DOWNLOAD' | 'CHECKOUT' | 'CHECKIN';
 
