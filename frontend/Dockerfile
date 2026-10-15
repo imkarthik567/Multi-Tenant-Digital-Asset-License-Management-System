@@ -3,10 +3,10 @@
 # ==============================================================================
 
 # Stage 1: Build Frontend Assets
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
-RUN apk add --no-cache libc6-compat
+RUN apk upgrade --no-cache && apk add --no-cache libc6-compat
 
 # Copy dependency manifests
 COPY package*.json ./
@@ -25,6 +25,9 @@ RUN node ../node_modules/vite/bin/vite.js build
 
 # Stage 2: Ultra-Slim Production Nginx Runtime
 FROM nginx:alpine AS runner
+
+# Apply security updates to packages in the Nginx base image.
+RUN apk upgrade --no-cache
 
 # Remove default nginx HTML templates
 RUN rm -rf /usr/share/nginx/html/*
