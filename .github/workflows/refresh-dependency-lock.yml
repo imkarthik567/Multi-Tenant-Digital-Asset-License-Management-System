@@ -45,4 +45,6 @@ jobs:
             exit 0
           fi
           git commit -m "fix(deps): refresh lockfiles for patched Vitest"
+          git fetch origin security/hardening-review-2026-10-15
+          git rebase origin/security/hardening-review-2026-10-15
           git push origin HEAD:security/hardening-review-2026-10-15
