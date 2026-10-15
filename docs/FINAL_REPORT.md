@@ -2,7 +2,7 @@
 ## Final Academic Project Report
 **Course:** BCSE307L Database Systems  
 **Academic Year:** Fall Semester 2026-27  
-**Author:** Karthikeyan S  
+**Author:** KARTHIKEYAN S (24BCT0332), SUDIR NIRANJ (24BDS0267), JASIM NAZIR AHMED (24BCE2912)  
 **Technology Stack:** PostgreSQL 16, Prisma ORM, Node.js/Express TypeScript, React 18, Vite, Docker, Prometheus, Grafana  
 
 ---
@@ -274,17 +274,17 @@ In accordance with production enterprise standards, AssetVault utilizes native d
 
 ### 9.3 CI/CD Automation (GitHub Actions)
 Five automated workflows ensure continuous integration and deployment:
-1. `ci.yml`: Runs linter, typechecks, spins up a PostgreSQL 16 service container, runs database migrations/seeds, and executes all 103 automated tests.
-2. `docker.yml`: Builds and verifies container images.
+1. `ci.yml`: Runs linter, typechecks, spins up a PostgreSQL 16 service container, runs database migrations/seeds, and executes all automated tests.
+2. `docker-publish.yml`: Builds and verifies container images and publishes to Docker Hub with Trivy vulnerability scanning.
 3. `deploy.yml`: Deploys API to Render Blueprint and Web SPA to Vercel.
 4. `keepalive.yml`: Healthcheck pings preventing free-tier dormancy.
-5. `nightly-backup.yml`: Nightly automated database backup artifact generation.
+5. `db-backup.yml`: Automated database backup artifact generation and verification.
 
 ---
 
 ## 10. Test Verification Results
 
-The automated test suite (`npm test`) executes across five distinct suites:
+The automated test suite (`npm test`) executes across six distinct suites:
 
 ```
 Test Suite Execution Results:
@@ -293,8 +293,9 @@ Test Suite Execution Results:
 ✓ backend/src/__tests__/services-coverage.test.ts (34 tests) - 100% PASS
 ✓ backend/src/__tests__/auth-rbac-isolation.test.ts (10 tests) - 100% PASS
 ✓ backend/src/__tests__/advanced-features.test.ts (19 tests) - 100% PASS
+✓ backend/src/__tests__/database-functions.test.ts (17 tests) - 100% PASS
 
-Total: 5 Test Files, 109 Tests Passed, 0 Failed (100% Pass Rate)
+Total: 6 Test Files, 126 Tests Passed, 0 Failed (100% Pass Rate)
 Static SQL Injection Check (check:sqli): 0 Violations
 Secret Scanner (check:secrets): 0 Leaks Found
 TypeScript Compilation (lint): 0 Errors (API & Web)
