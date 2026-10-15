@@ -163,10 +163,15 @@ export class AuthController {
    */
   public async googleCallback(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const primaryClientUrl = (env.CLIENT_URL.split(',')[0] || 'http://localhost:5173').trim().replace(/\/$/, '');
-      const requestOrigin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
-      const redirectOrigin =
-        requestOrigin && env.CLIENT_URL.includes(requestOrigin) ? requestOrigin : primaryClientUrl;
+      const allowedClientOrigins = env.CLIENT_URL
+        .split(',')
+        .map((origin) => origin.trim().replace(/\/$/, ''))
+        .filter(Boolean);
+      const primaryClientUrl = allowedClientOrigins[0] || 'http://localhost:5173';
+      const requestOrigin = typeof req.headers.origin === 'string' ? req.headers.origin.replace(/\/$/, '') : '';
+      const redirectOrigin = allowedClientOrigins.includes(requestOrigin)
+        ? requestOrigin
+        : primaryClientUrl;
 
       const user = req.user;
       if (!user) {
