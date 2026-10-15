@@ -2,7 +2,7 @@
 
 > **Course:** BCSE307L Database Systems (Fall 2026-27)  
 > **System:** Multi-Tenant Digital Asset & License Management System (AssetVault)  
-> **Package:** `apps/api` + PostgreSQL 16 Performance Hardening  
+> **Package:** `backend` + PostgreSQL 16 Performance Hardening  
 
 ---
 
@@ -43,7 +43,7 @@ All optimisations preserve absolute multi-tenant isolation and Row-Level Securit
 * **Problem:** Aggregating monthly access statistics (`mv_monthly_access_stats`) over hundreds of thousands of download events requires scanning multi-gigabyte log tables.
 * **Solution:**
   1. Created a dedicated materialized view `mv_monthly_access_stats` indexed on `(tenant_id, year, month)`.
-  2. Configured an hourly background job in `apps/api/src/worker.ts` executing:
+  2. Configured an hourly background job in `backend/src/worker.ts` executing:
      ```sql
      REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;
      ```
@@ -151,7 +151,7 @@ To verify performance indices and views in a running development or staging envi
 npx prisma db execute --stdin <<< "EXPLAIN ANALYZE SELECT * FROM mv_monthly_access_stats WHERE tenant_id = 'c1a7e930-b452-47df-bc6a-8d1e2e9c2f10';"
 
 # 2. Run background materialized view refresh
-npx ts-node apps/api/src/worker.ts --once
+npx ts-node backend/src/worker.ts --once
 
 # 3. Test cursor pagination endpoint
 curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5000/api/audit-logs?limit=20"

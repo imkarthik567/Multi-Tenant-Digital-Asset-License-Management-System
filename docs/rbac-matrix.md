@@ -2,7 +2,7 @@
 
 **Course:** BCSE307L Database Systems (Fall 2026-27)  
 **System Architecture:** Multi-Tenant Relational SaaS with Single `users` Table  
-**Source of Truth:** Defined here and programmatically enforced via `apps/api/src/config/permissions.ts`.
+**Source of Truth:** Defined here and programmatically enforced via `backend/src/config/permissions.ts`.
 
 ---
 

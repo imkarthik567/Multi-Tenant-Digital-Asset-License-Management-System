@@ -94,11 +94,11 @@ Build the production images locally and tag them for both version release (`1.0.
 
 ```bash
 # 1. Build and tag API Image
-docker build -t <DOCKERHUB_USERNAME>/assetvault-api:1.0.0 -f apps/api/Dockerfile .
+docker build -t <DOCKERHUB_USERNAME>/assetvault-api:1.0.0 -f backend/Dockerfile .
 docker tag <DOCKERHUB_USERNAME>/assetvault-api:1.0.0 <DOCKERHUB_USERNAME>/assetvault-api:latest
 
 # 2. Build and tag Web Frontend Image
-docker build -t <DOCKERHUB_USERNAME>/assetvault-web:1.0.0 -f apps/web/Dockerfile .
+docker build -t <DOCKERHUB_USERNAME>/assetvault-web:1.0.0 -f frontend/Dockerfile .
 docker tag <DOCKERHUB_USERNAME>/assetvault-web:1.0.0 <DOCKERHUB_USERNAME>/assetvault-web:latest
 ```
 

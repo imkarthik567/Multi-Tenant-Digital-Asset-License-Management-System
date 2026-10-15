@@ -11,8 +11,6 @@ export default {
     path.join(__dirname, 'src/**/*.{js,ts,jsx,tsx}'),
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
-    './apps/web/index.html',
-    './apps/web/src/**/*.{js,ts,jsx,tsx}',
   ],
   darkMode: 'class',
   theme: {

@@ -148,7 +148,7 @@ openssl rand -hex 32
 # On Windows PowerShell
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
-Paste these into `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET` inside `.env` and `apps/api/.env`.
+Paste these into `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET` inside `.env` and `backend/.env`.
 
 ### Step 4: Configure Google OAuth 2.0 (Optional for Local Testing)
 1. Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
@@ -162,10 +162,10 @@ Paste these into `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET` 
 npm install
 
 # Push relational schema to PostgreSQL
-npx prisma db push --schema apps/api/prisma/schema.prisma
+npx prisma db push --schema backend/prisma/schema.prisma
 
 # Seed baseline plans, enterprise tenants, categories, assets, and licenses
-node node_modules/ts-node/dist/bin.js apps/api/prisma/seed.ts
+node node_modules/ts-node/dist/bin.js backend/prisma/seed.ts
 ```
 
 ---
