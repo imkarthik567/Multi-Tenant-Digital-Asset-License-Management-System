@@ -177,6 +177,7 @@ export interface LicenseAllocation {
   allocatedAt: string;
   releasedAt?: string | null;
   status: AllocationStatus;
+  notes?: string | null;
   user?: { id: string; fullName: string; email: string; avatarUrl?: string | null };
   allocator?: { id: string; fullName: string; email: string } | null;
   license?: License;
