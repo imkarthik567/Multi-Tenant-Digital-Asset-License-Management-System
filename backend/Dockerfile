@@ -25,6 +25,7 @@ COPY backend ./backend
 WORKDIR /app/backend
 RUN npx prisma generate
 RUN node ../node_modules/typescript/bin/tsc -p tsconfig.build.json
+RUN node ../node_modules/typescript/bin/tsc -p tsconfig.seed.json
 
 # Stage 3: Production Runtime (Non-root user, slim footprint)
 FROM node:22-alpine AS runner
@@ -50,6 +51,7 @@ RUN npm ci --workspace=@assetvault/api --omit=dev && npm cache clean --force
 WORKDIR /app/backend
 # Copy built artifacts from builder
 COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/backend/dist-seed ./dist-seed
 COPY --from=builder /app/node_modules/.prisma /app/node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma /app/node_modules/@prisma
 
