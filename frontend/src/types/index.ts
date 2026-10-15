@@ -20,7 +20,15 @@ export type AccessAction = 'VIEW' | 'DOWNLOAD' | 'CHECKOUT' | 'CHECKIN';
 
 export type AuditAction = 'INSERT' | 'UPDATE' | 'DELETE' | 'TRUNCATE';
 
-export type NotificationType = 'LICENSE_EXPIRY' | 'SEAT_LIMIT' | 'SYSTEM';
+export type NotificationType =
+  | 'EXPIRY_30'
+  | 'EXPIRY_15'
+  | 'EXPIRY_7'
+  | 'EXPIRED'
+  | 'OVER_ALLOCATION'
+  | 'SYSTEM'
+  | 'LICENSE_EXPIRY'
+  | 'SEAT_LIMIT';
 
 export interface Plan {
   id: number;
@@ -205,7 +213,7 @@ export interface Notification {
   userId?: string | null;
   licenseId?: string | null;
   type: NotificationType;
-  title: string;
+  title?: string;
   message: string;
   isRead: boolean;
   createdAt: string;
