@@ -8,18 +8,24 @@ import { z } from 'zod';
 export const createVersionSchema = z.preprocess(
   (val: any) => {
     if (val && typeof val === 'object') {
-      const fileSize = val.fileSize !== undefined ? val.fileSize : val.fileSizeBytes;
-      const checksum = val.checksum !== undefined ? val.checksum : val.checksumSha256;
-      const changelog = val.changelog !== undefined ? val.changelog : val.changeNotes;
+      const rawSize = val.fileSize !== undefined ? val.fileSize : val.fileSizeBytes;
+      const rawChecksum = val.checksum !== undefined ? val.checksum : val.checksumSha256;
+      const rawChangelog = val.changelog !== undefined ? val.changelog : val.changeNotes;
+
+      const fileSize =
+        typeof rawSize === 'string' && rawSize.trim() !== ''
+          ? Number(rawSize)
+          : rawSize;
 
       return {
+        ...val,
         fileUrl: val.fileUrl,
         fileSize,
+        checksum: rawChecksum,
+        changelog: rawChangelog ?? null,
         fileSizeBytes: fileSize,
-        checksum,
-        checksumSha256: checksum,
-        changelog,
-        changeNotes: changelog,
+        checksumSha256: rawChecksum,
+        changeNotes: rawChangelog ?? null,
       };
     }
     return val;
@@ -27,32 +33,37 @@ export const createVersionSchema = z.preprocess(
   z
     .object({
       fileUrl: z.string().url('fileUrl must be a valid URL'),
-      fileSize: z.coerce.number().int().positive('fileSize must be a positive integer in bytes'),
-      fileSizeBytes: z.coerce.number().int().positive('fileSize must be a positive integer in bytes'),
-      checksum: z.string().min(8).max(128).trim(),
-      checksumSha256: z.string().min(8).max(128).trim(),
+      fileSize: z.number().int().positive('fileSize must be a positive integer in bytes'),
+      checksum: z
+        .string()
+        .min(8, 'checksum must be at least 8 characters')
+        .max(128, 'checksum cannot exceed 128 characters')
+        .trim(),
       changelog: z.string().max(1000).optional().nullable(),
+      fileSizeBytes: z.number().int().positive().optional(),
+      checksumSha256: z.string().min(8).max(128).trim().optional(),
       changeNotes: z.string().max(1000).optional().nullable(),
     })
-    .strip()
+    .passthrough()
 );
 
 export const compareVersionsQuerySchema = z.preprocess(
   (val: any) => {
     if (val && typeof val === 'object') {
-      const from = val.from !== undefined ? val.from : val.v1;
-      const to = val.to !== undefined ? val.to : val.v2;
+      const rawFrom = val.from !== undefined ? val.from : val.v1;
+      const rawTo = val.to !== undefined ? val.to : val.v2;
+
       return {
-        from,
-        to,
+        from: typeof rawFrom === 'string' ? parseInt(rawFrom, 10) : rawFrom,
+        to: typeof rawTo === 'string' ? parseInt(rawTo, 10) : rawTo,
       };
     }
     return val;
   },
   z
     .object({
-      from: z.coerce.number().int().positive('from must be a positive integer'),
-      to: z.coerce.number().int().positive('to must be a positive integer'),
+      from: z.number().int().positive('from must be a valid positive integer version number'),
+      to: z.number().int().positive('to must be a valid positive integer version number'),
     })
     .strip()
 );

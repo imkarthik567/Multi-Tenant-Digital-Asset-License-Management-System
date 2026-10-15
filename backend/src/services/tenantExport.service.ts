@@ -146,40 +146,40 @@ export class TenantExportService {
       });
 
       return {
-      metadata: {
-        system: 'AssetVault Enterprise SaaS',
-        version: '1.0.0',
-        exportedAt: new Date().toISOString(),
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        slug: tenant.slug,
-        subscriptionPlan: tenant.plan.name,
-        recordCounts: {
-          users: users.length,
-          vendors: vendors.length,
-          categories: categories.length,
-          tags: tags.length,
-          assets: serializedAssets.length,
-          licenses: licenses.length,
-          allocations: allocations.length,
+        metadata: {
+          system: 'AssetVault Enterprise SaaS',
+          version: '1.0.0',
+          exportedAt: new Date().toISOString(),
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          slug: tenant.slug,
+          subscriptionPlan: tenant.plan.name,
+          recordCounts: {
+            users: users.length,
+            vendors: vendors.length,
+            categories: categories.length,
+            tags: tags.length,
+            assets: serializedAssets.length,
+            licenses: licenses.length,
+            allocations: allocations.length,
+          },
         },
-      },
-      tenant: {
-        id: tenant.id,
-        name: tenant.name,
-        slug: tenant.slug,
-        status: tenant.status,
-        contactEmail: tenant.contactEmail,
-        createdAt: tenant.createdAt,
-      },
-      users,
-      vendors,
-      categories,
-      tags,
-      assets: serializedAssets,
-      licenses,
-      allocations,
-    };
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          status: tenant.status,
+          contactEmail: tenant.contactEmail,
+          createdAt: tenant.createdAt,
+        },
+        users,
+        vendors,
+        categories,
+        tags,
+        assets: serializedAssets,
+        licenses,
+        allocations,
+      };
     });
   }
 }

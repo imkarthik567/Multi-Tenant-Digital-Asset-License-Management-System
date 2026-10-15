@@ -16,17 +16,23 @@ export const queryNotificationSchema = z
 export const runExpiryCheckSchema = z.preprocess(
   (val: any) => {
     if (val && typeof val === 'object') {
-      const days = val.lookaheadDays !== undefined ? val.lookaheadDays : val.daysAhead;
+      const rawDays = val.lookaheadDays !== undefined ? val.lookaheadDays : val.daysAhead;
+      const lookaheadDays =
+        rawDays !== undefined
+          ? typeof rawDays === 'string'
+            ? parseInt(rawDays, 10)
+            : rawDays
+          : 30;
       return {
         ...val,
-        lookaheadDays: days !== undefined ? days : 30,
+        lookaheadDays,
       };
     }
-    return val !== undefined ? val : { lookaheadDays: 30 };
+    return { lookaheadDays: 30 };
   },
   z
     .object({
-      lookaheadDays: z.coerce.number().int().min(1).max(365).default(30),
+      lookaheadDays: z.number().int().min(1).max(365).default(30),
     })
-    .strip()
+    .passthrough()
 );

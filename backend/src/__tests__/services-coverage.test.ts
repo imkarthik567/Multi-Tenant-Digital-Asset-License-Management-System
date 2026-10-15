@@ -44,7 +44,7 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
     const techcorp = await systemPrisma.tenant.findUnique({
       where: { slug: 'techcorp' },
       include: {
-        users: { where: { email: 'techcorp.admin@techcorp.io' } },
+        users: { take: 1 },
         vendors: { take: 1 },
         assets: { take: 1 },
         licenses: { take: 1 },
@@ -56,7 +56,6 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
     }
 
     tenantId = techcorp.id;
-    adminUserId = techcorp.users[0]?.id || '';
     vendorId = techcorp.vendors[0]?.id || '';
     testAssetId = techcorp.assets[0]?.id || '';
     testLicenseId = techcorp.licenses[0]?.id || '';
@@ -74,6 +73,16 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       await systemPrisma.refreshToken.deleteMany({ where: { userId: { in: staleIds } } });
       await systemPrisma.user.deleteMany({ where: { id: { in: staleIds } } });
     }
+
+    // Safely assign permanent admin user
+    const adminUser =
+      (await systemPrisma.user.findFirst({
+        where: { tenantId: techcorp.id, email: 'techcorp.admin@techcorp.io' },
+      })) ||
+      (await systemPrisma.user.findFirst({
+        where: { tenantId: techcorp.id },
+      }));
+    adminUserId = adminUser?.id || '';
 
     // Ensure plan has sufficient seat capacity for test executions
     const enterprisePlan = await systemPrisma.plan.findFirst({

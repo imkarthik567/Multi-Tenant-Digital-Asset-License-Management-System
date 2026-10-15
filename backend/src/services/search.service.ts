@@ -43,7 +43,7 @@ export class SearchService {
     const likePattern = `%${rawQuery}%`;
 
     try {
-      return await prisma.$transaction(async (tx: any) => {
+      const { assets, licenses, vendors, tags } = await prisma.$transaction(async (tx: any) => {
         await tx.$executeRaw(
           Prisma.sql`SELECT 
             set_config('app.current_tenant_id', ${tenantId}, true),
@@ -64,7 +64,7 @@ export class SearchService {
           LIMIT 8;
         `);
 
-        const assets: SearchResultItem[] = assetRows.map((a: any) => ({
+        const mappedAssets: SearchResultItem[] = assetRows.map((a: any) => ({
           id: a.id,
           type: 'asset',
           title: a.name,
@@ -88,7 +88,7 @@ export class SearchService {
           LIMIT 8;
         `);
 
-        const licenses: SearchResultItem[] = licenseRows.map((l: any) => ({
+        const mappedLicenses: SearchResultItem[] = licenseRows.map((l: any) => ({
           id: l.id,
           type: 'license',
           title: l.name,
@@ -110,7 +110,7 @@ export class SearchService {
           LIMIT 8;
         `);
 
-        const vendors: SearchResultItem[] = vendorRows.map((v: any) => ({
+        const mappedVendors: SearchResultItem[] = vendorRows.map((v: any) => ({
           id: v.id,
           type: 'vendor',
           title: v.name,
@@ -129,7 +129,7 @@ export class SearchService {
           LIMIT 8;
         `);
 
-        const tags: SearchResultItem[] = tagRows.map((t: any) => ({
+        const mappedTags: SearchResultItem[] = tagRows.map((t: any) => ({
           id: t.id,
           type: 'tag',
           title: `#${t.name}`,
@@ -138,14 +138,21 @@ export class SearchService {
           meta: { color: t.color },
         }));
 
-        const total = assets.length + licenses.length + vendors.length + tags.length;
-
         return {
-          query: rawQuery,
-          results: { assets, licenses, vendors, tags },
-          total,
+          assets: mappedAssets,
+          licenses: mappedLicenses,
+          vendors: mappedVendors,
+          tags: mappedTags,
         };
       });
+
+      const total = assets.length + licenses.length + vendors.length + tags.length;
+
+      return {
+        query: rawQuery,
+        results: { assets, licenses, vendors, tags },
+        total,
+      };
     } catch (err: any) {
       logger.error({ err, q: rawQuery, tenantId }, 'Global search error');
       return {
