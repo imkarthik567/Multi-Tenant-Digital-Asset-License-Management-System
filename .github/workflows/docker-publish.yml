@@ -51,7 +51,7 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/assetvault-api
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,prefix=sha-,format=short
+            type=sha,prefix=sha-,format=long
             type=semver,pattern={{version}}
 
       - name: Build and Push AssetVault API
@@ -74,7 +74,7 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/assetvault-web
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,prefix=sha-,format=short
+            type=sha,prefix=sha-,format=long
             type=semver,pattern={{version}}
 
       - name: Build and Push AssetVault Web
@@ -97,7 +97,21 @@ jobs:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
-          image-ref: ${{ fromJSON(steps.meta-api.outputs.json).tags[0] }}
+          image-ref: ghcr.io/${{ github.repository_owner }}/assetvault-api:sha-${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run Trivy Security Vulnerability Scan on Web
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: false
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/assetvault-web:sha-${{ github.sha }}
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
