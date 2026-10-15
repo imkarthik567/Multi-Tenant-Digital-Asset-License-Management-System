@@ -53,7 +53,7 @@ jobs:
         run: npm run check:sqli
 
       - name: Security Gate - Dependency Vulnerability Audit
-        run: npm audit --audit-level=high || echo "⚠️ Audit completed with advisory notices"
+        run: npm audit --audit-level=high
 
       - name: Static Type-Check & Linting
         run: npm run lint
