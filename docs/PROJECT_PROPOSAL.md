@@ -25,11 +25,11 @@ The primary engineering and database objectives of AssetVault are:
 
 1. **Absolute Multi-Tenant Data Isolation:** Enforce complete logical separation across all tenant organizations at both the database level using PostgreSQL Row-Level Security (RLS) policies and the application layer through automated tenant-scoping middleware.
 2. **Normalized 3NF Relational Architecture:** Design, normalize, and implement a relational schema comprising 19 tables in Third Normal Form (3NF), eliminating transitive dependencies and update anomalies.
-3. **Concurrency-Safe License Seat Bounds Enforcement:** Prevent license over-allocation at the database engine level via a PL/pgSQL trigger (`check_license_seat_bounds`) and a transactional stored procedure (`allocate_license_seat`), guaranteeing that active allocations never exceed purchased capacity even under concurrent requests.
+3. **Concurrency-Safe License Seat Bounds Enforcement:** Prevent license over-allocation at the database engine level via a PL/pgSQL trigger (`trg_check_seat_availability`) and a transactional stored procedure (`sp_allocate_license_seat`), guaranteeing that active allocations never exceed purchased capacity even under concurrent requests.
 4. **Automated Multi-Horizon Expiry Alerts:** Implement automated database functions and scheduled routines that calculate and dispatch renewal notifications at 30, 15, and 7-day intervals prior to license expiration.
 5. **Immutable Compliance Audit Trail:** Capture 100% of state-modifying operations (`CREATE`, `UPDATE`, `DELETE`, `ALLOCATE`, `REVOKE`) in an append-only audit log recording client IP addresses, actor user IDs, operation timestamps, and structured JSONB diffs of `old_values` versus `new_values`.
 6. **High-Performance Query Execution:** Optimize all critical database query paths to achieve sub-100ms response times by deploying foreign key B-tree indexes, partial unique indexes for active seat allocations, and PostgreSQL GIN trigram indexes (`pg_trgm`) for fuzzy text searches across assets and tags.
-7. **Enterprise Dual-Mode Authentication & RBAC:** Implement secure authentication featuring Google OAuth 2.0 (via Passport.js) and email/password login hashed with bcrypt (cost factor 12), coupled with a 5-tier Role-Based Access Control hierarchy (Super Admin, Tenant Admin, Asset Manager, Member, Auditor).
+7. **Enterprise Dual-Mode Authentication & RBAC:** Implement secure authentication featuring Google OAuth 2.0 (via Passport.js) and email/password login hashed with bcrypt (cost factor 12), coupled with a 4-tier Role-Based Access Control hierarchy (`SUPER_ADMIN`, `TENANT_ADMIN`, `ASSET_MANAGER`, `MEMBER`).
 8. **Strictly Layered RESTful Backend API:** Develop a modular backend using Node.js 20+, Express.js, and TypeScript structured into Routes, Controllers, Services, and Repositories, with complete runtime input validation enforced via Zod schemas.
 9. **Responsive Single-Page Application (SPA):** Construct a responsive web frontend utilizing React 18, Vite, TypeScript, and Tailwind CSS, featuring TanStack Query for client-side caching, optimistic UI updates, and real-time form validation.
 10. **Containerization & Automated Disaster Recovery:** Provide a zero-dependency local deployment configuration via Docker and Docker Compose, alongside verified backup and restore scripts for PostgreSQL database dumps and point-in-time recovery.
@@ -63,7 +63,7 @@ The primary engineering and database objectives of AssetVault are:
 | Name | Register No. | Role | Responsibilities |
 | :--- | :--- | :--- | :--- |
 | `KARTHIKEYAN S` | `24BCT0332` | Database Architect & Backend Lead | Conceptual and logical ER modeling, relational 3NF normalization proofs, SQL DDL scripts, PL/pgSQL triggers, stored procedures, Row-Level Security policies, indexing strategy, Prisma ORM schema integration, and core backend REST API services (Asset, License, Seat Allocation). |
-| `SUDIR NIRANJ R` | `24BDS0267` | Frontend Architect & UI/UX Lead | React 18 + Vite SPA architecture, Tailwind CSS design system, responsive component engineering, TanStack Query caching and state synchronization, React Hook Form + Zod client validation, seat matrix user interface, and analytical reporting views. |
+| `SUDIR NIRANJ` | `24BDS0267` | Frontend Architect & UI/UX Lead | React 18 + Vite SPA architecture, Tailwind CSS design system, responsive component engineering, TanStack Query caching and state synchronization, React Hook Form + Zod client validation, seat matrix user interface, and analytical reporting views. |
 | `PRAVEEN P` | `24BAI0119` | DevOps Engineer, Security & QA Lead | Authentication engine (Google OAuth 2.0, JWT, bcrypt), security middleware (Helmet, rate limiting, CORS), Docker Compose configuration, GitHub Actions CI/CD workflows, automated backup/restore scripts, end-to-end testing, and project documentation. |
 
 ---
@@ -91,16 +91,16 @@ The primary engineering and database objectives of AssetVault are:
 2. **Relational Schema Specification & Normalization Proof:** Formal relational schemas with mathematical proofs demonstrating Third Normal Form (3NF) compliance and zero update/deletion anomalies ([`/database/normalization.md`](../database/normalization.md)).
 3. **Comprehensive Data Dictionary:** Detailed attribute specifications covering table names, column descriptions, PostgreSQL data types, nullability, primary/foreign key relationships, default values, and index rationale ([`/database/data-dictionary.md`](../database/data-dictionary.md)).
 4. **Complete SQL Script Suite:** Modular, executable PostgreSQL scripts located in [`/database/sql/`](../database/sql/):
-   - `01_schema.sql` (DDL with all constraints)
-   - `02_views.sql` (Analytical & reporting relational views)
-   - `03_procedures.sql` (Transactional stored procedures)
-   - `04_triggers.sql` (Automated audit logging and seat limit enforcement triggers)
-   - `05_rls.sql` (Row-Level Security multi-tenant policies)
-   - `06_indexes.sql` (B-tree, partial, and GIN trigram indexes)
-   - `07_backup_restore.ps1` (Automated dump and restore automation)
+   - `01_views.sql` (Analytical & reporting relational views, materialized views)
+   - `02_functions_procedures.sql` (Stored procedures, capacity allocation, dashboard KPI functions)
+   - `03_triggers.sql` (Automated audit logging, seat limit, and cross-tenant triggers)
+   - `04_rls.sql` (Row-Level Security multi-tenant policies)
+   - `05_queries.sql` (Complex multi-table queries, analytical aggregations)
+   - `06_transactions_demo.sql` (Transaction isolation levels & concurrency demonstrations)
+   - `08_production_bootstrap.sql` (Production schema initialization & database bootstrap)
 5. **Layered Backend REST API:** Modular Express.js + TypeScript service ([`/backend`](../backend)) implementing strict layered architecture, Zod validation, centralized error handling, and complete CRUD endpoints for all business domains.
 6. **Responsive React Web Application:** Modern SPA ([`/frontend`](../frontend)) built with React 18, Vite, TypeScript, and Tailwind CSS, providing intuitive asset catalogs, interactive license allocation matrices, analytics dashboards, and responsive controls.
-7. **Authentication & RBAC Engine:** Complete identity system supporting Google OAuth 2.0, bcrypt-hashed email/password credentials, short-lived JWT access tokens, SHA-256 hashed refresh tokens, and 5-tier role-based access enforcement.
+7. **Authentication & RBAC Engine:** Complete identity system supporting Google OAuth 2.0, bcrypt-hashed email/password credentials, short-lived JWT access tokens, SHA-256 hashed refresh tokens, and 4-tier role-based access enforcement (`SUPER_ADMIN`, `TENANT_ADMIN`, `ASSET_MANAGER`, `MEMBER`).
 8. **Disaster Recovery & Backup/Restore Scripts:** Production-ready PowerShell and Bash scripts providing automated `pg_dump` database export, validation checks, and point-in-time database restoration procedures.
 9. **Docker Image on Docker Hub:** Fully packaged, multi-stage production Docker images published to Docker Hub enabling single-command containerized deployment.
 10. **GitHub Repository:** Monorepo with conventional commit history, branch protections (`main` and `dev`), and GitHub Actions CI/CD workflows for automated linting, type-checking, and testing.
@@ -145,13 +145,13 @@ gantt
 
 | Task | Start | End | Owner |
 | :--- | :---: | :---: | :--- |
-| **Proposal** | 2026-10-19 | 2026-10-25 | `KARTHIKEYAN S`, `SUDIR NIRANJ R`, `PRAVEEN P` |
+| **Proposal** | 2026-10-19 | 2026-10-25 | `KARTHIKEYAN S`, `SUDIR NIRANJ`, `PRAVEEN P` |
 | **ER & Schema** | 2026-10-23 | 2026-10-31 | `KARTHIKEYAN S` |
 | **Database Implementation** | 2026-10-29 | 2026-11-06 | `KARTHIKEYAN S` |
 | **Auth & RBAC** | 2026-11-04 | 2026-11-12 | `KARTHIKEYAN S`, `PRAVEEN P` |
 | **Backend API** | 2026-11-10 | 2026-11-20 | `KARTHIKEYAN S` |
-| **Frontend** | 2026-11-17 | 2026-11-27 | `SUDIR NIRANJ R` |
-| **Advanced Features** | 2026-11-24 | 2026-12-03 | `KARTHIKEYAN S`, `SUDIR NIRANJ R` |
+| **Frontend** | 2026-11-17 | 2026-11-27 | `SUDIR NIRANJ` |
+| **Advanced Features** | 2026-11-24 | 2026-12-03 | `KARTHIKEYAN S`, `SUDIR NIRANJ` |
 | **Backup & Docker** | 2026-11-29 | 2026-12-05 | `PRAVEEN P` |
 | **Deployment & CI/CD** | 2026-12-02 | 2026-12-08 | `PRAVEEN P` |
-| **Testing & Documentation** | 2026-12-06 | 2026-12-13 | `SUDIR NIRANJ R`, `PRAVEEN P` |
+| **Testing & Documentation** | 2026-12-06 | 2026-12-13 | `SUDIR NIRANJ`, `PRAVEEN P` |
