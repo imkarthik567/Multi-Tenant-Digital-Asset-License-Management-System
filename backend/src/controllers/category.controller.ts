@@ -11,7 +11,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 
 export class CategoryController {
   public listCategories = asyncHandler(async (req: Request, res: Response) => {
-    const params = getPaginationParams(req, 'name', ['name', 'slug', 'createdAt']);
+    const params = getPaginationParams(req, 'name', ['name', 'createdAt']);
     const parentId = req.query.parentId !== undefined ? (req.query.parentId as string) || null : undefined;
     const result = await categoryService.listCategories(req.prisma, params, { parentId });
     sendResponse(res, 200, result.data, result.meta);

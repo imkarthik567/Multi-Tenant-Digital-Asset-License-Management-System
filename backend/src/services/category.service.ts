@@ -11,7 +11,6 @@ import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.u
 export interface CategoryTreeNode {
   id: string;
   name: string;
-  slug: string;
   description: string | null;
   parentId: string | null;
   assetCount: number;
@@ -43,7 +42,6 @@ export class CategoryService {
       map.set(cat.id, {
         id: cat.id,
         name: cat.name,
-        slug: cat.slug,
         description: cat.description,
         parentId: cat.parentId,
         assetCount: cat._count?.assets || 0,
