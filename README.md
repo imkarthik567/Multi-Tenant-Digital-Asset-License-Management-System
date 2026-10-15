@@ -257,7 +257,7 @@ All demo accounts are initialized during `prisma/seed.ts`. Default password: `Pa
 | `CLIENT_URL` | Allowed client origin for CORS policies | `http://localhost:5173` |
 | `VITE_API_URL` | Backend URL for Vite frontend client proxy | `http://localhost:5000` |
 | `RUN_WORKER` | Enables background cron scheduler | `true` |
-| `METRICS_BEARER_TOKEN` | Bearer token protecting Prometheus `/metrics` | `dev-metrics-token-assetvault` |
+| `METRICS_BEARER_TOKEN` | Bearer token protecting Prometheus `/metrics` (required to be explicitly set in production) | *(Unique random secret)* |
 
 ---
 
