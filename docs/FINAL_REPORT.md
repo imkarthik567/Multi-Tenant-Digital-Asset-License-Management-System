@@ -122,7 +122,7 @@ A database schema is formally normalized to ensure zero data redundancy, prevent
 - **Anti-Pattern Averted (Tenant Plans):** Storing plan attributes (`max_users`, `max_assets`, `price_cents`) directly in `tenants` would create a transitive dependency:
   $$\text{tenant\_id} \rightarrow \text{plan\_name} \rightarrow \{\text{max\_users}, \text{max\_assets}, \text{price\_cents}\}$$
   Updating a plan's limit would cause update anomalies across all tenants on that plan.
-  - **Resolution:** Factored out into independent relation `subscription_plans(id, name, max_users, max_assets, price_cents)`.
+  - **Resolution:** Factored out into independent relation `plans(id, name, max_users, max_assets, price_cents)`.
 - **Anti-Pattern Averted (License Types):** Storing license metadata in `licenses` would introduce:
   $$\text{license\_id} \rightarrow \text{license\_type\_name} \rightarrow \text{description}$$
   - **Resolution:** Factored out into `license_types(id, name, description)`.
@@ -196,14 +196,14 @@ To guarantee sub-second execution over millions of records, AssetVault implement
 
 ### 6.2 Stored Procedures & Concurrency Control
 AssetVault implements three stored procedures in PL/pgSQL:
-1. `sp_allocate_license_seat`: Uses `SELECT ... FOR UPDATE` row locking to acquire exclusive locks on license rows, verifies active status, validates seat availability, generates allocation UUID, inserts record, and increments `used_seats`.
-2. `sp_release_license_seat`: Acquires row lock, validates active allocation, stamps `released_at = NOW()`, updates status to `'RELEASED'`, and decrements `used_seats`.
+1. `sp_allocate_license_seat`: Uses `SELECT ... FOR UPDATE` row locking to acquire exclusive locks on license rows, verifies active status and tenant match, dynamically checks seat availability via `SELECT COUNT(*) FROM license_allocations WHERE status = 'ACTIVE'` (preserving 3NF), generates allocation UUID, and inserts the allocation record.
+2. `sp_release_license_seat`: Acquires row lock, validates active allocation, stamps `revoked_at = NOW()`, appends optional reason to `notes`, updates status to `'REVOKED'`, and cleanses active seat count dynamically without redundant counter columns.
 3. `sp_renew_license`: Extends license expiration date by specified duration and writes an immutable audit record to `license_renewals`.
 
 ### 6.3 Database Triggers
-- `trg_audit_log_immutable`: Intercepts `UPDATE` and `DELETE` attempts on `audit_logs`, raising SQL exception `ERRCODE = '28000'` (invalid authorization specification), guaranteeing non-repudiation of security logs.
-- `trg_set_timestamp`: Automatically stamps `updated_at = NOW()` across tables upon mutation.
-- `trg_check_seat_limits`: Acts as an extra defensive backstop preventing `used_seats > total_seats`.
+- `trg_audit_immutable`: Intercepts `UPDATE` and `DELETE` attempts on `audit_logs`, raising SQL exception `ERRCODE = '28000'` (invalid authorization specification), guaranteeing non-repudiation of security logs.
+- `trg_*_updated_at`: Automatically stamps `updated_at = NOW()` across tables upon mutation.
+- `trg_check_seat_availability`: Acts as an extra defense-in-depth backstop preventing active allocations from exceeding `licenses.total_seats`.
 
 ---
 
@@ -211,18 +211,18 @@ AssetVault implements three stored procedures in PL/pgSQL:
 
 ### 7.1 The 20-Thread Race Condition Penetration Test
 To demonstrate concurrency safety, the test suite (`backend/src/__tests__/break-it-security.test.ts`) executed an adversarial race condition exploit:
-- A license with `total_seats = 3` and `used_seats = 0` was targeted.
+- A license with `total_seats = 3` and 0 initial allocations was targeted.
 - 20 distinct user threads simultaneously fired seat allocation requests via `Promise.all`:
 ```
 Test Execution Trace:
-Thread 1: Acquires FOR UPDATE lock -> used_seats=0 -> Allocated (1/3)
-Thread 2: Waits for lock -> used_seats=1 -> Allocated (2/3)
-Thread 3: Waits for lock -> used_seats=2 -> Allocated (3/3)
-Thread 4: Waits for lock -> used_seats=3 -> EXCEPTION: License seats exhausted (Code 23514)
+Thread 1: Acquires FOR UPDATE lock -> active_seats=0 -> Allocated (1/3)
+Thread 2: Waits for lock -> active_seats=1 -> Allocated (2/3)
+Thread 3: Waits for lock -> active_seats=2 -> Allocated (3/3)
+Thread 4: Waits for lock -> active_seats=3 -> EXCEPTION: License seats exhausted (Code 23514)
 ...
 Threads 5-20: Sequentially rejected with PostgreSQL Code 23514
 ```
-- **Observed Result:** Exactly 3 requests returned `200 OK`; exactly 17 requests were safely blocked. The database state confirmed `used_seats = 3`. Zero over-allocation occurred.
+- **Observed Result:** Exactly 3 requests returned `200 OK`; exactly 17 requests were safely blocked. The database state confirmed 3 active allocations (and dynamic analytical view `used_seats = 3`). Zero over-allocation occurred.
 
 ---
 

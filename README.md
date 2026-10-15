@@ -230,7 +230,7 @@ All demo accounts are initialized during `prisma/seed.ts`. Default password: `Pa
 |---|---|---|---|
 | `superadmin@assetvault.internal` | `SUPER_ADMIN` | Global Platform | Cross-tenant metrics, manage subscription plans, suspend/activate tenants. |
 | `techcorp.admin@techcorp.io` | `TENANT_ADMIN` | TechCorp Dynamics | Manage team members, review audit ledger, compliance score remediation, JSON export. |
-| `techcorp.manager@techcorp.io` | `ASSET_MANAGER` | TechCorp Dynamics | Create/edit assets, upload new versions, provision licenses, allocate seats. |
+| `techcorp.mgr1@techcorp.io` | `ASSET_MANAGER` | TechCorp Dynamics | Create/edit assets, upload new versions, provision licenses, allocate seats. |
 | `techcorp.member1@techcorp.io` | `MEMBER` | TechCorp Dynamics | Browse asset catalog, download covered assets, view self-assigned license seats. |
 | `innovatelabs.admin@innovatelabs.com` | `TENANT_ADMIN` | InnovateLabs Inc | Isolated second tenant for cross-tenant boundary verification tests. |
 
