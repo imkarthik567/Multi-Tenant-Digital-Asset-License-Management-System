@@ -125,19 +125,6 @@ export class UserService {
         },
       });
 
-      // Write audit log entry with the explicit change reason
-      await tx.auditLog.create({
-        data: {
-          tenantId,
-          userId: actorUserId || null,
-          tableName: 'users',
-          recordId: userId,
-          action: 'UPDATE',
-          oldData: { roleId: currentUser.roleId, role: currentUser.role.name },
-          newData: { roleId: targetRole.id, role: targetRole.name, reason },
-        },
-      });
-
       // Revoke refresh tokens so user gets updated role claim on re-login
       await tx.refreshToken.updateMany({
         where: { userId, revokedAt: null },
