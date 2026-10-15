@@ -156,9 +156,14 @@ export const handleApiError = (err: unknown): never => {
 export const api = {
   async get<T = any>(url: string, configOrParams?: any): Promise<T> {
     try {
-      const config = configOrParams?.params || configOrParams?.headers
-        ? configOrParams
-        : { params: configOrParams };
+      const isAxiosConfig =
+        configOrParams &&
+        (configOrParams.params !== undefined ||
+          configOrParams.headers !== undefined ||
+          configOrParams.responseType !== undefined ||
+          configOrParams.signal !== undefined);
+
+      const config = isAxiosConfig ? configOrParams : { params: configOrParams };
       const response = await apiClient.get<T>(url, config);
       return response.data;
     } catch (err) {
