@@ -8,6 +8,9 @@
 -- SECTION 1: CRUD OPERATIONS
 -- ==============================================================================
 
+-- Ensure clean state for repeatable execution
+DELETE FROM assets WHERE asset_code = 'AST-BRAND-2026-001';
+
 -- 1.1 INSERT with RETURNING: Create a new digital asset and instantly retrieve generated attributes
 INSERT INTO assets (
     tenant_id,
