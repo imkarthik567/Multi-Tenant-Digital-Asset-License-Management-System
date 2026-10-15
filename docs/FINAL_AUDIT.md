@@ -114,7 +114,7 @@
 | **Docker Compose Orchestration** | `docker-compose.yml` | **PASS** | Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies. |
 | **Git Hygiene & Commit History** | `git log --oneline` | **PASS** | Clean history with Conventional Commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `ci:`); dual-branch model (`main`, `dev`). |
 | **CI/CD Automation (5 Workflows)** | `.github/workflows/` | **PASS** | `ci.yml` (lint, test, build), `docker.yml` (container build), `deploy.yml` (cloud deploy), `keepalive.yml` (free-tier pings), `nightly-backup.yml` (automated backup artifacts). |
-| **Automated Test Coverage** | `backend/src/__tests__/` | **PASS** | **103 tests passing across 5 suites** (100% pass rate: `break-it-security`, `rest-api`, `services-coverage`, `auth-rbac-isolation`, `advanced-features`). |
+| **Automated Test Coverage** | `backend/src/__tests__/` | **PASS** | **109 tests passing across 5 suites** (100% pass rate: `break-it-security`, `rest-api`, `services-coverage`, `auth-rbac-isolation`, `advanced-features`). |
 
 ---
 
@@ -127,7 +127,7 @@
 | **Tenant Compliance Scoring Engine** | `backend/src/services/compliance.service.ts` | **PASS** | `GET /api/reports/compliance` computes tenant score (0-100) based on valid license coverage, over-allocation risk, expired license usage, and 30-day expiries. |
 | **Unused Seats Cost Optimization** | `backend/src/services/costOptimization.service.ts` | **PASS** | `GET /api/reports/unused-seats` detects allocations inactive for 30+ days, calculates monthly dollar savings, and offers a 1-click release action. |
 | **CSV & PDF Reporting** | `export.service.ts`, `license.controller.ts` | **PASS** | Streaming CSV exports for Assets and Licenses; PDF report generation for license certificates. |
-| **E2E Playwright Tests** | `frontend/e2e/` | **PASS** | Browser-level end-to-end integration tests verifying login, navigation, and CRUD workflows. |
+| **E2E Playwright Tests** | `tests/e2e/` | **PASS** | Browser-level end-to-end integration tests verifying login, navigation, and CRUD workflows. |
 
 ---
 
