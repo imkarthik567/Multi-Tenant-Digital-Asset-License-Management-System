@@ -97,6 +97,7 @@ export class UserService {
         Prisma.sql`SELECT 
           set_config('app.current_tenant_id', ${tenantId}, true),
           set_config('app.current_user_id', ${actorUserId || ''}, true),
+          set_config('app.audit_reason', ${reason}, true),
           set_config('app.is_super_admin', 'false', true);`
       );
 
