@@ -178,22 +178,44 @@ SELECT
     p.max_users,
     p.max_assets,
     p.monthly_price AS plan_monthly_price,
-    COUNT(DISTINCT u.id) AS user_count,
-    COUNT(DISTINCT a.id) FILTER (WHERE a.deleted_at IS NULL) AS asset_count,
-    COUNT(DISTINCT l.id) FILTER (WHERE l.deleted_at IS NULL) AS license_count,
-    COUNT(DISTINCT la.id) FILTER (WHERE la.status = 'ACTIVE') AS active_seats_count,
-    (
-        COALESCE(SUM(DISTINCT l.cost), 0) + 
-        COALESCE((SELECT SUM(lr.cost) FROM license_renewals lr JOIN licenses lic ON lic.id = lr.license_id WHERE lic.tenant_id = t.id), 0)
-    )::NUMERIC(12,2) AS total_license_spend,
+    COALESCE(u.user_count, 0) AS user_count,
+    COALESCE(a.asset_count, 0) AS asset_count,
+    COALESCE(l.license_count, 0) AS license_count,
+    COALESCE(la.active_seats_count, 0) AS active_seats_count,
+    (COALESCE(l.total_initial_cost, 0) + COALESCE(lr.total_renewal_cost, 0))::NUMERIC(12,2) AS total_license_spend,
     t.created_at AS onboarded_at
 FROM tenants t
 JOIN plans p ON p.id = t.plan_id
-LEFT JOIN users u ON u.tenant_id = t.id
-LEFT JOIN assets a ON a.tenant_id = t.id
-LEFT JOIN licenses l ON l.tenant_id = t.id
-LEFT JOIN license_allocations la ON la.license_id = l.id
-GROUP BY t.id, t.name, t.slug, t.status, p.name, p.max_users, p.max_assets, p.monthly_price, t.created_at;
+LEFT JOIN (
+    SELECT tenant_id, COUNT(id) AS user_count 
+    FROM users 
+    GROUP BY tenant_id
+) u ON u.tenant_id = t.id
+LEFT JOIN (
+    SELECT tenant_id, COUNT(id) AS asset_count 
+    FROM assets 
+    WHERE deleted_at IS NULL 
+    GROUP BY tenant_id
+) a ON a.tenant_id = t.id
+LEFT JOIN (
+    SELECT tenant_id, COUNT(id) AS license_count, SUM(cost) AS total_initial_cost 
+    FROM licenses 
+    WHERE deleted_at IS NULL 
+    GROUP BY tenant_id
+) l ON l.tenant_id = t.id
+LEFT JOIN (
+    SELECT lic.tenant_id, COUNT(la.id) AS active_seats_count
+    FROM license_allocations la
+    JOIN licenses lic ON lic.id = la.license_id
+    WHERE la.status = 'ACTIVE' AND lic.deleted_at IS NULL
+    GROUP BY lic.tenant_id
+) la ON la.tenant_id = t.id
+LEFT JOIN (
+    SELECT lic.tenant_id, SUM(lr.cost) AS total_renewal_cost
+    FROM license_renewals lr
+    JOIN licenses lic ON lic.id = lr.license_id
+    GROUP BY lic.tenant_id
+) lr ON lr.tenant_id = t.id;
 
 -- 1.6 Materialized View: mv_monthly_access_stats & Refresh Routine
 DROP MATERIALIZED VIEW IF EXISTS mv_monthly_access_stats CASCADE;
