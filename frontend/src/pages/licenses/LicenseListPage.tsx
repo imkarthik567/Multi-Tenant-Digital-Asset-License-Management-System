@@ -25,6 +25,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { DatePicker } from '../../components/common/DatePicker';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 
 export const LicenseListPage: React.FC = () => {
   const { user } = useAuth();
@@ -37,6 +38,7 @@ export const LicenseListPage: React.FC = () => {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [allocationNotes, setAllocationNotes] = useState('');
   const [actionMessage, setActionMessage] = useState<{ text: string; error?: boolean } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   // Creation form state matching backend createLicenseSchema
   const [createForm, setCreateForm] = useState({
@@ -305,7 +307,9 @@ export const LicenseListPage: React.FC = () => {
                 {/* Card Actions */}
                 <div className="mt-5 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-[11px] text-slate-400">
-                    {lic.assetLicenses?.length || 0} linked asset(s)
+                    {lic.days_to_expiry !== null && lic.days_to_expiry !== undefined
+                      ? (lic.days_to_expiry < 0 ? 'Expired' : `${lic.days_to_expiry}d remaining`)
+                      : 'Perpetual'}
                   </span>
 
                   <div className="flex items-center space-x-2">
@@ -332,11 +336,7 @@ export const LicenseListPage: React.FC = () => {
 
                     {canManage && (
                       <button
-                        onClick={() => {
-                          if (window.confirm(`Soft-delete license "${licName}"?`)) {
-                            deleteMutation.mutate(licId);
-                          }
-                        }}
+                        onClick={() => setDeleteTarget({ id: licId, name: licName })}
                         className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
                         title="Delete License"
                       >
@@ -546,6 +546,23 @@ export const LicenseListPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Soft-Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) {
+            deleteMutation.mutate(deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+        title="Move License to Trash"
+        message={`Are you sure you want to soft-delete license "${deleteTarget?.name}"? Active allocations will be terminated.`}
+        confirmText="Delete License"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 };
