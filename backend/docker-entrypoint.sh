@@ -11,7 +11,8 @@ echo "[AssetVault API] Starting container initialization..."
 if [ -n "$DATABASE_URL" ]; then
   echo "[AssetVault API] Applying production database migrations..."
   npx prisma migrate deploy || {
-    echo "[AssetVault API] Migration failed, checking database readiness..."
+    echo "[AssetVault API] FATAL: Database migration failed! Exiting container."
+    exit 1
   }
 fi
 
