@@ -67,10 +67,12 @@ export class AllocationController {
 
   public listAllocations = asyncHandler(async (req: Request, res: Response) => {
     const params = getPaginationParams(req, 'allocated_at', ['allocated_at', 'status']);
+    const status = req.query.status as string | undefined;
     const result = await allocationService.listAllocations(
       req.prisma,
       req.user!.tenantId as string,
-      params
+      params,
+      status
     );
     sendResponse(res, 200, result.data, result.meta);
   });

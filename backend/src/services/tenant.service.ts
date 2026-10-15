@@ -75,7 +75,11 @@ export class TenantService {
    */
   public async suspendOrActivateTenant(id: string, status: TenantStatus, actorUserId?: string) {
     return prisma.$transaction(async (tx: any) => {
-      await tx.$executeRaw(Prisma.sql`SELECT set_config('app.is_super_admin', 'true', true);`);
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 
+          set_config('app.is_super_admin', 'true', true),
+          set_config('app.current_user_id', ${actorUserId || ''}, true);`
+      );
 
       const current = await tx.tenant.findUnique({ where: { id } });
       if (!current) {
@@ -104,19 +108,6 @@ export class TenantService {
         }
       }
 
-      // Record audit log
-      await tx.auditLog.create({
-        data: {
-          tenantId: id,
-          userId: actorUserId || null,
-          tableName: 'tenants',
-          recordId: id,
-          action: 'UPDATE',
-          oldData: { status: current.status },
-          newData: { status: updated.status, reason: `Status changed to ${status}` },
-        },
-      });
-
       return updated;
     });
   }
@@ -124,9 +115,13 @@ export class TenantService {
   /**
    * Atomic Tenant Deletion
    */
-  public async deleteTenant(id: string, _actorUserId?: string) {
+  public async deleteTenant(id: string, actorUserId?: string) {
     return prisma.$transaction(async (tx: any) => {
-      await tx.$executeRaw(Prisma.sql`SELECT set_config('app.is_super_admin', 'true', true);`);
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 
+          set_config('app.is_super_admin', 'true', true),
+          set_config('app.current_user_id', ${actorUserId || ''}, true);`
+      );
 
       const current = await tx.tenant.findUnique({ where: { id } });
       if (!current) {
@@ -145,6 +140,10 @@ export class TenantService {
           data: { revokedAt: new Date() },
         });
       }
+
+      // Delete tenant's assets and licenses first inside the transaction
+      await tx.asset.deleteMany({ where: { tenantId: id } });
+      await tx.license.deleteMany({ where: { tenantId: id } });
 
       // Delete tenant
       const deleted = await tx.tenant.delete({ where: { id } });

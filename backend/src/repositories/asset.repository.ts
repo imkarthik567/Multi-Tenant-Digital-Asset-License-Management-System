@@ -16,6 +16,8 @@ export interface AssetCatalogViewRow {
   asset_type: AssetType;
   asset_status: AssetStatus;
   category_name: string | null;
+  category_id?: string | null;
+  owner_id?: string;
   owner_name: string;
   owner_email: string;
   latest_version_no: number;
@@ -56,6 +58,14 @@ export class AssetRepository {
       conditions.push(
         Prisma.sql`(asset_name ILIKE ${searchPattern} OR asset_code ILIKE ${searchPattern} OR description ILIKE ${searchPattern})`
       );
+    }
+
+    if (filter.categoryId) {
+      conditions.push(Prisma.sql`category_id = ${filter.categoryId}::UUID`);
+    }
+
+    if (filter.ownerId) {
+      conditions.push(Prisma.sql`owner_id = ${filter.ownerId}::UUID`);
     }
 
     if (filter.assetType) {

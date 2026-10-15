@@ -37,7 +37,7 @@ export class AssetService {
       throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
     }
 
-    return assetRepository.create(prismaClient, {
+    const asset = await assetRepository.create(prismaClient, {
       name: data.name,
       assetCode: data.assetCode,
       assetType: data.assetType,
@@ -47,6 +47,35 @@ export class AssetService {
       owner: { connect: { id: ownerId } },
       tenant: { connect: { id: tenantId } },
     });
+
+    if (data.fileUrl) {
+      await prismaClient.assetVersion.create({
+        data: {
+          assetId: asset.id,
+          versionNo: 1,
+          fileUrl: data.fileUrl,
+          fileSizeBytes: BigInt(data.fileSizeBytes || 1048576),
+          checksumSha256:
+            data.checksumSha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          uploadedBy: ownerId,
+        },
+      });
+    }
+
+    if (Array.isArray(data.tags) && data.tags.length > 0) {
+      for (const tagItem of data.tags) {
+        if (!tagItem || typeof tagItem !== 'string' || !tagItem.trim()) continue;
+        const tagName = tagItem.trim();
+        const tag = await prismaClient.tag.upsert({
+          where: { tenantId_name: { tenantId, name: tagName } },
+          create: { tenantId, name: tagName },
+          update: {},
+        });
+        await assetRepository.attachTag(prismaClient, asset.id, tag.id);
+      }
+    }
+
+    return asset;
   }
 
   public async updateAsset(prismaClient: any, id: string, data: any) {

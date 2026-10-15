@@ -225,24 +225,6 @@ export class AuthService {
         include: { role: true },
       });
 
-      await tx.auditLog.create({
-        data: {
-          tenantId: createdTenant.id,
-          userId: createdUser.id,
-          tableName: 'tenants',
-          recordId: createdTenant.id,
-          action: 'INSERT',
-          newData: {
-            tenantId: createdTenant.id,
-            name: createdTenant.name,
-            slug: createdTenant.slug,
-            adminEmail: createdUser.email,
-            plan: freePlan.name,
-            onboardedAt: new Date().toISOString(),
-          },
-        },
-      });
-
       return { tenant: createdTenant, user: createdUser };
     });
 
