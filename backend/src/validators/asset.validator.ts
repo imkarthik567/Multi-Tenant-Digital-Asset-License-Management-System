@@ -13,7 +13,11 @@ export const createAssetSchema = z
     assetCode: z.string().min(2).max(50).trim(),
     assetType: z.nativeEnum(AssetType),
     description: z.string().max(1000).optional().nullable(),
-    categoryId: z.string().uuid().optional().nullable(),
+    categoryId: z.preprocess((v) => (v === '' ? null : v), z.string().uuid().optional().nullable()),
+    fileUrl: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+    fileSizeBytes: z.number().int().positive().optional(),
+    checksumSha256: z.string().length(64).optional(),
+    tags: z.array(z.string()).optional(),
   })
   .strip();
 
@@ -22,7 +26,7 @@ export const updateAssetSchema = z
     name: z.string().min(2).max(200).trim().optional(),
     assetType: z.nativeEnum(AssetType).optional(),
     description: z.string().max(1000).optional().nullable(),
-    categoryId: z.string().uuid().optional().nullable(),
+    categoryId: z.preprocess((v) => (v === '' ? null : v), z.string().uuid().optional().nullable()),
     status: z.nativeEnum(AssetStatus).optional(),
   })
   .strip();

@@ -109,11 +109,21 @@ export class AllocationRepository {
   public async findAll(
     prisma: PrismaClient | any,
     tenantId: string,
-    params: PaginationParams
+    params: PaginationParams,
+    status?: string
   ): Promise<{ data: any[]; total: number }> {
-    const where = {
+    const where: any = {
       license: { tenantId },
     };
+
+    if (status) {
+      if (status === 'RELEASED' || status === 'REVOKED') {
+        where.status = { in: ['RELEASED', 'REVOKED'] };
+      } else {
+        where.status = status;
+      }
+    }
+
     const [data, total] = await Promise.all([
       prisma.licenseAllocation.findMany({
         where,

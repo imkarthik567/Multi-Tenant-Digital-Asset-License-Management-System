@@ -131,8 +131,8 @@ export class AllocationService {
     return formatPaginatedResponse(data, total, params);
   }
 
-  public async listAllocations(prismaClient: any, tenantId: string, params: PaginationParams) {
-    const { data, total } = await allocationRepository.findAll(prismaClient, tenantId, params);
+  public async listAllocations(prismaClient: any, tenantId: string, params: PaginationParams, status?: string) {
+    const { data, total } = await allocationRepository.findAll(prismaClient, tenantId, params, status);
     return formatPaginatedResponse(data, total, params);
   }
 }

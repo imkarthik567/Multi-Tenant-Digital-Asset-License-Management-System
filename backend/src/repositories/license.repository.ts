@@ -10,6 +10,8 @@ import { PaginationParams } from '../utils/pagination.util';
 export interface LicenseUtilizationViewRow {
   license_id: string;
   tenant_id: string;
+  vendor_id?: string;
+  license_type_id?: number;
   license_name: string;
   vendor_name: string;
   license_type: string;
@@ -50,6 +52,14 @@ export class LicenseRepository {
     if (params.q) {
       const searchPattern = `%${params.q}%`;
       conditions.push(Prisma.sql`(license_name ILIKE ${searchPattern} OR vendor_name ILIKE ${searchPattern})`);
+    }
+
+    if (filter.vendorId) {
+      conditions.push(Prisma.sql`vendor_id = ${filter.vendorId}::UUID`);
+    }
+
+    if (filter.licenseTypeId !== undefined) {
+      conditions.push(Prisma.sql`license_type_id = ${filter.licenseTypeId}`);
     }
 
     if (filter.status) {
