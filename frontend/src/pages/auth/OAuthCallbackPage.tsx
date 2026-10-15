@@ -1,7 +1,7 @@
 // ==============================================================================
 // AssetVault: Google OAuth 2.0 Client Callback Consumer
 // Course: BCSE307L Database Systems (Fall 2026-27)
-// Captures JWT access token from OAuth redirect query, refreshes profile, and mounts session
+// Captures JWT access token from the OAuth URL fragment, then clears the URL before loading the profile
 // ==============================================================================
 
 import React, { useEffect, useState } from 'react';
@@ -22,8 +22,15 @@ export const OAuthCallbackPage: React.FC = () => {
     let isMounted = true;
 
     const handleCallback = async () => {
-      const token = searchParams.get('token');
-      const error = searchParams.get('error');
+      // URL fragments are not sent to the web server in HTTP requests or referrer headers.
+      const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const token = fragmentParams.get('token');
+      const error = searchParams.get('error') || fragmentParams.get('error');
+
+      // Remove any OAuth credentials from the visible URL before making further requests.
+      if (token) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
 
       if (error) {
         let msg = 'Google authentication failed';

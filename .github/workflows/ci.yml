@@ -34,10 +34,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install Monorepo Dependencies
@@ -51,9 +51,6 @@ jobs:
 
       - name: Security Gate - SQL Injection Static Analysis
         run: npm run check:sqli
-
-      - name: Security Gate - Dependency Vulnerability Audit
-        run: npm audit --audit-level=high || echo "⚠️ Audit completed with advisory notices"
 
       - name: Static Type-Check & Linting
         run: npm run lint
@@ -100,3 +97,16 @@ jobs:
 
       - name: Production Monorepo Build
         run: npm run build
+
+      # Keep all dependency advisories visible. The current high-severity braces
+      # advisory affects braces@3.0.3, a development-only transitive dependency, and
+      # has no patched upstream release listed yet. This diagnostic may therefore warn.
+      - name: Full Dependency Audit (including development tools)
+        if: always()
+        continue-on-error: true
+        run: npm audit
+
+      # Block releases on high/critical vulnerabilities in runtime dependencies.
+      - name: Security Gate - Production Dependency Vulnerability Audit
+        if: always()
+        run: npm audit --omit=dev --audit-level=high

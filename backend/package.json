@@ -15,7 +15,7 @@
     "prisma:push": "node ../node_modules/prisma/build/index.js db push",
     "prisma:seed": "node ../node_modules/ts-node/dist/bin.js prisma/seed.ts",
     "lint": "node ../node_modules/typescript/bin/tsc --noEmit",
-    "test": "node ../node_modules/vitest/vitest.mjs run",
+    "test": "node node_modules/vitest/vitest.mjs run",
     "check:sqli": "node ../scripts/check-sqli.js",
     "check:secrets": "node ../scripts/scan-secrets.js"
   },
@@ -63,7 +63,7 @@
     "@types/passport-google-oauth20": "^2.0.16",
     "@types/pdfkit": "^0.17.6",
     "@types/supertest": "^7.2.1",
-    "@vitest/coverage-v8": "^2.1.8",
+    "@vitest/coverage-v8": "^4.1.11",
     "nodemon": "^3.1.0",
     "pino-pretty": "^13.2.0",
     "prisma": "^5.14.0",
@@ -71,6 +71,6 @@
     "supertest": "^7.3.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.11"
   }
 }
