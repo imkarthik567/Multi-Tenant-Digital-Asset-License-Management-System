@@ -125,7 +125,6 @@ if (env.NODE_ENV !== 'test') {
 
 // 8. Global API Rate Limiting
 app.use('/api', globalRateLimiter);
-app.use('/api/v1', globalRateLimiter);
 
 // 9. Health & Observability Endpoints
 app.get('/health', getHealth);
