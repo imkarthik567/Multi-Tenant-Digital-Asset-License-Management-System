@@ -52,9 +52,6 @@ jobs:
       - name: Security Gate - SQL Injection Static Analysis
         run: npm run check:sqli
 
-      - name: Security Gate - Dependency Vulnerability Audit
-        run: npm audit --audit-level=high
-
       - name: Static Type-Check & Linting
         run: npm run lint
 
@@ -100,3 +97,9 @@ jobs:
 
       - name: Production Monorepo Build
         run: npm run build
+
+      # Run audit after functional validation so dependency findings do not hide
+      # lint, database, test, or build results. This remains a blocking gate.
+      - name: Security Gate - Dependency Vulnerability Audit
+        if: always()
+        run: npm audit --audit-level=high
