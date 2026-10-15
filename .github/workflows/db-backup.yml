@@ -1,0 +1,55 @@
+name: Nightly Cloud Database Backup
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Every day at 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  cloud-backup:
+    name: Run Cloud pg_dump & Artifact Upload
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install PostgreSQL Client Tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Execute pg_dump against Cloud Database
+        env:
+          DATABASE_DIRECT_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          TARGET_URL="${DATABASE_DIRECT_URL:-$DATABASE_URL}"
+          if [ -z "$TARGET_URL" ]; then
+            echo "⚠️ Neither DATABASE_DIRECT_URL nor DATABASE_URL secret is configured in GitHub repository settings."
+            echo "ℹ️ Skipping automated cloud backup gracefully."
+            exit 0
+          fi
+
+          mkdir -p backups
+          TIMESTAMP=$(date -u +"%Y%m%d_%H%M%S")
+          BACKUP_FILE="backups/assetvault_cloud_${TIMESTAMP}.dump"
+          CHECKSUM_FILE="${BACKUP_FILE}.sha256"
+
+          echo "📦 Initiating native PostgreSQL custom dump (-Fc)..."
+          pg_dump "$TARGET_URL" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --file="$BACKUP_FILE"
+
+          echo "🔒 Generating SHA-256 integrity checksum..."
+          sha256sum "$BACKUP_FILE" > "$CHECKSUM_FILE"
+          cat "$CHECKSUM_FILE"
+
+          echo "✅ Backup archive generated successfully: $BACKUP_FILE"
+
+      - name: Upload Backup Artifact (7-Day Retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: assetvault-nightly-backup-${{ github.run_id }}
+          path: backups/
+          retention-days: 7
+          if-no-files-found: warn
