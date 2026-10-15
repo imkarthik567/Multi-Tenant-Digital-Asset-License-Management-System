@@ -84,7 +84,10 @@ declare global {
 
 export const requestIdMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const incomingId = req.headers['x-request-id'] as string | undefined;
-  const requestId = incomingId && incomingId.trim().length > 0 ? incomingId : crypto.randomUUID();
+  const requestId =
+    incomingId && /^[A-Za-z0-9._:-]{1,128}$/.test(incomingId)
+      ? incomingId
+      : crypto.randomUUID();
 
   req.id = requestId;
   req.startTime = Date.now();
@@ -140,7 +143,7 @@ export const getMetricsHandler = async (req: Request, res: Response): Promise<vo
 // ------------------------------------------------------------------------------
 // 4. GET /api/ready Readiness Probe (Verifies PostgreSQL Connectivity)
 // ------------------------------------------------------------------------------
-export const getReadinessHandler = async (_req: Request, res: Response): Promise<void> => {
+export const getReadinessHandler = async (req: Request, res: Response): Promise<void> => {
   const startTime = Date.now();
   try {
     // Run direct query to verify database connection pool and responsiveness
@@ -157,12 +160,12 @@ export const getReadinessHandler = async (_req: Request, res: Response): Promise
       service: 'assetvault-api',
     });
   } catch (err: any) {
-    logger.error({ err }, 'Readiness check failed: Database unreachable');
+    logger.error({ err, requestId: req.id }, 'Readiness check failed: Database unreachable');
     res.status(503).json({
       status: 'not_ready',
       database: {
         status: 'disconnected',
-        error: err.message,
+        error: 'Database unavailable',
       },
       timestamp: new Date().toISOString(),
       service: 'assetvault-api',
