@@ -15,7 +15,7 @@
     "prisma:push": "node ../node_modules/prisma/build/index.js db push",
     "prisma:seed": "node ../node_modules/ts-node/dist/bin.js prisma/seed.ts",
     "lint": "node ../node_modules/typescript/bin/tsc --noEmit",
-    "test": "node ../node_modules/vitest/vitest.mjs run",
+    "test": "node node_modules/vitest/vitest.mjs run",
     "check:sqli": "node ../scripts/check-sqli.js",
     "check:secrets": "node ../scripts/scan-secrets.js"
   },
