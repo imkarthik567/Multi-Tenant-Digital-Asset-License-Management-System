@@ -90,5 +90,8 @@ services:
         sync: false
       - key: SUPER_ADMIN_NAME
         value: "Global Super Administrator"
+      # Run the idempotent baseline seed on startup; demo tenants remain disabled.
+      - key: RUN_SEED
+        value: "true"
       - key: SEED_DEMO
         value: "false"
