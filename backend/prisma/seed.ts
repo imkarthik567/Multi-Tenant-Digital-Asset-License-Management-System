@@ -13,6 +13,19 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const superAdminEmail =
+    process.env.SUPER_ADMIN_EMAIL?.trim() || (isProduction ? '' : 'superadmin@assetvault.io');
+  const superAdminPassword =
+    process.env.SUPER_ADMIN_PASSWORD || (isProduction ? '' : 'Password123!');
+  const superAdminName = process.env.SUPER_ADMIN_NAME || 'Global Super Administrator';
+
+  if (isProduction && (!superAdminEmail || !superAdminPassword)) {
+    throw new Error(
+      'SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD must be configured before production seeding.'
+    );
+  }
+
   console.log('🌱 Starting comprehensive AssetVault database seed...');
 
   // ----------------------------------------------------------------------------
@@ -87,10 +100,7 @@ async function main() {
     licenseTypesMap.set(licenseType.name, licenseType.id);
   }
 
-  // Dynamic Super Admin credentials from environment (defaults to demo admin if unset)
-  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@assetvault.io';
-  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'Password123!';
-  const superAdminName = process.env.SUPER_ADMIN_NAME || 'Global Super Administrator';
+  // Hash the configured password for first-time administrator creation.
   const superAdminHash = await bcrypt.hash(superAdminPassword, 10);
 
   // Common password hash for test accounts
@@ -102,9 +112,10 @@ async function main() {
   console.log('  -> Seeding platform super administrator...');
   const superAdmin = await prisma.user.upsert({
     where: { email: superAdminEmail },
+    // Do not reset the password on every container restart. The configured
+    // password is applied only when the administrator is created for the first time.
     update: {
       fullName: superAdminName,
-      passwordHash: superAdminHash,
       isActive: true,
     },
     create: {
@@ -119,7 +130,6 @@ async function main() {
   console.log(`    ✓ Super Admin configured: ${superAdmin.email}`);
 
   // Check if demo seed should run (production skips demo entities unless SEED_DEMO=true)
-  const isProduction = process.env.NODE_ENV === 'production';
   const shouldSeedDemo = process.env.SEED_DEMO === 'true' || !isProduction;
 
   if (!shouldSeedDemo) {
