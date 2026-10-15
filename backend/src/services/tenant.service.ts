@@ -120,6 +120,7 @@ export class TenantService {
       await tx.$executeRaw(
         Prisma.sql`SELECT 
           set_config('app.is_super_admin', 'true', true),
+          set_config('app.allow_audit_delete', 'true', true),
           set_config('app.current_user_id', ${actorUserId || ''}, true);`
       );
 
