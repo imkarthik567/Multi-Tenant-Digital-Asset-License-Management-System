@@ -46,9 +46,9 @@
 | Requirement | Evidence (File Path / Output) | Status | Fix Applied / Details |
 | :--- | :--- | :---: | :--- |
 | **Free RDBMS Used** | PostgreSQL 16 (`SELECT version()`) | **PASS** | PostgreSQL 16.4 deployed via Docker container and native installation. |
-| **Database Creation & Migrations** | `apps/api/prisma/migrations/` | **PASS** | Declarative migration history managed via Prisma Migrate and custom SQL bootstrap scripts. |
-| **CRUD Operations** | `apps/api/src/repositories/` | **PASS** | Full Create, Read, Update, and Delete across Assets, Licenses, Allocations, Users, Vendors, and Categories. |
-| **SQL Joins** | `apps/api/src/repositories/asset.repository.ts` | **PASS** | Multi-table INNER and LEFT JOINs across `assets`, `categories`, `users`, `asset_versions`, `asset_licenses`, `licenses`, `vendors`. |
+| **Database Creation & Migrations** | `backend/prisma/migrations/` | **PASS** | Declarative migration history managed via Prisma Migrate and custom SQL bootstrap scripts. |
+| **CRUD Operations** | `backend/src/repositories/` | **PASS** | Full Create, Read, Update, and Delete across Assets, Licenses, Allocations, Users, Vendors, and Categories. |
+| **SQL Joins** | `backend/src/repositories/asset.repository.ts` | **PASS** | Multi-table INNER and LEFT JOINs across `assets`, `categories`, `users`, `asset_versions`, `asset_licenses`, `licenses`, `vendors`. |
 | **Aggregate Queries** | `compliance.service.ts`, `costOptimization.service.ts` | **PASS** | `COUNT(*)`, `SUM(l.cost)`, `AVG(monthly_cost)`, `GROUP BY v.id` in compliance scoring and cost optimization queries. |
 | **Database Views** | `v_asset_catalog`, `mv_monthly_access_stats` | **PASS** | Standard view `v_asset_catalog` (denormalizes catalog for performant listing); Materialized view `mv_monthly_access_stats` (aggregates monthly download metrics with concurrent refresh). |
 | **Database Transactions** | `sp_renew_license`, `user.service.ts` | **PASS** | Atomic multi-step operations wrapped in Prisma `$transaction` and PostgreSQL transaction blocks. |
@@ -59,14 +59,14 @@
 #### Complete Raw SQL Justification Table
 | File | Method | SQL Construct | Examiner Justification |
 | :--- | :--- | :--- | :--- |
-| `apps/api/src/config/prisma.ts` | `prismaForRequest` | `SELECT set_config(...)` | Sets PostgreSQL transaction-local session context (`app.current_tenant_id`) for Row-Level Security policies. Prisma ORM has no native RLS context API. |
-| `apps/api/src/repositories/asset.repository.ts` | `findCatalog` | `SELECT * FROM v_asset_catalog ...` | Queries standard database view `v_asset_catalog` with dynamic filters; views cannot be represented as writable Prisma models. |
-| `apps/api/src/services/allocation.service.ts` | `allocateSeat` | `CALL sp_allocate_license_seat(...)` | Invokes stored procedure to guarantee atomic seat increments under row-level `FOR UPDATE` lock. |
-| `apps/api/src/services/allocation.service.ts` | `releaseSeat` | `CALL sp_release_license_seat(...)` | Invokes stored procedure to atomically decrement used seats and stamp allocation release timestamp. |
-| `apps/api/src/services/license.service.ts` | `renewLicense` | `CALL sp_renew_license(...)` | Invokes stored procedure to atomically extend license dates and insert renewal historical records. |
-| `apps/api/src/worker.ts` | `refreshMaterializedViewJob` | `REFRESH MATERIALIZED VIEW CONCURRENTLY ...` | Scheduled job refreshing materialized view `mv_monthly_access_stats` without locking reads. |
-| `apps/api/src/services/compliance.service.ts` | `calculateTenantCompliance` | Parameterized Aggregates | Complex compliance multi-table calculations combining joins, conditional sums, and window counts. |
-| `apps/api/src/services/costOptimization.service.ts` | `getUnusedSeatsReport` | Parameterized Aggregates | Computes unused seat allocations with date deltas and potential cost savings grouped by vendor. |
+| `backend/src/config/prisma.ts` | `prismaForRequest` | `SELECT set_config(...)` | Sets PostgreSQL transaction-local session context (`app.current_tenant_id`) for Row-Level Security policies. Prisma ORM has no native RLS context API. |
+| `backend/src/repositories/asset.repository.ts` | `findCatalog` | `SELECT * FROM v_asset_catalog ...` | Queries standard database view `v_asset_catalog` with dynamic filters; views cannot be represented as writable Prisma models. |
+| `backend/src/services/allocation.service.ts` | `allocateSeat` | `CALL sp_allocate_license_seat(...)` | Invokes stored procedure to guarantee atomic seat increments under row-level `FOR UPDATE` lock. |
+| `backend/src/services/allocation.service.ts` | `releaseSeat` | `CALL sp_release_license_seat(...)` | Invokes stored procedure to atomically decrement used seats and stamp allocation release timestamp. |
+| `backend/src/services/license.service.ts` | `renewLicense` | `CALL sp_renew_license(...)` | Invokes stored procedure to atomically extend license dates and insert renewal historical records. |
+| `backend/src/worker.ts` | `refreshMaterializedViewJob` | `REFRESH MATERIALIZED VIEW CONCURRENTLY ...` | Scheduled job refreshing materialized view `mv_monthly_access_stats` without locking reads. |
+| `backend/src/services/compliance.service.ts` | `calculateTenantCompliance` | Parameterized Aggregates | Complex compliance multi-table calculations combining joins, conditional sums, and window counts. |
+| `backend/src/services/costOptimization.service.ts` | `getUnusedSeatsReport` | Parameterized Aggregates | Computes unused seat allocations with date deltas and potential cost savings grouped by vendor. |
 
 ---
 
@@ -75,14 +75,14 @@
 | :--- | :--- | :---: | :--- |
 | **Modern Framework** | React 18, Vite, Express TypeScript | **PASS** | Modular, type-safe full-stack monorepo with high-performance bundling and sub-second HMR. |
 | **Responsive UI** | Tailwind CSS + Lucide Icons | **PASS** | Fully responsive layout spanning mobile viewports ($<640\text{px}$), tablets, and widescreen desktop displays ($>1280\text{px}$). |
-| **Login Page** | `apps/web/src/pages/LoginPage.tsx` | **PASS** | Branded enterprise authentication portal with Email/Password, quick demo credentials buttons, and Google OAuth 2.0 CTA. |
-| **Dashboard** | `apps/web/src/pages/DashboardPage.tsx` | **PASS** | Real-time KPI summary cards, interactive Compliance Gauge (0-100), Unused Seats cost alerts, recent activity feed, and quick-action modals. |
+| **Login Page** | `frontend/src/pages/LoginPage.tsx` | **PASS** | Branded enterprise authentication portal with Email/Password, quick demo credentials buttons, and Google OAuth 2.0 CTA. |
+| **Dashboard** | `frontend/src/pages/DashboardPage.tsx` | **PASS** | Real-time KPI summary cards, interactive Compliance Gauge (0-100), Unused Seats cost alerts, recent activity feed, and quick-action modals. |
 | **Full CRUD UI** | `AssetsPage.tsx`, `LicensesPage.tsx`, `UsersPage.tsx` | **PASS** | Complete creation, detail modal, editing, soft-deletion, and restoration workflows. |
-| **Search Functionality** | `apps/web/src/components/GlobalSearchModal.tsx` | **PASS** | Real-time global search querying Assets, Licenses, and Users simultaneously (`GET /api/search?q=`). |
-| **Filtering & Sorting** | `apps/web/src/components/FilterBar.tsx` | **PASS** | Multi-faceted filtering by Category, Status, License Type, Tag, and Date range with bidirectional column sorting. |
-| **Pagination** | `apps/web/src/components/Pagination.tsx` | **PASS** | Server-side paginated queries with customizable page sizes (10, 25, 50, 100) and page jump navigation. |
-| **Form Validation** | `apps/api/src/validators/` (Zod) | **PASS** | Strongly typed Zod schemas validating client inputs on API routes and React Hook Form on the frontend. |
-| **Exception Handling** | `apps/api/src/middleware/errorHandler.ts` | **PASS** | Centralized error hierarchy (`AppError`, `NotFoundError`, `ConflictError`, `ForbiddenError`, `UnauthorizedError`) with consistent JSON envelopes. |
+| **Search Functionality** | `frontend/src/components/GlobalSearchModal.tsx` | **PASS** | Real-time global search querying Assets, Licenses, and Users simultaneously (`GET /api/search?q=`). |
+| **Filtering & Sorting** | `frontend/src/components/FilterBar.tsx` | **PASS** | Multi-faceted filtering by Category, Status, License Type, Tag, and Date range with bidirectional column sorting. |
+| **Pagination** | `frontend/src/components/Pagination.tsx` | **PASS** | Server-side paginated queries with customizable page sizes (10, 25, 50, 100) and page jump navigation. |
+| **Form Validation** | `backend/src/validators/` (Zod) | **PASS** | Strongly typed Zod schemas validating client inputs on API routes and React Hook Form on the frontend. |
+| **Exception Handling** | `backend/src/middleware/errorHandler.ts` | **PASS** | Centralized error hierarchy (`AppError`, `NotFoundError`, `ConflictError`, `ForbiddenError`, `UnauthorizedError`) with consistent JSON envelopes. |
 
 ---
 
@@ -92,12 +92,12 @@
 | **Secure Token Handling** | `auth.service.ts`, `auth.middleware.ts` | **PASS** | Short-lived Access Tokens (15m) in memory/Bearer header; Long-lived Refresh Tokens (7d) in `HttpOnly`, `SameSite=Strict` cookies. |
 | **Authenticated User Retrieval** | `GET /api/auth/me` | **PASS** | Returns current user profile, organization details, role, and granular permission array. |
 | **Google OAuth 2.0 Integration** | `passport.config.ts`, `auth.routes.ts` | **PASS** | Seamless single sign-on linking Google identity to existing tenant user or self-service onboarding. |
-| **JWT Implementation** | `apps/api/src/utils/token.util.ts` | **PASS** | Cryptographically signed using HMAC-SHA256 with distinct secrets (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). |
-| **Roles ($\ge 2$ required, 4 implemented)** | `SUPER_ADMIN`, `TENANT_ADMIN`, `ASSET_MANAGER`, `MEMBER` | **PASS** | 4 distinct roles configured with hierarchical permission matrix (`apps/api/src/config/permissions.ts`). |
-| **Role-Based Menu & UI Scoping** | `apps/web/src/components/Sidebar.tsx` | **PASS** | Navigation menu dynamically renders items strictly matching the user's role permissions (e.g., Settings/Users hidden from Members). |
+| **JWT Implementation** | `backend/src/utils/token.util.ts` | **PASS** | Cryptographically signed using HMAC-SHA256 with distinct secrets (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). |
+| **Roles ($\ge 2$ required, 4 implemented)** | `SUPER_ADMIN`, `TENANT_ADMIN`, `ASSET_MANAGER`, `MEMBER` | **PASS** | 4 distinct roles configured with hierarchical permission matrix (`backend/src/config/permissions.ts`). |
+| **Role-Based Menu & UI Scoping** | `frontend/src/components/Sidebar.tsx` | **PASS** | Navigation menu dynamically renders items strictly matching the user's role permissions (e.g., Settings/Users hidden from Members). |
 | **Role-Based API Scoping** | `authorize(...)` middleware | **PASS** | Every protected API route enforces specific permission claims (e.g. `authorize('licenses:create')`). |
 | **Single Users Table Proof** | Database Catalog: `\d users` | **PASS** | **Verified: Only ONE `users` table exists**, containing `role_id INT REFERENCES roles(id)`. No separate `admin_users`, `faculty_users`, or `employee_users` tables exist. |
-| **BCrypt Password Hashing** | `apps/api/src/utils/hash.util.ts` | **PASS** | BCrypt hashing using adaptive cost factor **12** with unique per-password cryptographic salts. |
+| **BCrypt Password Hashing** | `backend/src/utils/hash.util.ts` | **PASS** | BCrypt hashing using adaptive cost factor **12** with unique per-password cryptographic salts. |
 | **SQL Injection Prevention** | Static Analysis (`scripts/check-sqli.js`) | **PASS** | Zero string concatenation in SQL queries; 100% parameterization via Prisma tagged templates. |
 | **Secret Management** | `scripts/scan-secrets.js`, `.env.example` | **PASS** | Zero secrets in repository; loaded strictly via environment variables; `.gitignore` covers all sensitive extensions. |
 
@@ -110,11 +110,11 @@
 | **SHA-256 Checksum Verification** | `backup.sh`, `restore.sh` | **PASS** | Checksums automatically generated upon backup and verified before any restore operation. |
 | **7-Day Retention Rotation** | `backup.sh` / `backup.ps1` | **PASS** | Automatic pruning keeping strictly the latest 7 daily backups. |
 | **Disaster Recovery Drill Evidence** | [`docs/backup-recovery.md`](./backup-recovery.md) | **PASS** | Fully documented recovery drill: backup taken, rows deleted, restored into scratch DB, row counts verified 100% match. |
-| **Docker Multi-Stage Containers** | `apps/api/Dockerfile`, `apps/web/Dockerfile` | **PASS** | Non-root Alpine builds with production-only dependencies and native healthchecks. |
+| **Docker Multi-Stage Containers** | `backend/Dockerfile`, `frontend/Dockerfile` | **PASS** | Non-root Alpine builds with production-only dependencies and native healthchecks. |
 | **Docker Compose Orchestration** | `docker-compose.yml` | **PASS** | Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies. |
 | **Git Hygiene & Commit History** | `git log --oneline` | **PASS** | Clean history with Conventional Commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `ci:`); dual-branch model (`main`, `dev`). |
 | **CI/CD Automation (5 Workflows)** | `.github/workflows/` | **PASS** | `ci.yml` (lint, test, build), `docker.yml` (container build), `deploy.yml` (cloud deploy), `keepalive.yml` (free-tier pings), `nightly-backup.yml` (automated backup artifacts). |
-| **Automated Test Coverage** | `apps/api/src/__tests__/` | **PASS** | **103 tests passing across 5 suites** (100% pass rate: `break-it-security`, `rest-api`, `services-coverage`, `auth-rbac-isolation`, `advanced-features`). |
+| **Automated Test Coverage** | `backend/src/__tests__/` | **PASS** | **103 tests passing across 5 suites** (100% pass rate: `break-it-security`, `rest-api`, `services-coverage`, `auth-rbac-isolation`, `advanced-features`). |
 
 ---
 
@@ -122,12 +122,12 @@
 | Feature | Evidence (File Path / Output) | Status | Details |
 | :--- | :--- | :---: | :--- |
 | **Prometheus & Grafana Monitoring** | `monitoring/` | **PASS** | Live metrics scraping (`/metrics`) and Grafana dashboard (`assetvault-overview.json`) tracking HTTP throughput, p95 latency, and database connection pool. |
-| **Real-Time Notifications (SSE)** | `apps/api/src/controllers/notification.controller.ts` | **PASS** | `GET /api/notifications/stream` Server-Sent Events endpoint pushing real-time alerts to the frontend notification bell without polling. |
-| **Background Scheduler & Advisory Locking** | `apps/api/src/worker.ts` | **PASS** | Node-cron worker using `pg_try_advisory_lock` to ensure idempotent execution of expiry notifications, view refreshes, and auto-renewals across multi-instance clusters. |
-| **Tenant Compliance Scoring Engine** | `apps/api/src/services/compliance.service.ts` | **PASS** | `GET /api/reports/compliance` computes tenant score (0-100) based on valid license coverage, over-allocation risk, expired license usage, and 30-day expiries. |
-| **Unused Seats Cost Optimization** | `apps/api/src/services/costOptimization.service.ts` | **PASS** | `GET /api/reports/unused-seats` detects allocations inactive for 30+ days, calculates monthly dollar savings, and offers a 1-click release action. |
+| **Real-Time Notifications (SSE)** | `backend/src/controllers/notification.controller.ts` | **PASS** | `GET /api/notifications/stream` Server-Sent Events endpoint pushing real-time alerts to the frontend notification bell without polling. |
+| **Background Scheduler & Advisory Locking** | `backend/src/worker.ts` | **PASS** | Node-cron worker using `pg_try_advisory_lock` to ensure idempotent execution of expiry notifications, view refreshes, and auto-renewals across multi-instance clusters. |
+| **Tenant Compliance Scoring Engine** | `backend/src/services/compliance.service.ts` | **PASS** | `GET /api/reports/compliance` computes tenant score (0-100) based on valid license coverage, over-allocation risk, expired license usage, and 30-day expiries. |
+| **Unused Seats Cost Optimization** | `backend/src/services/costOptimization.service.ts` | **PASS** | `GET /api/reports/unused-seats` detects allocations inactive for 30+ days, calculates monthly dollar savings, and offers a 1-click release action. |
 | **CSV & PDF Reporting** | `export.service.ts`, `license.controller.ts` | **PASS** | Streaming CSV exports for Assets and Licenses; PDF report generation for license certificates. |
-| **E2E Playwright Tests** | `apps/web/e2e/` | **PASS** | Browser-level end-to-end integration tests verifying login, navigation, and CRUD workflows. |
+| **E2E Playwright Tests** | `frontend/e2e/` | **PASS** | Browser-level end-to-end integration tests verifying login, navigation, and CRUD workflows. |
 
 ---
 
@@ -164,7 +164,7 @@ For a developer or examiner deploying the system to live free-tier cloud environ
    - Connect repository to [render.com](https://render.com) using Blueprint `render.yaml`.
    - Set secret environment variables marked `sync: false` (`DATABASE_URL`, `DIRECT_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `SESSION_SECRET`).
 4. **Vercel Frontend Deployment:**
-   - Import `apps/web` project to [vercel.com](https://vercel.com).
+   - Import `frontend` project to [vercel.com](https://vercel.com).
    - Set `VITE_API_URL` to your live Render backend URL (`https://assetvault-api.onrender.com`).
    - Deploy.
 

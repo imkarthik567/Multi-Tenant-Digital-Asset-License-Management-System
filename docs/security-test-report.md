@@ -2,7 +2,7 @@
 **Course:** BCSE307L Database Systems (Fall 2026-27)  
 **Examiner Evaluation Target:** Security Defenses, Isolation, Concurrency Integrity, & Attack Resilience  
 **Date of Execution:** October 14, 2026  
-**Test Suite:** `apps/api/src/__tests__/break-it-security.test.ts` (100% Pass: 22/22 Tests Passing)  
+**Test Suite:** `backend/src/__tests__/break-it-security.test.ts` (100% Pass: 22/22 Tests Passing)  
 
 ---
 
@@ -10,7 +10,7 @@
 
 AssetVault is architected under an adversarial threat model assuming hostile multi-tenant actors, malicious internal actors (privilege escalation attempts), network eavesdroppers, and high-frequency race condition exploits. 
 
-The security test suite (`apps/api/src/__tests__/break-it-security.test.ts`) subjects the application and database to direct penetration attempts without mocking, running against a live PostgreSQL 16 instance.
+The security test suite (`backend/src/__tests__/break-it-security.test.ts`) subjects the application and database to direct penetration attempts without mocking, running against a live PostgreSQL 16 instance.
 
 | Test Category | Invariant Tested | Attack Vector Simulated | Result | Verification Metric |
 | :--- | :--- | :--- | :---: | :--- |
@@ -170,11 +170,11 @@ $$;
 ```
 
 ### Empirical Test Output
-In `apps/api/src/__tests__/break-it-security.test.ts`:
+In `backend/src/__tests__/break-it-security.test.ts`:
 - A clean 3-seat license (`totalSeats: 3`, `usedSeats: 0`) was targeted.
 - 20 concurrent allocation requests were dispatched simultaneously via `Promise.all`:
 ```
-stdout | apps/api/src/__tests__/break-it-security.test.ts > AssetVault Examiner Break-It Security Suite > 4. Over-Allocation Race Condition Defense > fires 20 concurrent allocation requests at a 3-seat license: exactly 3 succeed, 17 blocked
+stdout | backend/src/__tests__/break-it-security.test.ts > AssetVault Examiner Break-It Security Suite > 4. Over-Allocation Race Condition Defense > fires 20 concurrent allocation requests at a 3-seat license: exactly 3 succeed, 17 blocked
 Raw query failed. Code: 23514. Message: ERROR: License seats exhausted
 Raw query failed. Code: 23514. Message: ERROR: License seats exhausted
 ... (17 identical database-level rejections) ...

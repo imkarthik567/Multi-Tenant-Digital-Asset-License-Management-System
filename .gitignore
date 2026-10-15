@@ -19,8 +19,6 @@ out/
 !.env.example
 !backend/.env.example
 !frontend/.env.example
-!apps/api/.env.example
-!apps/web/.env.example
 
 # Cryptographic Keys and Certificates
 *.pem
@@ -66,7 +64,7 @@ pgdata/
 
 # Local uploaded files
 uploads/
-/apps/api/uploads/
+/backend/uploads/
 
 # E2E Test Reports & Artifacts
 test-results/

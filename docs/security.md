@@ -302,7 +302,7 @@ cors({
 
 ## 6. Automated Security Test Suite Verification
 
-The security architecture is verified by automated integration tests using Vitest and Supertest in `apps/api/src/__tests__/auth-rbac-isolation.test.ts`.
+The security architecture is verified by automated integration tests using Vitest and Supertest in `backend/src/__tests__/auth-rbac-isolation.test.ts`.
 
 | Test ID | Test Scenario | Verification Mechanism | Status |
 |:---:|---|---|:---:|

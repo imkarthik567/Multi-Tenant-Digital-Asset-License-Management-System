@@ -80,7 +80,7 @@ From your local terminal or CI/CD runner:
 
 ```bash
 # 1. Apply Prisma migrations to the cloud database
-DIRECT_URL="<YOUR_SUPABASE_DIRECT_URL>" npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
+DIRECT_URL="<YOUR_SUPABASE_DIRECT_URL>" npx prisma migrate deploy --schema backend/prisma/schema.prisma
 
 # 2. Seed system roles, subscription plans, license types and initial Super Admin
 DIRECT_URL="<YOUR_SUPABASE_DIRECT_URL>" \
@@ -106,7 +106,7 @@ npm run db:seed
 1. In Render, select **New** -> **Web Service**.
 2. Connect your Git repository.
 3. Choose **Docker** environment.
-4. Set **Dockerfile Path**: `apps/api/Dockerfile`.
+4. Set **Dockerfile Path**: `backend/Dockerfile`.
 5. Set **Docker Context**: `.` (root directory).
 6. Set **Health Check Path**: `/api/health`.
 7. Select the **Free** instance type.
@@ -120,7 +120,7 @@ npm run db:seed
 2. Import your GitHub repository.
 3. Configure the project settings:
    - **Framework Preset**: `Vite`
-   - **Root Directory**: `apps/web`
+   - **Root Directory**: `frontend`
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
 4. Set Environment Variables:
