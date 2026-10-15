@@ -100,6 +100,12 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       border: 'border-slate-300 dark:border-slate-700',
       dot: 'bg-slate-400',
     },
+    REVOKED: {
+      bg: 'bg-rose-50 dark:bg-rose-950/40',
+      text: 'text-rose-700 dark:text-rose-300',
+      border: 'border-rose-200 dark:border-rose-800/60',
+      dot: 'bg-rose-500',
+    },
   };
 
   const currentTheme = colorMap[normalized] || {

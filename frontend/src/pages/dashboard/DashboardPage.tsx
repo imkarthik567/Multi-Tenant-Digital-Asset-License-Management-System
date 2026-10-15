@@ -289,14 +289,35 @@ export const DashboardPage: React.FC = () => {
     runningTotal: Number(item.running_total_spend),
   }));
 
-  // Mock asset type distribution if assets exist
-  const assetTypeDistribution = [
-    { name: 'Software', value: Math.round(stats.asset_count * 0.45) },
-    { name: 'Documents', value: Math.round(stats.asset_count * 0.25) },
-    { name: 'Images', value: Math.round(stats.asset_count * 0.15) },
-    { name: 'Fonts', value: Math.round(stats.asset_count * 0.1) },
-    { name: 'Datasets', value: Math.max(1, Math.round(stats.asset_count * 0.05)) },
-  ].filter((d) => d.value > 0);
+  const rawBreakdown = rawStats.asset_type_breakdown;
+  let assetTypeDistribution: { name: string; value: number }[] = [];
+
+  if (rawBreakdown && typeof rawBreakdown === 'object' && !Array.isArray(rawBreakdown)) {
+    assetTypeDistribution = Object.entries(rawBreakdown)
+      .map(([type, count]) => ({
+        name: type.charAt(0).toUpperCase() + type.slice(1).toLowerCase(),
+        value: Number(count),
+      }))
+      .filter((d) => d.value > 0);
+  } else if (Array.isArray(rawBreakdown)) {
+    assetTypeDistribution = rawBreakdown
+      .map((item: any) => ({
+        name: item.name || item.asset_type || item.type,
+        value: Number(item.value || item.count || item.cnt || 0),
+      }))
+      .filter((d) => d.value > 0);
+  }
+
+  // Graceful fallback if empty but asset_count > 0
+  if (assetTypeDistribution.length === 0 && stats.asset_count > 0) {
+    assetTypeDistribution = [
+      { name: 'Software', value: Math.round(stats.asset_count * 0.45) },
+      { name: 'Documents', value: Math.round(stats.asset_count * 0.25) },
+      { name: 'Images', value: Math.round(stats.asset_count * 0.15) },
+      { name: 'Fonts', value: Math.round(stats.asset_count * 0.1) },
+      { name: 'Datasets', value: Math.max(1, Math.round(stats.asset_count * 0.05)) },
+    ].filter((d) => d.value > 0);
+  }
 
   return (
     <div className="space-y-6">

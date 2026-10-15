@@ -166,8 +166,10 @@ export const ReportsPage: React.FC = () => {
       const list = Array.isArray(res) ? res : (res as any).data || [];
       return list.map((r: any) => ({
         ...r,
-        downloads: toNum(r.downloads),
-        checkouts: toNum(r.checkouts),
+        month: r.month_year || r.month,
+        downloads: toNum(r.download_count ?? r.downloads),
+        checkouts: toNum(r.checkout_count ?? r.checkouts),
+        views: toNum(r.view_count ?? r.views),
       }));
     },
     enabled: activeTab === 'trends',
