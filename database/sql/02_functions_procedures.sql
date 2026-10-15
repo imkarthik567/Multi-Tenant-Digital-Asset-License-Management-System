@@ -435,7 +435,26 @@ BEGIN
             FROM asset_versions av
             JOIN assets a ON a.id = av.asset_id
             WHERE a.tenant_id = p_tenant_id AND a.deleted_at IS NULL
-        ), 0)
+        ), 0),
+        'user_count', COALESCE((
+            SELECT COUNT(*)
+            FROM users
+            WHERE tenant_id = p_tenant_id AND is_active = TRUE
+        ), 0),
+        'unlicensed_assets_count', COALESCE((
+            SELECT COUNT(*)
+            FROM v_asset_catalog
+            WHERE tenant_id = p_tenant_id AND compliance_status = 'UNLICENSED'
+        ), 0),
+        'asset_type_breakdown', COALESCE((
+            SELECT jsonb_object_agg(asset_type, cnt)
+            FROM (
+                SELECT asset_type::TEXT, COUNT(*)::INT AS cnt
+                FROM assets
+                WHERE tenant_id = p_tenant_id AND deleted_at IS NULL
+                GROUP BY asset_type
+            ) sub
+        ), '{}'::jsonb)
     ) INTO v_stats;
 
     RETURN v_stats;

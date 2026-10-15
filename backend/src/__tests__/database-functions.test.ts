@@ -407,7 +407,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
   // 4. PostgreSQL Views & Materialized Views
   // ----------------------------------------------------------------------------
   describe('4. Real-time Analytical & Materialized Views', () => {
-    it('queries v_license_utilization successfully with calculated columns', async () => {
+    it('queries v_license_utilization successfully with calculated columns and filter columns', async () => {
       const views: any = await prisma.$queryRaw`
         SELECT * FROM v_license_utilization WHERE tenant_id = ${tenantAId}::UUID LIMIT 5;
       `;
@@ -417,10 +417,13 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
         expect(views[0]).toHaveProperty('used_seats');
         expect(views[0]).toHaveProperty('available_seats');
         expect(views[0]).toHaveProperty('utilization_pct');
+        // Filter columns exposed for backend queries
+        expect(views[0]).toHaveProperty('vendor_id');
+        expect(views[0]).toHaveProperty('license_type_id');
       }
     });
 
-    it('queries v_asset_catalog with taxonomic category and tags array', async () => {
+    it('queries v_asset_catalog with taxonomic category, tags array, and filter columns', async () => {
       const catalog: any = await prisma.$queryRaw`
         SELECT * FROM v_asset_catalog WHERE tenant_id = ${tenantAId}::UUID LIMIT 5;
       `;
@@ -429,7 +432,37 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
         expect(catalog[0]).toHaveProperty('asset_id');
         expect(catalog[0]).toHaveProperty('asset_code');
         expect(catalog[0]).toHaveProperty('tags');
+        // Filter columns exposed for backend queries
+        expect(catalog[0]).toHaveProperty('category_id');
+        expect(catalog[0]).toHaveProperty('owner_id');
+        // Compliance status derived correctly
+        expect(['COMPLIANT', 'UNLICENSED', 'EXPIRED_LICENSE']).toContain(catalog[0].compliance_status);
       }
+    });
+
+    it('fn_tenant_dashboard_stats returns all KPIs including new user_count, unlicensed_assets_count, and asset_type_breakdown', async () => {
+      const result: any = await prisma.$queryRaw`
+        SELECT fn_tenant_dashboard_stats(${tenantAId}::UUID) AS stats;
+      `;
+      const stats = result[0]?.stats;
+      expect(stats).toBeDefined();
+      // Existing KPIs
+      expect(stats).toHaveProperty('total_assets');
+      expect(stats).toHaveProperty('total_licenses');
+      expect(stats).toHaveProperty('total_seats');
+      expect(stats).toHaveProperty('allocated_seats');
+      expect(stats).toHaveProperty('expiring_in_30_days');
+      expect(stats).toHaveProperty('monthly_plan_price');
+      expect(stats).toHaveProperty('total_license_cost');
+      expect(stats).toHaveProperty('storage_used_bytes');
+      // New KPIs
+      expect(stats).toHaveProperty('user_count');
+      expect(typeof stats.user_count).toBe('number');
+      expect(stats.user_count).toBeGreaterThan(0);
+      expect(stats).toHaveProperty('unlicensed_assets_count');
+      expect(typeof stats.unlicensed_assets_count).toBe('number');
+      expect(stats).toHaveProperty('asset_type_breakdown');
+      expect(typeof stats.asset_type_breakdown).toBe('object');
     });
 
     it('refreshes materialized view mv_monthly_access_stats concurrently', async () => {
