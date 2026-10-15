@@ -26,7 +26,7 @@
 ### Section 2: Database Design & Normalization
 | Requirement | Evidence (File Path / Output) | Status | Fix Applied / Details |
 | :--- | :--- | :---: | :--- |
-| **ER Diagram Exists & Matches Tables** | [`docs/ER_DIAGRAM.md`](./ER_DIAGRAM.md), [`schema.prisma`](../backend/prisma/schema.prisma) | **PASS** | Mermaid ER diagram exactly matches all 19 domain tables in PostgreSQL catalog. |
+| **ER Diagram Exists & Matches Tables** | [`database/er-diagram.md`](../database/er-diagram.md), [`schema.prisma`](../backend/prisma/schema.prisma) | **PASS** | Mermaid ER diagram exactly matches all 19 domain tables in PostgreSQL catalog. |
 | **Primary Entities ($\ge 4$)** | Catalog query: `tenants`, `users`, `assets`, `licenses` | **PASS** | 4 core entities + 15 supporting domain entities (Vendors, Categories, Tags, Versions, Allocations, Renewals, etc.). |
 | **Relationships ($\ge 3$)** | Catalog query: 34 Foreign Keys | **PASS** | 34 defined relational links across 1:N and M:N relationships. |
 | **Table Count ($\ge 8$ required)** | PostgreSQL Catalog: 19 domain tables | **PASS** | 19 domain tables: `plans`, `tenants`, `roles`, `users`, `refresh_tokens`, `vendors`, `categories`, `assets`, `asset_versions`, `tags`, `asset_tags`, `license_types`, `licenses`, `asset_licenses`, `license_allocations`, `license_renewals`, `asset_access_logs`, `notifications`, `audit_logs`. |
@@ -38,7 +38,7 @@
 | **UNIQUE Constraints** | PostgreSQL Catalog | **PASS** | **14 explicit domain UNIQUE constraints/indexes** (e.g. `users_email_key`, `tenants_slug_key`, `asset_tags_pkey`). |
 | **Indexes Created** | PostgreSQL Catalog: `pg_indexes` | **PASS** | **56 active indexes** across foreign keys, tenant scopes, text search, and date filters. |
 | **Normalization to 3NF / BCNF** | Section 3 of [`docs/FINAL_REPORT.md`](./FINAL_REPORT.md) | **PASS** | 1NF: Atomic attributes; 2NF: No partial key dependencies; 3NF: No transitive dependencies (e.g., plans factored out of tenants, license types factored out of licenses); BCNF: All determinants are candidate keys. |
-| **Relational Schema & Data Dictionary** | [`docs/data-dictionary.md`](./data-dictionary.md) | **PASS** | Full relational schema and column-by-column data dictionary detailing types, nullability, defaults, and business meaning. |
+| **Relational Schema & Data Dictionary** | [`database/data-dictionary.md`](../database/data-dictionary.md) | **PASS** | Full relational schema and column-by-column data dictionary detailing types, nullability, defaults, and business meaning. |
 
 ---
 

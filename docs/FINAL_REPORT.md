@@ -68,7 +68,7 @@ erDiagram
     TENANTS ||--o{ VENDORS : "manages"
     TENANTS ||--o{ CATEGORIES : "defines"
     
-    SUBSCRIPTION_PLANS ||--o{ TENANTS : "subscribes"
+    PLANS ||--o{ TENANTS : "subscribes"
     ROLES ||--o{ USERS : "assigned_to"
     USERS ||--o{ REFRESH_TOKENS : "holds"
     
