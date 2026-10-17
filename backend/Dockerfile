@@ -6,7 +6,7 @@
 # Stage 1: Dependencies Resolution
 FROM node:22-alpine AS deps
 WORKDIR /app
-RUN apk upgrade --no-cache && apk add --no-cache libc6-compat
+RUN apk upgrade --no-cache && apk add --no-cache openssl libc6-compat
 
 COPY package*.json ./
 COPY backend/package*.json ./backend/
@@ -18,6 +18,7 @@ RUN npm ci --workspace=@assetvault/api
 # Stage 2: Compilation & Prisma Generation
 FROM node:22-alpine AS builder
 WORKDIR /app
+RUN apk upgrade --no-cache && apk add --no-cache openssl libc6-compat
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY backend ./backend
@@ -35,7 +36,7 @@ ENV NODE_ENV=production
 ENV PORT=5000
 
 # Install runtime utilities (curl/wget for healthcheck) and refresh npm's bundled dependency tree.
-RUN apk upgrade --no-cache && apk add --no-cache curl wget libc6-compat && npm install --global npm@11 && npm cache clean --force
+RUN apk upgrade --no-cache && apk add --no-cache openssl curl wget libc6-compat && npm install --global npm@11 && npm cache clean --force
 
 # Create node workspace layout
 COPY package*.json /app/
