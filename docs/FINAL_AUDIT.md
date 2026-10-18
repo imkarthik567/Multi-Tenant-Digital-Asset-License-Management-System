@@ -52,7 +52,7 @@
 | **CRUD Operations** | `backend/src/repositories/` | **PASS** | Full Create, Read, Update, and Delete across Assets, Licenses, Allocations, Users, Vendors, and Categories. |
 | **SQL Joins** | `backend/src/repositories/asset.repository.ts` | **PASS** | Multi-table INNER and LEFT JOINs across `assets`, `categories`, `users`, `asset_versions`, `asset_licenses`, `licenses`, `vendors`. |
 | **Aggregate Queries** | `compliance.service.ts`, `costOptimization.service.ts` | **PASS** | `COUNT(*)`, `SUM(l.cost)`, `AVG(monthly_cost)`, `GROUP BY v.id` in compliance scoring and cost optimization queries. |
-| **Database Views & Materialized Views** | `database/sql/01_views.sql`, `20261018140000_secure_reporting_views/migration.sql` | **SOURCE UPDATED; CI RECHECK PENDING** | Seven ordinary views are present, including tenant-scoped `v_monthly_spend` and `v_top_downloaded_assets`; the all-tenant monthly statistics materialized view is exposed through `v_monthly_access_stats_tenant` and is intended to be inaccessible directly to the runtime role. Tests now check security-invoker flags and effective SELECT privileges; confirm latest CI is green before marking verified. |
+| **Database Views & Materialized Views** | `database/sql/01_views.sql`, `20261018140000_secure_reporting_views/migration.sql`, [green CI](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189166) | **PASS IN CI** | Seven ordinary views are present, including tenant-scoped `v_monthly_spend` and `v_top_downloaded_assets`; the all-tenant monthly statistics materialized view is exposed through `v_monthly_access_stats_tenant`. Regression tests pass for security-invoker flags, filtered access and runtime SELECT privileges. Live deployment still requires verification. |
 | **Database Transactions** | `sp_renew_license`, `user.service.ts` | **PASS** | Atomic multi-step operations wrapped in Prisma `$transaction` and PostgreSQL transaction blocks. |
 | **Stored Procedures** | `sp_allocate_license_seat`, `sp_release_license_seat`, `sp_renew_license` | **PASS** | 3 enterprise stored procedures in PL/pgSQL handling row locking (`FOR UPDATE`), seat validation, and renewal histories. |
 | **Triggers** | `trg_audit_log_immutable`, `trg_set_timestamp`, `trg_check_seat_limits` | **PASS** | Append-only immutability trigger on `audit_logs` (rejects updates/deletes with error `28000`); Automatic `updated_at` triggers; Allocation boundary triggers. |
@@ -77,7 +77,7 @@
 | :--- | :--- | :---: | :--- |
 | **Modern Framework** | React 18, Vite, Express TypeScript | **PASS** | Modular, type-safe full-stack monorepo with high-performance bundling and sub-second HMR. |
 | **Responsive UI** | Tailwind CSS + Lucide Icons | **PASS** | Fully responsive layout spanning mobile viewports ($<640\text{px}$), tablets, and widescreen desktop displays ($>1280\text{px}$). |
-| **Login Page** | `frontend/src/pages/LoginPage.tsx` | **PASS** | Branded enterprise authentication portal with Email/Password, quick demo credentials buttons, and Google OAuth 2.0 CTA. |
+| **Login Page** | `frontend/src/pages/auth/LoginPage.tsx` | **PASS IN CI** | Email/password validation and optional Google OAuth; no prefilled demo credentials or one-click persona/password shortcuts. |
 | **Dashboard** | `frontend/src/pages/DashboardPage.tsx` | **PASS** | Real-time KPI summary cards, interactive Compliance Gauge (0-100), Unused Seats cost alerts, recent activity feed, and quick-action modals. |
 | **Full CRUD UI** | `AssetsPage.tsx`, `LicensesPage.tsx`, `UsersPage.tsx` | **PASS** | Complete creation, detail modal, editing, soft-deletion, and restoration workflows. |
 | **Search Functionality** | `frontend/src/components/GlobalSearchModal.tsx` | **PASS** | Real-time global search querying Assets, Licenses, and Users simultaneously (`GET /api/search?q=`). |
@@ -91,7 +91,7 @@
 ### Section 5: Authentication & Role-Based Access Control (RBAC)
 | Requirement | Evidence (File Path / Output) | Status | Fix Applied / Details |
 | :--- | :--- | :---: | :--- |
-| **Secure Token Handling** | `auth.service.ts`, `auth.middleware.ts` | **PASS** | Short-lived Access Tokens (15m) in memory/Bearer header; Long-lived Refresh Tokens (7d) in `HttpOnly`, `SameSite=Strict` cookies. |
+| **Secure Token Handling** | `auth.service.ts`, `auth.middleware.ts`, `token.util.ts`, `render.yaml` | **SOURCE + CI PASS; DEPLOYMENT CHECK PENDING** | Short-lived access tokens (15m) in memory/Bearer header; refresh tokens in `HttpOnly`, secure production cookies. `COOKIE_SAMESITE=none` is required for the configured cross-site Vercel/Render topology; verify the live cookie attributes. |
 | **Authenticated User Retrieval** | `GET /api/auth/me` | **PASS** | Returns current user profile, organization details, role, and granular permission array. |
 | **Google OAuth 2.0 Integration** | `passport.config.ts`, `auth.routes.ts` | **PASS** | Seamless single sign-on linking Google identity to existing tenant user or self-service onboarding. |
 | **JWT Implementation** | `backend/src/utils/token.util.ts` | **PASS** | Cryptographically signed using HMAC-SHA256 with distinct secrets (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). |
@@ -116,7 +116,7 @@
 | **Docker Compose Orchestration** | `docker-compose.yml` | **PASS** | Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies. |
 | **Git Hygiene & Commit History** | `git log --oneline` | **PASS** | Clean history with Conventional Commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `ci:`); dual-branch model (`main`, `dev`). |
 | **CI/CD Automation (5 Workflows)** | `.github/workflows/` | **PASS** | `ci.yml`, `docker-publish.yml`, `deploy.yml`, `keepalive.yml`, and `db-backup.yml`. |
-| **Automated Tests** | `backend/src/__tests__/`, [CI run](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39135857240) | **PASS IN CI** | Latest run: 8 test files, 139 tests passed, 0 failed; secret scan, SQLi scan, shell syntax, lint/type-check, database migrations/seeding, seed compilation and production build passed. Coverage was 69.60% statements / 71.68% lines; statement coverage is below a 70% target. Live deployment and restore are not verified by this run. |
+| **Automated Tests** | `backend/src/__tests__/`, [CI run](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189166) | **PASS IN CI** | Latest run on the draft branch: 8 test files, 139 tests passed, 0 failed; secret scan, SQLi scan, shell syntax, lint/type-check, migrations/seeding, seed compilation and production build passed. Coverage was 69.60% statements / 50.25% branches / 80.26% functions / 71.68% lines. The faculty brief specifies no numeric coverage threshold; live deployment and restore are not verified by CI. |
 
 ---
 
