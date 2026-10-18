@@ -183,7 +183,7 @@ if [[ "${DOCKER_MODE}" == "true" ]]; then
   if [[ "${DUMP_FILE}" =~ \.sql$ ]]; then
     docker compose exec -T db psql -U "${DB_USER}" -d "${DB_NAME}" < "${DUMP_FILE}"
   else
-    docker compose exec -T db pg_restore -U "${DB_USER}" -d "${DB_NAME}" --clean --if-exists --no-owner < "${DUMP_FILE}" || true
+    docker compose exec -T db pg_restore -U "${DB_USER}" -d "${DB_NAME}" --clean --if-exists --no-owner < "${DUMP_FILE}"
   fi
 else
   PG_RESTORE_CMD="pg_restore"
@@ -199,7 +199,7 @@ else
   if [[ "${DUMP_FILE}" =~ \.sql$ ]]; then
     psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f "${DUMP_FILE}"
   else
-    "${PG_RESTORE_CMD}" -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" --clean --if-exists --no-owner "${DUMP_FILE}" || true
+    "${PG_RESTORE_CMD}" -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" --clean --if-exists --no-owner "${DUMP_FILE}"
   fi
 fi
 
