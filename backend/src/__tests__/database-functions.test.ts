@@ -440,6 +440,35 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       }
     });
 
+    it('queries monthly spend and top-download analytics views', async () => {
+      const spendRows: any[] = await prisma.$queryRaw`
+        SELECT tenant_id, month_year, monthly_spend, running_total_spend
+        FROM v_monthly_spend
+        WHERE tenant_id = ${tenantAId}::UUID
+        ORDER BY month_year
+        LIMIT 5;
+      `;
+      expect(Array.isArray(spendRows)).toBe(true);
+      if (spendRows.length > 0) {
+        expect(spendRows[0]).toHaveProperty('monthly_spend');
+        expect(spendRows[0]).toHaveProperty('running_total_spend');
+      }
+
+      const topRows: any[] = await prisma.$queryRaw`
+        SELECT tenant_id, asset_id, asset_name, download_count, rank
+        FROM v_top_downloaded_assets
+        WHERE tenant_id = ${tenantAId}::UUID
+        ORDER BY rank, asset_name
+        LIMIT 10;
+      `;
+      expect(Array.isArray(topRows)).toBe(true);
+      expect(topRows.length).toBeLessThanOrEqual(10);
+      if (topRows.length > 0) {
+        expect(topRows[0]).toHaveProperty('download_count');
+        expect(topRows[0]).toHaveProperty('rank');
+      }
+    });
+
     it('fn_tenant_dashboard_stats returns all KPIs including new user_count, unlicensed_assets_count, and asset_type_breakdown', async () => {
       const result: any = await prisma.$queryRaw`
         SELECT fn_tenant_dashboard_stats(${tenantAId}::UUID) AS stats;
@@ -475,11 +504,13 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
             'v_expiring_licenses',
             'v_asset_catalog',
             'v_vendor_spend',
-            'v_tenant_summary'
+            'v_tenant_summary',
+            'v_monthly_spend',
+            'v_top_downloaded_assets'
           );
       `;
 
-      expect(viewOptions).toHaveLength(5);
+      expect(viewOptions).toHaveLength(7);
       for (const view of viewOptions) {
         expect(view.reloptions || []).toContain('security_invoker=true');
       }
