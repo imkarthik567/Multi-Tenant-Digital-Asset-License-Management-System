@@ -284,7 +284,7 @@ Five automated workflows ensure continuous integration and deployment:
 
 ## 10. Test Verification Results
 
-> **Verification note (October 18, 2026):** The results below are a historical snapshot, not a claim that the current review branch passes. A recent CI run completed type-check/lint, secret scanning, SQL injection scanning, migrations and seeding successfully, then reported **132 tests passed and 1 failed**. The remaining failure is a tenant-registration test that must preserve the endpoint's password-complexity requirement. Check the linked Actions run and rerun CI after the latest test fix before submission.
+> **Verification note (October 18, 2026):** The results below are a historical snapshot, not a claim that the current review branch passes. The last fully completed CI run on the preceding revision completed type-check/lint, secret scanning, SQL injection scanning, migrations and seeding successfully, then reported **132 tests passed and 1 failed**. The failure was a tenant-registration fixture that used a random password without the required complexity. The fixture was corrected in the current branch; the replacement CI run is the source of truth for current results.
 
 The automated test suite (`npm test`) executes across six distinct suites:
 
