@@ -53,7 +53,76 @@ if (-not $Docker -and -not (Get-Command "psql" -ErrorAction SilentlyContinue)) {
 }
 
 function Invoke-VerificationSql([string]$Database, [string]$Sql) {
-    if ($Database -notmatch '^[A-Za-z_][A-Za-z0-9_]{0,62}$') {
+    if ($Database -notmatch '^[A-Za-z_][A-Za-z0-9_]{0,62}
+try {
+    Write-Host "================================================================================" -ForegroundColor Cyan
+    Write-Host " AssetVault: Database Restore Verification Drill" -ForegroundColor Cyan
+    Write-Host " Source Database : $($ConnectionDetails.database)" -ForegroundColor Gray
+    Write-Host " Scratch Database: $ScratchDb" -ForegroundColor Gray
+    Write-Host "================================================================================" -ForegroundColor Cyan
+
+    $restoreArgs = @("-Scratch", "-TargetDb", $ScratchDb, "-Yes")
+    if ($DumpFile) { $restoreArgs += @("-DumpFile", $DumpFile) }
+    if ($Docker) { $restoreArgs += "-Docker" }
+
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $RestoreScript @restoreArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Restoration into scratch database failed with code $LASTEXITCODE."
+    }
+    $restoreSucceeded = $true
+
+    $tableQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT LIKE '_prisma%' ORDER BY table_name;"
+    $tableList = Invoke-VerificationSql $ConnectionDetails.database $tableQuery
+    $tables = @($tableList -split "`r?`n" | Where-Object { $_ })
+    if ($tables.Count -eq 0) {
+        throw "No base tables found in source database '$($ConnectionDetails.database)'."
+    }
+
+    $allPassed = $true
+    $results = foreach ($table in $tables) {
+        # Catalog names are quoted as identifiers; table names cannot inject SQL here.
+        $escapedTable = $table.Replace('"', '""')
+        $countSql = "SELECT COUNT(*) FROM `"$escapedTable`";"
+        $sourceCount = Invoke-VerificationSql $ConnectionDetails.database $countSql
+        $scratchCount = Invoke-VerificationSql $ScratchDb $countSql
+        $status = if ($sourceCount -eq $scratchCount) { "PASS" } else { "FAIL" }
+        if ($status -eq "FAIL") { $allPassed = $false }
+        [PSCustomObject]@{ Table = $table; SourceRows = $sourceCount; ScratchRows = $scratchCount; Status = $status }
+    }
+
+    Write-Host ("`n{0,-32} {1,14} {2,14} {3,10}" -f "Table Name", "Source Rows", "Scratch Rows", "Status") -ForegroundColor Cyan
+    Write-Host ("-" * 74) -ForegroundColor Gray
+    foreach ($result in $results) {
+        $color = if ($result.Status -eq "PASS") { "Green" } else { "Red" }
+        Write-Host ("{0,-32} {1,14} {2,14} {3,10}" -f $result.Table, $result.SourceRows, $result.ScratchRows, $result.Status) -ForegroundColor $color
+    }
+
+    if (-not $allPassed) {
+        Write-Host "[RESULT] FAIL: Table row counts differ." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "[RESULT] PASS: All $($tables.Count) tables verified with exact row parity." -ForegroundColor Green
+}
+finally {
+    if (-not $KeepScratch) {
+        try {
+            # The database name is generated above and is safe to interpolate as an identifier.
+            if ($Docker) {
+                & docker compose exec -T -e "PGPASSWORD=$($ConnectionDetails.password)" db psql -v ON_ERROR_STOP=1 -U $ConnectionDetails.username -d postgres -c "DROP DATABASE IF EXISTS $ScratchDb;" | Out-Null
+            } else {
+                $adminUrl = Normalize-PgConnectionUrl -Url $ConnectionUrl -Database "postgres"
+                & $PsqlExe $adminUrl -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $ScratchDb;" | Out-Null
+            }
+            if ($LASTEXITCODE -ne 0) { throw "Scratch database cleanup failed with code $LASTEXITCODE." }
+            Write-Host "[INFO] Scratch database cleaned up." -ForegroundColor Gray
+        } catch {
+            Write-Error "Could not clean up scratch database '$ScratchDb': $($_.Exception.Message)"
+        }
+    } elseif ($restoreSucceeded) {
+        Write-Host "[INFO] Scratch database '$ScratchDb' retained for manual inspection." -ForegroundColor Yellow
+    }
+}
+) {
         throw "Invalid database identifier requested for verification."
     }
 
@@ -67,6 +136,13 @@ function Invoke-VerificationSql([string]$Database, [string]$Sql) {
         throw "PostgreSQL verification query failed for database '$Database' (exit code $LASTEXITCODE)."
     }
     return (($output -join "`n").Trim())
+}
+
+# Refuse to overwrite any existing database, including a future accidental
+# collision. The generated GUID name makes concurrent checks vanishingly unlikely.
+$existingScratch = Invoke-VerificationSql "postgres" "SELECT 1 FROM pg_database WHERE datname = '$ScratchDb';"
+if (-not [string]::IsNullOrWhiteSpace($existingScratch)) {
+    throw "Scratch database '$ScratchDb' already exists; refusing to drop or overwrite it."
 }
 
 $restoreSucceeded = $false
