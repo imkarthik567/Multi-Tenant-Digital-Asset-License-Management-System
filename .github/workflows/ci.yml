@@ -57,6 +57,19 @@ jobs:
           bash -n backend/docker-entrypoint.sh
           find database/backup -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
 
+      - name: Validate PowerShell Script Syntax
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path database/backup -Filter '*.ps1' -File | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+            }
+          }
+
       - name: Static Type-Check & Linting
         run: npm run lint
 
