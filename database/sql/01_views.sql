@@ -11,7 +11,7 @@
 -- Includes vendor_id and license_type_id for backend filtering.
 -- ------------------------------------------------------------------------------
 DROP VIEW IF EXISTS v_license_utilization CASCADE;
-CREATE OR REPLACE VIEW v_license_utilization AS
+CREATE OR REPLACE VIEW v_license_utilization WITH (security_invoker = true) AS
 SELECT 
     l.id AS license_id,
     l.tenant_id,
@@ -48,7 +48,7 @@ GROUP BY l.id, l.tenant_id, l.vendor_id, l.license_type_id, l.name, v.name, lt.n
 -- Captures active licenses terminating within the next 30 days,
 -- categorizing urgency into CRITICAL (<=7d), WARNING (<=15d), and NOTICE (<=30d).
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW v_expiring_licenses AS
+CREATE OR REPLACE VIEW v_expiring_licenses WITH (security_invoker = true) AS
 SELECT 
     l.id AS license_id,
     l.tenant_id,
@@ -86,7 +86,7 @@ GROUP BY l.id, l.tenant_id, l.name, v.name, l.license_key, l.total_seats, l.star
 -- Includes category_id and owner_id for backend filtering.
 -- ------------------------------------------------------------------------------
 DROP VIEW IF EXISTS v_asset_catalog CASCADE;
-CREATE OR REPLACE VIEW v_asset_catalog AS
+CREATE OR REPLACE VIEW v_asset_catalog WITH (security_invoker = true) AS
 WITH latest_versions AS (
     SELECT 
         asset_id,
@@ -152,7 +152,7 @@ WHERE a.deleted_at IS NULL;
 -- 4. View: v_vendor_spend
 -- Aggregates procurement and renewal financial spend per vendor and tenant.
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW v_vendor_spend AS
+CREATE OR REPLACE VIEW v_vendor_spend WITH (security_invoker = true) AS
 SELECT 
     v.tenant_id,
     v.id AS vendor_id,
@@ -177,7 +177,7 @@ GROUP BY v.tenant_id, v.id, v.name, v.contact_email;
 -- Platform-wide overview for Super Administrators summarizing tenant scale,
 -- resource quotas, and financial expenditure.
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW v_tenant_summary AS
+CREATE OR REPLACE VIEW v_tenant_summary WITH (security_invoker = true) AS
 SELECT 
     t.id AS tenant_id,
     t.name AS tenant_name,
@@ -248,6 +248,23 @@ JOIN assets a ON a.id = aal.asset_id
 GROUP BY a.tenant_id, TO_CHAR(aal.accessed_at, 'YYYY-MM');
 
 CREATE UNIQUE INDEX idx_mv_monthly_access_unique ON mv_monthly_access_stats (tenant_id, month_year);
+
+-- Do not expose the all-tenant materialized view directly to tenant-scoped users.
+-- The wrapper view is intentionally owner-executed, with a security barrier and
+-- an explicit tenant/admin predicate based on the trusted transaction GUCs.
+CREATE OR REPLACE VIEW v_monthly_access_stats_tenant WITH (security_barrier = true) AS
+SELECT
+  tenant_id,
+  month_year,
+  download_count,
+  checkout_count,
+  view_count,
+  checkin_count,
+  total_access_events,
+  active_accessing_users,
+  distinct_assets_accessed
+FROM mv_monthly_access_stats
+WHERE tenant_id = fn_current_tenant_id() OR fn_is_super_admin();
 
 -- Routine to refresh the materialized view
 CREATE OR REPLACE FUNCTION fn_refresh_monthly_access_stats()
