@@ -382,6 +382,33 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
     expect(Array.isArray(res.body.data)).toBe(true);
   });
 
+  it('11. Tenant self-registration records the initial authenticated login timestamp', async () => {
+    const suffix = `1792312784150-${Math.floor(Math.random() * 10000)}`;
+    const registrationTestSlug = `last-login-qa-${suffix}`;
+    const adminEmail = `last-login-user-${suffix}@example.com`;
+
+    const res = await request(app)
+      .post('/api/auth/register-tenant')
+      .send({
+        tenantName: `Last Login QA ${suffix}`,
+        slug: registrationTestSlug,
+        contactEmail: `last-login-contact-${suffix}@example.com`,
+        adminFullName: 'Last Login QA User',
+        adminEmail,
+        password: 'Strong-QA-Pass123!',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('success');
+    expect(res.body.data.user.email).toBe(adminEmail);
+
+    const createdUser = await systemPrisma.user.findUnique({
+      where: { email: adminEmail },
+      select: { lastLoginAt: true },
+    });
+    expect(createdUser?.lastLoginAt).toBeInstanceOf(Date);
+  });
+
   afterAll(async () => {
     const testAssets = await systemPrisma.asset.findMany({
       where: {
