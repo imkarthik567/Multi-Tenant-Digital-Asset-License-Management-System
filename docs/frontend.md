@@ -169,7 +169,7 @@ frontend/
 │   │       └── ErrorBoundary.tsx # Catch-all error fallback with recovery retry
 │   └── pages/
 │       ├── auth/
-│       │   ├── LoginPage.tsx        # Login form with quick demo persona buttons
+│       │   ├── LoginPage.tsx        # Login form with email/password validation and optional Google OAuth
 │       │   └── RegisterPage.tsx     # Tenant self-registration form
 │       ├── dashboard/
 │       │   └── DashboardPage.tsx    # Role-aware Executive Dashboard & Super Admin Platform View
