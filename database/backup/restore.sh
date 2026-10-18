@@ -148,6 +148,13 @@ if [[ -n "${DATABASE_URL:-}" && -z "${TARGET_DB}" && "${SCRATCH_MODE}" != "true"
   DB_NAME="${RAW_DB%%\?*}"
 fi
 
+# The name is interpolated into DROP/CREATE DATABASE statements below. Accept
+# only unquoted identifier syntax so a typo or crafted value cannot execute SQL.
+if [[ ! "${DB_NAME}" =~ ^[A-Za-z_][A-Za-z0-9_]{0,62}$ ]]; then
+  echo "[ERROR] Invalid target database name '${DB_NAME}'. Use a simple PostgreSQL identifier (letters, digits, underscores; 63 characters max)."
+  exit 2
+fi
+
 export PGPASSWORD="${DB_PASS}"
 
 echo "================================================================================"
