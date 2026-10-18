@@ -19,8 +19,8 @@ export const runExpiryCheckSchema = z.preprocess(
       const rawDays = val.lookaheadDays !== undefined ? val.lookaheadDays : val.daysAhead;
       const lookaheadDays =
         rawDays !== undefined
-          ? typeof rawDays === 'string'
-            ? parseInt(rawDays, 10)
+          ? typeof rawDays === 'string' && /^[1-9]\d*$/.test(rawDays)
+            ? Number(rawDays)
             : rawDays
           : 30;
       return {
