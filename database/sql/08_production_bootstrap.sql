@@ -5,15 +5,16 @@
 --          with least-privilege access (DML only, no DDL/DROP capabilities).
 --
 -- Usage:
---   psql "$DIRECT_URL" -v APP_PASSWORD="'${APP_DB_PASSWORD}'" -f database/sql/08_production_bootstrap.sql
+--   psql "$DIRECT_URL" -v APP_PASSWORD="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
 -- ==============================================================================
 
 \set ON_ERROR_STOP on
 
--- Default fallback password if not supplied via -v APP_PASSWORD
+-- Never fall back to a known/default password.
 \if :{?APP_PASSWORD}
 \else
-  \set APP_PASSWORD '\'ChangeMe_In_Production_Secret!\''
+  \echo 'FATAL: APP_PASSWORD must be supplied explicitly; refusing insecure default credentials.'
+  \quit 3
 \endif
 
 -- 1. Create restricted application runtime role if it doesn't exist
@@ -28,10 +29,10 @@ BEGIN
 END $$;
 
 -- 2. Set password for application runtime role from variable
-ALTER ROLE assetvault_app WITH PASSWORD :APP_PASSWORD;
+ALTER ROLE assetvault_app WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD :'APP_PASSWORD';
 
 -- 3. Grant connection privileges on the current database
-GRANT CONNECT ON DATABASE current_database() TO assetvault_app;
+SELECT format('GRANT CONNECT ON DATABASE %I TO assetvault_app', current_database()) \gexec
 
 -- 4. Grant schema usage (prevents schema tampering)
 GRANT USAGE ON SCHEMA public TO assetvault_app;
@@ -57,7 +58,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON ROUTINES TO assetvaul
 -- 10. Verification query: output granted privileges
 SELECT 
   grantee, 
-  table_schema, 
+  schema_name, 
   privilege_type 
 FROM information_schema.schema_privileges 
 WHERE grantee = 'assetvault_app';
