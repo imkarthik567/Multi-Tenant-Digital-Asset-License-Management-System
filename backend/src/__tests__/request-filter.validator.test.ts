@@ -4,6 +4,7 @@ import { queryAssetSchema } from '../validators/asset.validator';
 import { queryLicenseSchema } from '../validators/license.validator';
 import { queryTenantSchema } from '../validators/tenant.validator';
 import { planIdParamsSchema } from '../validators/plan.validator';
+import { compareVersionsQuerySchema, versionNoParamsSchema } from '../validators/version.validator';
 import {
   exportAuditLogQuerySchema,
   queryAuditLogSchema,
@@ -80,5 +81,22 @@ describe('plan ID route parameters', () => {
 
   it('accepts a valid positive plan ID', () => {
     expect(planIdParamsSchema.safeParse({ id: '3' }).success).toBe(true);
+  });
+});
+
+
+describe('asset version number inputs', () => {
+  it('rejects malformed and out-of-range version numbers', () => {
+    expect(versionNoParamsSchema.safeParse({ id: '00000000-0000-4000-8000-000000000001', versionNo: '2x' }).success).toBe(false);
+    expect(versionNoParamsSchema.safeParse({ id: '00000000-0000-4000-8000-000000000001', versionNo: '2147483648' }).success).toBe(false);
+    expect(compareVersionsQuerySchema.safeParse({ from: '2x', to: '3' }).success).toBe(false);
+    expect(compareVersionsQuerySchema.safeParse({ from: '1e2', to: '3' }).success).toBe(false);
+    expect(compareVersionsQuerySchema.safeParse({ from: '2147483648', to: '3' }).success).toBe(false);
+  });
+
+  it('accepts positive integer values and legacy comparison aliases', () => {
+    expect(versionNoParamsSchema.safeParse({ id: '00000000-0000-4000-8000-000000000001', versionNo: '2' }).success).toBe(true);
+    const result = compareVersionsQuerySchema.safeParse({ v1: '2', v2: '3' });
+    expect(result.success && result.data).toEqual({ from: 2, to: 3 });
   });
 });
