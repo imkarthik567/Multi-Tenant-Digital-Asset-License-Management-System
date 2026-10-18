@@ -289,7 +289,7 @@ Five automated workflows ensure continuous integration and deployment:
 
 ## 10. Test Verification Results
 
-> **Verification note (October 18, 2026):** The results below are a historical snapshot, not a claim that the current review branch passes. The last fully completed CI run on the preceding revision completed type-check/lint, secret scanning, SQL injection scanning, migrations and seeding successfully, then reported **132 tests passed and 1 failed**. The failure was a tenant-registration fixture that used a random password without the required complexity. The fixture was corrected in the current branch; the replacement CI run is the source of truth for current results.
+> **Verification note (October 18, 2026):** GitHub Actions run [39135857240](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39135857240) passed on the rubric-fix branch. It completed secret scanning, SQL-injection static analysis, shell syntax checks, TypeScript/lint, migrations, custom SQL, seeding, Vitest, production seed compilation and production monorepo build. The Docker Build & Publish run [39135857203](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39135857203) also succeeded. This verifies the checked branch in CI, not the live cloud deployment or backup restore drill.
 
 The automated test suite (`npm test`) executes across six distinct suites:
 
@@ -297,12 +297,14 @@ The automated test suite (`npm test`) executes across six distinct suites:
 Test Suite Execution Results:
 ✓ backend/src/__tests__/break-it-security.test.ts (22 tests) - 100% PASS
 ✓ backend/src/__tests__/rest-api.test.ts (24 tests) - 100% PASS
-✓ backend/src/__tests__/services-coverage.test.ts (34 tests) - 100% PASS
-✓ backend/src/__tests__/auth-rbac-isolation.test.ts (10 tests) - 100% PASS
+✓ backend/src/__tests__/services-coverage.test.ts (35 tests) - PASS
+✓ backend/src/__tests__/auth-rbac-isolation.test.ts (11 tests) - PASS
 ✓ backend/src/__tests__/advanced-features.test.ts (19 tests) - 100% PASS
-✓ backend/src/__tests__/database-functions.test.ts (17 tests) - 100% PASS
+✓ backend/src/__tests__/database-functions.test.ts (23 tests) - PASS
+✓ backend/src/__tests__/response.util.test.ts (2 tests) - PASS
+✓ backend/src/__tests__/csv.util.test.ts (3 tests) - PASS
 
-Historical snapshot only: 6 Test Files, 126 Tests Passed, 0 Failed. Not yet re-verified for the current branch.
+Latest CI snapshot: 8 Test Files, 139 Tests Passed, 0 Failed. Coverage report: 69.60% statements, 50.25% branches, 80.26% functions, and 71.68% lines. Statement coverage is below 70%, so do not claim the statement-coverage metric meets a 70% threshold.
 Static SQL Injection Check (check:sqli): 0 Violations
 Secret Scanner (check:secrets): passed on the latest reviewed CI revision
 TypeScript Compilation (lint): passed on the latest reviewed CI revision
