@@ -84,6 +84,8 @@ const parseEnv = () => {
       result.data.JWT_ACCESS_SECRET,
       result.data.JWT_REFRESH_SECRET,
       result.data.COOKIE_SECRET,
+      result.data.APP_DB_PASSWORD || '',
+      result.data.METRICS_BEARER_TOKEN,
     ];
     const unsafePlaceholder = /placeholder|change.?me|example|your[_ -]?(secret|key)|postgrespassword|password123/i;
 
@@ -93,7 +95,7 @@ const parseEnv = () => {
     }
 
     if (new Set(productionSecrets).size !== productionSecrets.length) {
-      console.error('❌ FATAL: JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, and COOKIE_SECRET must all be different.');
+      console.error('❌ FATAL: JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, COOKIE_SECRET, APP_DB_PASSWORD, and METRICS_BEARER_TOKEN must all be different.');
       process.exit(1);
     }
   }
