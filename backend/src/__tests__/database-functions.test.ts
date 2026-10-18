@@ -494,6 +494,66 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       expect(typeof stats.asset_type_breakdown).toBe('object');
     });
 
+    it('does not multiply initial vendor spend when one license has multiple renewals', async () => {
+      // Ensure a single license has at least two renewal rows to catch fan-out bugs.
+      await systemPrisma.licenseRenewal.createMany({
+        data: [
+          {
+            licenseId: testLicenseId,
+            renewedBy: userAAdminId,
+            oldEndDate: new Date('2027-01-01'),
+            newEndDate: new Date('2028-01-01'),
+            cost: new Prisma.Decimal(25),
+            notes: 'vendor-spend aggregation regression fixture A',
+          },
+          {
+            licenseId: testLicenseId,
+            renewedBy: userAAdminId,
+            oldEndDate: new Date('2028-01-01'),
+            newEndDate: new Date('2029-01-01'),
+            cost: new Prisma.Decimal(40),
+            notes: 'vendor-spend aggregation regression fixture B',
+          },
+        ],
+      });
+
+      const [viewRows, expectedRows] = await Promise.all([
+        prisma.$queryRaw<Array<{ total_initial_cost: Prisma.Decimal; total_renewal_cost: Prisma.Decimal; total_seats_contracted: bigint }>>(
+          Prisma.sql`SELECT total_initial_cost, total_renewal_cost, total_seats_contracted
+                      FROM v_vendor_spend
+                      WHERE tenant_id = ${tenantAId}::uuid AND vendor_id = ${vendorAId}::uuid;`
+        ),
+        prisma.$queryRaw<Array<{ total_initial_cost: Prisma.Decimal; total_renewal_cost: Prisma.Decimal; total_seats_contracted: bigint }>>(
+          Prisma.sql`SELECT
+            COALESCE((
+              SELECT SUM(l.cost) FROM licenses l
+              WHERE l.tenant_id = ${tenantAId}::uuid
+                AND l.vendor_id = ${vendorAId}::uuid
+                AND l.deleted_at IS NULL
+            ), 0)::NUMERIC(12,2) AS total_initial_cost,
+            COALESCE((
+              SELECT SUM(lr.cost)
+              FROM license_renewals lr
+              JOIN licenses l ON l.id = lr.license_id
+              WHERE l.tenant_id = ${tenantAId}::uuid
+                AND l.vendor_id = ${vendorAId}::uuid
+                AND l.deleted_at IS NULL
+            ), 0)::NUMERIC(12,2) AS total_renewal_cost,
+            COALESCE((
+              SELECT SUM(l.total_seats) FROM licenses l
+              WHERE l.tenant_id = ${tenantAId}::uuid
+                AND l.vendor_id = ${vendorAId}::uuid
+                AND l.deleted_at IS NULL
+            ), 0)::BIGINT AS total_seats_contracted;`
+        ),
+      ]);
+
+      expect(viewRows).toHaveLength(1);
+      expect(Number(viewRows[0].total_initial_cost)).toBe(Number(expectedRows[0].total_initial_cost));
+      expect(Number(viewRows[0].total_renewal_cost)).toBe(Number(expectedRows[0].total_renewal_cost));
+      expect(Number(viewRows[0].total_seats_contracted)).toBe(Number(expectedRows[0].total_seats_contracted));
+    });
+
     it('marks tenant reporting views as security-invoker views', async () => {
       const viewOptions: any[] = await prisma.$queryRaw`
         SELECT relname, reloptions
