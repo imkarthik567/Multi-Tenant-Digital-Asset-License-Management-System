@@ -15,6 +15,7 @@ import {
   updateTenantSchema,
   updateTenantStatusSchema,
   updateTenantPlanSchema,
+  queryTenantSchema,
 } from '../validators/tenant.validator';
 
 const router = Router();
@@ -22,7 +23,7 @@ const router = Router();
 router.use(authenticate, loadUser);
 
 // Platform-level tenant listing (Super Admin)
-router.get('/', authorize('tenants:read_platform'), tenantContext, tenantController.listTenants);
+router.get('/', authorize('tenants:read_platform'), tenantContext, validate(queryTenantSchema), tenantController.listTenants);
 
 // 1. Export entire tenant archive as JSON (Tenant Admin)
 router.get('/export', authorize('tenants:update_own'), tenantContext, tenantController.exportTenantData);
