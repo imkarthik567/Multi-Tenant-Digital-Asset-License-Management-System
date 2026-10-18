@@ -523,6 +523,36 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       expect((tenantAAssets as any[]).length).toBe(0);
     });
 
+    it('enforces tenant RLS through security-invoker reporting views', async () => {
+      const foreignTenantRows = await prisma.$transaction(async (tx: any) => {
+        await tx.$executeRaw(Prisma.sql`SET LOCAL ROLE assetvault_app;`);
+        await tx.$executeRaw(
+          Prisma.sql`SELECT
+            set_config('app.current_tenant_id', ${tenantAId}, true),
+            set_config('app.is_super_admin', 'false', true);`
+        );
+        return tx.$queryRaw(
+          Prisma.sql`SELECT asset_id, tenant_id FROM v_asset_catalog WHERE tenant_id = ${tenantBId}::uuid;`
+        );
+      });
+
+      expect(foreignTenantRows).toHaveLength(0);
+    });
+
+    it('filters the all-tenant monthly stats wrapper to the current tenant', async () => {
+      const rows = await prisma.$transaction(async (tx: any) => {
+        await tx.$executeRaw(Prisma.sql`SET LOCAL ROLE assetvault_app;`);
+        await tx.$executeRaw(
+          Prisma.sql`SELECT
+            set_config('app.current_tenant_id', ${tenantAId}, true),
+            set_config('app.is_super_admin', 'false', true);`
+        );
+        return tx.$queryRaw(Prisma.sql`SELECT tenant_id FROM v_monthly_access_stats_tenant;`);
+      });
+
+      expect((rows as any[]).every((row) => row.tenant_id === tenantAId)).toBe(true);
+    });
+
     it('allows super admin session to query across all tenants', async () => {
       const allTenantsAssets = await prisma.$transaction(async (tx: any) => {
         await tx.$executeRaw(Prisma.sql`SET LOCAL ROLE assetvault_app;`);
