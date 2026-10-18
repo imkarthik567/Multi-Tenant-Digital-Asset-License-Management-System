@@ -41,7 +41,7 @@ export const updateLicenseSchema = z
     cost: z.number().min(0).optional(),
     currency: z.string().length(3).optional(),
     startDate: z.string().optional().transform((str) => (str ? new Date(str) : undefined)),
-    endDate: z.string().optional().nullable().transform((str) => (str ? new Date(str) : null)),
+    endDate: z.string().optional().nullable().transform((str) => (str === undefined ? undefined : str ? new Date(str) : null)),
     status: z.nativeEnum(LicenseStatus).optional(),
     autoRenew: z.boolean().optional(),
   })
