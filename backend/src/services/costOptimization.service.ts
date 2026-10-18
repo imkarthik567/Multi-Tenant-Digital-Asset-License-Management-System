@@ -53,7 +53,7 @@ export class CostOptimizationService {
           set_config('app.is_super_admin', 'false', true);`
       );
 
-      // 1. Query seat allocations with no access log on covered assets in the last 30 days
+      // 1. Query active allocations with no access on covered assets for at least 30 days.
       const rows: any = await tx.$queryRaw(Prisma.sql`
         SELECT 
           la.id AS allocation_id,
@@ -76,7 +76,7 @@ export class CostOptimizationService {
         WHERE l.tenant_id = ${tenantId}::uuid
           AND la.status = 'ACTIVE'
           AND l.deleted_at IS NULL
-          AND la.allocated_at < (NOW() - INTERVAL '7 days') -- Give 7 days grace period post-allocation
+          AND la.allocated_at < (NOW() - INTERVAL '30 days') -- An allocation with no access logs uses its allocation date as the inactivity reference.
         GROUP BY 
           la.id, la.license_id, l.name, l.cost, l.total_seats, 
           u.id, u.full_name, u.email, v.name, la.allocated_at
@@ -101,7 +101,7 @@ export class CostOptimizationService {
         const lastActivityDate = r.last_accessed_at ? new Date(r.last_accessed_at) : null;
         const allocatedDate = new Date(r.allocated_at);
         const referenceDate = lastActivityDate || allocatedDate;
-        const inactiveDays = Math.max(30, Math.floor((Date.now() - referenceDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const inactiveDays = Math.max(0, Math.floor((Date.now() - referenceDate.getTime()) / (1000 * 60 * 60 * 24)));
 
         return {
           allocationId: r.allocation_id,
