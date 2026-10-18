@@ -17,6 +17,22 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Resolve-Path (Join-Path $ScriptDir "..\..")
 
+function Load-EnvFile([string]$Path) {
+    if (Test-Path $Path) {
+        Get-Content $Path | ForEach-Object {
+            $line = $_.Trim()
+            if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+                $idx = $line.IndexOf("=")
+                $key = $line.Substring(0, $idx).Trim()
+                $value = $line.Substring($idx + 1).Trim().Trim('"').Trim("'")
+                if (-not [Environment]::GetEnvironmentVariable($key, "Process")) {
+                    [Environment]::SetEnvironmentVariable($key, $value, "Process")
+                }
+            }
+        }
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($BackupDir)) {
     $BackupDir = Join-Path $ProjectRoot "backups"
 }
