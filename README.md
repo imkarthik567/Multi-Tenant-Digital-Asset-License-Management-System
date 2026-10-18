@@ -102,6 +102,7 @@ AssetVault adopts a **Pooled Schema Multi-Tenant Model**:
 * **Data Dictionary:** [`database/data-dictionary.md`](database/data-dictionary.md)
 * **Relational Schema:** [`database/relational-schema.md`](database/relational-schema.md)
 * **Normalization Proofs:** [`database/normalization.md`](database/normalization.md)
+* **PDF Rubric Compliance:** [`docs/RUBRIC_COMPLIANCE.md`](docs/RUBRIC_COMPLIANCE.md)
 
 ### Database Object Inventory
 * **19 Relational Base Tables:** `tenants`, `plans`, `users`, `roles`, `refresh_tokens`, `categories`, `tags`, `vendors`, `assets`, `asset_versions`, `asset_tags`, `license_types`, `licenses`, `asset_licenses`, `license_allocations`, `license_renewals`, `asset_access_logs`, `audit_logs`, `notifications`.
