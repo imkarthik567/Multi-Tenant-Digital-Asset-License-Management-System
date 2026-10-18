@@ -127,13 +127,13 @@ try {
     $ExitCode = 1
     Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
 } finally {
-    if (-not $KeepScratch) {
+    if (-not $KeepScratch -and $RestoreSucceeded) {
         try {
             if ($Docker) {
-                & docker compose exec -T -e "PGPASSWORD=$($ConnectionDetails.password)" db psql -v ON_ERROR_STOP=1 -U $ConnectionDetails.username -d postgres -c "DROP DATABASE IF EXISTS $ScratchDb;" | Out-Null
+                & docker compose exec -T -e "PGPASSWORD=$($ConnectionDetails.password)" db psql -v ON_ERROR_STOP=1 -U $ConnectionDetails.username -d postgres -c "DROP DATABASE $ScratchDb;" | Out-Null
             } else {
                 $adminUrl = Normalize-PgConnectionUrl -Url $ConnectionUrl -Database "postgres"
-                & $PsqlExe $adminUrl -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $ScratchDb;" | Out-Null
+                & $PsqlExe $adminUrl -v ON_ERROR_STOP=1 -c "DROP DATABASE $ScratchDb;" | Out-Null
             }
             if ($LASTEXITCODE -ne 0) { throw "Scratch database cleanup failed with code $LASTEXITCODE." }
             Write-Host "[INFO] Scratch database cleaned up." -ForegroundColor Gray
@@ -141,8 +141,10 @@ try {
             $ExitCode = 1
             Write-Host "[ERROR] Could not clean up scratch database '$ScratchDb': $($_.Exception.Message)" -ForegroundColor Red
         }
-    } elseif ($RestoreSucceeded) {
+    } elseif ($KeepScratch -and $RestoreSucceeded) {
         Write-Host "[INFO] Scratch database '$ScratchDb' retained for manual inspection." -ForegroundColor Yellow
+    } elseif (-not $RestoreSucceeded) {
+        Write-Host "[WARN] Restore did not complete; leaving any scratch database untouched for safety." -ForegroundColor Yellow
     }
 }
 
