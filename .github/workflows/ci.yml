@@ -70,6 +70,8 @@ jobs:
           export SUPER_ADMIN_EMAIL="ci-superadmin@assetvault.test"
           export SUPER_ADMIN_PASSWORD="$(openssl rand -hex 32)"
           export DEFAULT_SEED_PASSWORD="$(openssl rand -hex 32)"
+          echo "SUPER_ADMIN_EMAIL=$SUPER_ADMIN_EMAIL" >> "$GITHUB_ENV"
+          echo "SUPER_ADMIN_PASSWORD=$SUPER_ADMIN_PASSWORD" >> "$GITHUB_ENV"
           echo "DEFAULT_SEED_PASSWORD=$DEFAULT_SEED_PASSWORD" >> "$GITHUB_ENV"
           export SEED_DEMO="true"
           npx prisma migrate deploy --schema backend/prisma/schema.prisma
