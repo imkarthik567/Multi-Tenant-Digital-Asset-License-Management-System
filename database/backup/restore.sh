@@ -89,7 +89,8 @@ if [[ -f "${CHECKSUM_FILE}" ]]; then
   fi
   echo "[PASS] Checksum verified: ${ACTUAL_HASH}"
 else
-  echo "[WARN] No .sha256 checksum file found next to ${DUMP_NAME}; proceeding without verification"
+  echo "[ERROR] No .sha256 checksum file found next to ${DUMP_NAME}; refusing to restore without verifying the archive." >&2
+  exit 1
 fi
 
 # 3. Load a privileged connection URL. Restore must not use the tenant-scoped
@@ -169,7 +170,7 @@ fi
 if [[ "${SCRATCH_MODE}" == "true" ]]; then
   echo "[2/3] Setting up scratch database '${DB_NAME}'..."
   if [[ "${DOCKER_MODE}" == "true" ]]; then
-    docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -U "${DB_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
+    docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -v ON_ERROR_STOP=1 -U "${DB_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
   else
     psql "${ADMIN_URL}" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
   fi
