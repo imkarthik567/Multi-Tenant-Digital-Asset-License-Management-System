@@ -95,6 +95,12 @@ export class LicenseService {
     const existing = await licenseRepository.findById(prismaClient, id);
     if (!existing) throw new NotFoundError('License not found');
 
+    const nextStartDate = data.startDate ?? existing.startDate;
+    const nextEndDate = data.endDate === undefined ? existing.endDate : data.endDate;
+    if (nextEndDate && nextEndDate <= nextStartDate) {
+      throw new BadRequestError('End date must be after start date');
+    }
+
     return licenseRepository.update(prismaClient, id, {
       name: data.name,
       licenseKey: data.licenseKey,
