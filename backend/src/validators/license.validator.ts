@@ -7,6 +7,11 @@
 import { z } from 'zod';
 import { LicenseStatus } from '@prisma/client';
 
+const licenseDateSchema = z
+  .string()
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), 'Invalid date')
+  .transform((value) => new Date(value));
+
 export const createLicenseSchema = z
   .object({
     name: z.string().min(2).max(100).trim(),
@@ -16,8 +21,8 @@ export const createLicenseSchema = z
     totalSeats: z.number().int().positive('totalSeats must be at least 1'),
     cost: z.number().min(0).default(0),
     currency: z.string().length(3).default('USD'),
-    startDate: z.string().transform((str) => new Date(str)),
-    endDate: z.string().optional().nullable().transform((str) => (str === undefined ? undefined : str ? new Date(str) : null)),
+    startDate: licenseDateSchema,
+    endDate: licenseDateSchema.optional().nullable(),
     autoRenew: z.boolean().default(false),
   })
   .strip()
@@ -40,8 +45,8 @@ export const updateLicenseSchema = z
     totalSeats: z.number().int().positive().optional(),
     cost: z.number().min(0).optional(),
     currency: z.string().length(3).optional(),
-    startDate: z.string().optional().transform((str) => (str ? new Date(str) : undefined)),
-    endDate: z.string().optional().nullable().transform((str) => (str === undefined ? undefined : str ? new Date(str) : null)),
+    startDate: licenseDateSchema.optional(),
+    endDate: licenseDateSchema.optional().nullable(),
     status: z.nativeEnum(LicenseStatus).optional(),
     autoRenew: z.boolean().optional(),
   })
