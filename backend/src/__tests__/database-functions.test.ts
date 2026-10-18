@@ -694,23 +694,42 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
   });
 
   it('does not classify a ten-day-old allocation with no access logs as dormant', async () => {
-    const recentAllocationAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-    const allocation = await systemPrisma.licenseAllocation.create({
+    // Keep this regression independent of allocations made by other procedure tests.
+    const license = await systemPrisma.license.create({
       data: {
-        licenseId: testLicenseId,
-        userId: userAAdminId,
-        allocatedBy: userAAdminId,
-        allocatedAt: recentAllocationAt,
+        tenantId: tenantAId,
+        vendorId: vendorAId,
+        licenseTypeId: 3,
+        name: 'Recent Allocation Inactivity Regression',
+        licenseKey: `TEST-RECENT-${Date.now()}`,
+        totalSeats: 1,
+        cost: 10,
+        currency: 'USD',
         status: 'ACTIVE',
-        notes: 'recent allocation inactivity regression test',
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2027-01-01'),
       },
     });
+    let allocationId: string | undefined;
 
     try {
+      const allocation = await systemPrisma.licenseAllocation.create({
+        data: {
+          licenseId: license.id,
+          userId: userAAdminId,
+          allocatedBy: userAAdminId,
+          allocatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          status: 'ACTIVE',
+          notes: 'recent allocation inactivity regression test',
+        },
+      });
+      allocationId = allocation.id;
+
       const report = await costOptimizationService.getUnusedSeatsReport(tenantAId);
       expect(report.reclaimCandidates.some((candidate) => candidate.allocationId === allocation.id)).toBe(false);
     } finally {
-      await systemPrisma.licenseAllocation.delete({ where: { id: allocation.id } });
+      if (allocationId) await systemPrisma.licenseAllocation.delete({ where: { id: allocationId } });
+      await systemPrisma.license.delete({ where: { id: license.id } });
     }
   });
 });
