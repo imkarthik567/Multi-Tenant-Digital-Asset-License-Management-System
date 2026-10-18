@@ -213,7 +213,7 @@ npm run lint
 # 2. Secret Hygiene Pre-Scan
 npm run check:secrets
 
-# 3. Vitest Unit & Integration Tests (81 Tests, >=70% Service Coverage)
+# 3. Vitest unit and integration suite with coverage
 npm run test
 
 # 4. Playwright End-to-End User Journeys (3 Full E2E Flows)
@@ -275,7 +275,7 @@ Demo tenant users are seeded by `prisma/seed.ts` in local development (and in pr
 | `CLIENT_URL` | Allowed client origin for CORS policies | `http://localhost:5173` |
 | `VITE_API_URL` | Backend URL for Vite frontend client proxy | `http://localhost:5000` |
 | `RUN_WORKER` | Enables background cron scheduler | `true` |
-| `METRICS_BEARER_TOKEN` | Bearer token protecting Prometheus `/metrics` (required to be explicitly set in production) | *(Unique random secret)* |
+| `METRICS_BEARER_TOKEN` | Bearer token protecting Prometheus `/metrics` (required to be explicitly set in production) | *(Unique random secret)*\n| `GRAFANA_PASSWORD` | Required Grafana administrator password for the local monitoring profile | Set in the untracked `.env`; no default is provided |
 
 ---
 
@@ -311,8 +311,10 @@ Comprehensive deployment guides:
 # Start API, Web, DB, Prometheus, and Grafana
 docker compose --profile monitoring up -d
 
-# Access Grafana Dashboard (admin / admin):
+# Open the Grafana dashboard:
 # http://localhost:3001
+# Username defaults to admin (or GRAFANA_USER); set GRAFANA_PASSWORD
+# in the untracked .env file. Compose does not provide a default password.
 # Pre-provisioned dashboard: "AssetVault Enterprise Operations & Telemetry"
 ```
 
