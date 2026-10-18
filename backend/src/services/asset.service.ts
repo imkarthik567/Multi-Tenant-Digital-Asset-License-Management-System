@@ -149,6 +149,10 @@ export class AssetService {
           set_config('app.is_super_admin', 'false', true);`
       );
 
+      // Serialize version allocation per asset. Without a parent-row lock,
+      // concurrent transactions can both observe the same latest version number.
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM assets WHERE id = ${assetId}::UUID FOR UPDATE;`);
+
       const asset = await tx.asset.findFirst({
         where: { id: assetId, deletedAt: null },
       });
