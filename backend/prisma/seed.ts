@@ -9,6 +9,13 @@
 
 import { PrismaClient, AssetType, AssetStatus, LicenseStatus, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+}
 
 const seedDatabaseUrl = process.env.SEED_DATABASE_URL || process.env.DIRECT_URL || process.env.DATABASE_URL;
 const prisma = new PrismaClient(
@@ -17,8 +24,7 @@ const prisma = new PrismaClient(
 
 async function main() {
   const isProduction = process.env.NODE_ENV === 'production';
-  const superAdminEmail =
-    process.env.SUPER_ADMIN_EMAIL?.trim() || (isProduction ? '' : 'superadmin@assetvault.io');
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL?.trim() || '';
   const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || '';
   const superAdminName = process.env.SUPER_ADMIN_NAME || 'Global Super Administrator';
   const shouldSeedDemo = process.env.SEED_DEMO === 'true' || !isProduction;
