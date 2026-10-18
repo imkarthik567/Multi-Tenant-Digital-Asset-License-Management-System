@@ -15,7 +15,7 @@ export const createAssetSchema = z
     description: z.string().max(1000).optional().nullable(),
     categoryId: z.preprocess((v) => (v === '' ? null : v), z.string().uuid().optional().nullable()),
     fileUrl: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
-    fileSizeBytes: z.number().int().positive().optional(),
+    fileSizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER, 'fileSizeBytes exceeds the safely representable byte range').optional(),
     checksumSha256: z.string().trim().regex(/^[a-fA-F0-9]{64}$/, 'checksumSha256 must be a 64-character hexadecimal SHA-256 checksum').optional(),
     tags: z.array(z.string()).optional(),
   })

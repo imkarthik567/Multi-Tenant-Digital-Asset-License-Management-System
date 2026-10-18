@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Request } from 'express';
 import { getPaginationParams } from '../utils/pagination.util';
 import { queryAccessLogSchema } from '../validators/access.validator';
-import { queryAssetSchema } from '../validators/asset.validator';
+import { createAssetSchema, queryAssetSchema } from '../validators/asset.validator';
 import { queryLicenseSchema } from '../validators/license.validator';
 import { queryTenantSchema, tenantIdQuerySchema } from '../validators/tenant.validator';
 import { planIdParamsSchema } from '../validators/plan.validator';
@@ -135,6 +135,27 @@ describe('asset version file size precision', () => {
       fileUrl: 'https://assets.example.test/version.bin',
       fileSize: '9007199254740991',
       checksum: 'a'.repeat(64),
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+
+describe('asset creation file size precision', () => {
+  const validAsset = { name: 'Example asset', assetCode: 'ASSET-1', assetType: 'SOFTWARE' as const };
+
+  it('rejects byte counts beyond JavaScript safe integer precision', () => {
+    const result = createAssetSchema.safeParse({
+      ...validAsset,
+      fileSizeBytes: Number.MAX_SAFE_INTEGER + 1,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts the largest safely representable byte count', () => {
+    const result = createAssetSchema.safeParse({
+      ...validAsset,
+      fileSizeBytes: Number.MAX_SAFE_INTEGER,
     });
     expect(result.success).toBe(true);
   });
