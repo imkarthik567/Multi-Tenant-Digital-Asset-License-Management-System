@@ -5,15 +5,15 @@
 --          with least-privilege access (DML only, no DDL/DROP capabilities).
 --
 -- Usage:
---   psql "$DIRECT_URL" -v APP_PASSWORD="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
+--   psql "$DIRECT_URL" -v DBPASS="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
 -- ==============================================================================
 
 \set ON_ERROR_STOP on
 
 -- Never fall back to a known/default password.
-\if :{?APP_PASSWORD}
+\if :{?DBPASS}
 \else
-  \echo 'FATAL: APP_PASSWORD must be supplied explicitly; refusing insecure default credentials.'
+  \echo 'FATAL: DBPASS must be supplied explicitly; refusing insecure default credentials.'
   \quit 3
 \endif
 
@@ -29,7 +29,7 @@ BEGIN
 END $$;
 
 -- 2. Set password for application runtime role from variable
-ALTER ROLE assetvault_app WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD :'APP_PASSWORD';
+ALTER ROLE assetvault_app WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD :'DBPASS';
 
 -- 3. Grant connection privileges on the current database
 SELECT format('GRANT CONNECT ON DATABASE %I TO assetvault_app', current_database()) \gexec
