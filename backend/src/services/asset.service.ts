@@ -137,14 +137,36 @@ export class AssetService {
     return assetRepository.restore(prismaClient, id);
   }
 
-  public async attachTags(prismaClient: any, assetId: string, tagIds: string[]) {
-    await this.getAssetById(prismaClient, assetId);
-    const results = [];
-    for (const tagId of tagIds) {
-      const res = await assetRepository.attachTag(prismaClient, assetId, tagId);
-      results.push(res);
-    }
-    return results;
+  public async attachTags(tenantId: string, userId: string, assetId: string, tagIds: string[]) {
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${userId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+
+      const asset = await tx.asset.findFirst({
+        where: { id: assetId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!asset) {
+        throw new NotFoundError('Asset not found');
+      }
+
+      const results = [];
+      for (const tagId of tagIds) {
+        const tag = await tx.tag.findFirst({
+          where: { id: tagId, tenantId },
+          select: { id: true },
+        });
+        if (!tag) {
+          throw new NotFoundError('Tag not found');
+        }
+        results.push(await assetRepository.attachTag(tx, assetId, tag.id));
+      }
+      return results;
+    });
   }
 
   public async detachTag(prismaClient: any, assetId: string, tagId: string) {
