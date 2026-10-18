@@ -4,7 +4,7 @@ import { getPaginationParams } from '../utils/pagination.util';
 import { queryAccessLogSchema } from '../validators/access.validator';
 import { queryAssetSchema } from '../validators/asset.validator';
 import { queryLicenseSchema } from '../validators/license.validator';
-import { queryTenantSchema } from '../validators/tenant.validator';
+import { queryTenantSchema, tenantIdQuerySchema } from '../validators/tenant.validator';
 import { planIdParamsSchema } from '../validators/plan.validator';
 import { compareVersionsQuerySchema, createVersionSchema, versionNoParamsSchema } from '../validators/version.validator';
 import { runExpiryCheckSchema } from '../validators/notification.validator';
@@ -159,5 +159,15 @@ describe('pagination parameters', () => {
       requestWithQuery({ page: '9007199254740992', limit: '100' })
     );
     expect(params).toMatchObject({ page: 1, limit: 100, skip: 0 });
+  });
+});
+
+
+describe('report tenant ID filters', () => {
+  it('rejects malformed tenant IDs and accepts UUID filters', () => {
+    expect(tenantIdQuerySchema.safeParse({ tenantId: 'not-a-uuid' }).success).toBe(false);
+    expect(
+      tenantIdQuerySchema.safeParse({ tenantId: '00000000-0000-4000-8000-000000000001' }).success
+    ).toBe(true);
   });
 });
