@@ -21,6 +21,12 @@ import { prismaForRequest } from '../config/prisma';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
+const testPassword = process.env.DEFAULT_SEED_PASSWORD;
+if (!testPassword) {
+  throw new Error('Set DEFAULT_SEED_PASSWORD before running seeded-user integration tests.');
+}
+const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@assetvault.io';
+
 describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
   let adminToken: string;
   let memberToken: string;
@@ -37,7 +43,7 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
     // 1. Authenticate TechCorp Tenant Admin
     const adminLoginRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'techcorp.admin@techcorp.io', password: 'Password123!' });
+      .send({ email: 'techcorp.admin@techcorp.io', password: testPassword });
     expect(adminLoginRes.status).toBe(200);
     adminToken = adminLoginRes.body.data.accessToken;
     tenantId = adminLoginRes.body.data.user.tenantId;
@@ -46,7 +52,7 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
     // 2. Authenticate TechCorp Member
     const memberLoginRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'techcorp.dev1@techcorp.io', password: 'Password123!' });
+      .send({ email: 'techcorp.dev1@techcorp.io', password: testPassword });
     expect(memberLoginRes.status).toBe(200);
     memberToken = memberLoginRes.body.data.accessToken;
     memberUserId = memberLoginRes.body.data.user.id;
@@ -54,7 +60,7 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
     // 3. Authenticate Platform Super Admin
     const superAdminRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'superadmin@assetvault.io', password: 'Password123!' });
+      .send({ email: superAdminEmail, password: testPassword });
     expect(superAdminRes.status).toBe(200);
     superAdminToken = superAdminRes.body.data.accessToken;
 
