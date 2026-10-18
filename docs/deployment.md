@@ -24,7 +24,7 @@ AssetVault is designed for zero-cost, high-reliability deployment on modern free
                                              ▼
                       ┌──────────────────────────────────────────────┐
                       │             Render Web Service               │
-                      │  - Multi-stage Docker Container (Node 20)    │
+                      │  - Multi-stage Docker Container (Node 22)    │
                       │  - Express API + In-Process Worker Cron      │
                       │  - PostgreSQL Advisory Locks (1001-1003)     │
                       └──────────────┬───────────────────────────────┘
