@@ -19,15 +19,16 @@
 - [x] The latest reviewed CI revision passed the SQL-injection static scan.
 - [x] Login no longer pre-fills seeded credentials or offers a one-click demo credential picker.
 - [ ] Store real, unique values for `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `COOKIE_SECRET`, `METRICS_BEARER_TOKEN` and `APP_DB_PASSWORD` in the appropriate hosting secret stores.
-- [ ] Set `DATABASE_URL` to the restricted `assetvault_app` runtime role. Set `DIRECT_URL` to a separate privileged direct connection for migrations and trusted maintenance. Ensure the password in the runtime URL matches `APP_DB_PASSWORD`; URL-encode special characters.
+- [ ] Set `DATABASE_URL` to the restricted `assetvault_app` runtime role and verify the URL password matches `APP_DB_PASSWORD`; URL-encode special characters.
+- [ ] **Review the elevated-credential trade-off:** the current Render blueprint runs scheduled maintenance in the API process and passes `DIRECT_URL` into that long-lived process. For strict least privilege, move cross-tenant maintenance into a separate worker service and avoid retaining migration/admin credentials in the public API process.
 - [ ] Rotate any credentials that were previously used as public demo/default credentials in an actual deployed environment. Removing the default from source does not rotate an already-created account's database password.
 
 ## 3. Database, RLS and reporting
 
-- [x] PostgreSQL migrations, custom SQL setup and seeding passed in an earlier run of the current fix branch.
+- [x] PostgreSQL migrations, custom SQL setup and seeding passed in the latest reviewed CI run (October 18, 2026).
 - [x] Reporting views are configured with `security_invoker=true`, and the raw all-tenant monthly access materialization is intended to be revoked from the runtime role.
 - [x] Regression tests now cover reporting view options and access boundaries.
-- [ ] Confirm the **latest** Actions run passes the privilege/RLS tests after the final grant ordering in `database/sql/04_rls.sql`.
+- [x] Latest CI run passed the privilege/RLS tests after the final grant ordering in `database/sql/04_rls.sql` ([run 39136189166](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189166)).
 - [ ] Apply migrations to the intended production database and verify all extensions, constraints, views, functions, triggers, privileges and RLS policies against the live catalog.
 - [ ] Test tenant A cannot read tenant B rows through base tables, ordinary reporting views and `v_monthly_access_stats_tenant`; verify the runtime role cannot directly select `mv_monthly_access_stats`.
 - [ ] Recheck dashboard queries, report filters and stored procedure behavior after the reporting-view changes.
@@ -41,7 +42,7 @@
 
 ## 5. Docker, CI/CD and backup/recovery
 
-- [x] Docker image workflow has succeeded on a prior revision of this branch; the latest revision is still subject to CI verification.
+- [x] Docker image build, scan and publish workflow succeeded on the latest reviewed branch revision ([run 39136189118](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189118)).
 - [ ] Configure `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in repository Actions secrets, then verify the API and web images are published to the intended Docker Hub repositories.
 - [ ] Run `.github/workflows/db-backup.yml` with `DATABASE_DIRECT_URL` (preferred) or `DATABASE_URL` configured and confirm an artifact/checksum is created.
 - [ ] Execute a restore to a scratch database and compare table counts/data, not just a successful `pg_dump`.
@@ -50,6 +51,6 @@
 
 ## 6. Current CI evidence
 
-- The branch previously completed secret scanning, SQL-injection static scanning, TypeScript/lint checks, migrations and seeding.
-- A later CI run passed 137 tests and failed one newly added database privilege test because the custom RLS script re-granted the raw materialized-view permission. The permission revocation has since been moved to the end of `database/sql/04_rls.sql`; the rerun on the newest branch revision is the source of truth.
+- Latest reviewed CI revision: **139/139 tests passed**, 8 test files, TypeScript/lint, secret scan, SQL-injection static scan, shell syntax, database migration/custom SQL/seed, production seed compilation and production build all passed.
+- Docker build and vulnerability scan succeeded for the same reviewed branch revision. These CI results do not verify the deployed database, hosting secrets, live URLs or backup recovery drill.
 - The dependency audit previously reported 18 total vulnerabilities, including high-severity development dependency advisories and moderate React Router advisories in the production tree. Do not claim a clean all-dependencies audit until those findings are either fixed or explicitly risk-accepted with evidence.
