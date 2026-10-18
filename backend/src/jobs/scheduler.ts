@@ -5,11 +5,17 @@
 // ==============================================================================
 
 import cron from 'node-cron';
-import { Prisma } from '@prisma/client';
-import { prisma } from '../config/prisma';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { emailService } from '../services/email.service';
 import { notificationStreamService } from '../services/notificationStream.service';
+
+// Scheduled maintenance spans tenants and must use the explicitly configured
+// maintenance connection. The web API uses the restricted assetvault_app role.
+const workerPrisma = new PrismaClient({
+  datasources: { db: { url: env.DIRECT_URL || env.DATABASE_URL } },
+});
 
 // Advisory lock keys (32-bit unique integers)
 const LOCK_EXPIRY_NOTIFICATIONS = 1001;
@@ -28,7 +34,7 @@ export class JobScheduler {
     action: () => Promise<T>
   ): Promise<T | null> {
     try {
-      const lockResult: any = await prisma.$queryRaw(
+      const lockResult: any = await workerPrisma.$queryRaw(
         Prisma.sql`SELECT pg_try_advisory_lock(${lockId}) AS locked;`
       );
       const isLocked = Boolean(lockResult?.[0]?.locked);
@@ -42,7 +48,7 @@ export class JobScheduler {
       try {
         return await action();
       } finally {
-        await prisma.$queryRaw(Prisma.sql`SELECT pg_advisory_unlock(${lockId});`);
+        await workerPrisma.$queryRaw(Prisma.sql`SELECT pg_advisory_unlock(${lockId});`);
         logger.debug({ jobName, lockId }, `Released advisory lock ${lockId}.`);
       }
     } catch (err: any) {
@@ -62,7 +68,7 @@ export class JobScheduler {
         logger.info('Starting scheduled license expiry notification routine...');
 
         // 1. Get all active tenants
-        const tenants: any = await prisma.$queryRaw(
+        const tenants: any = await workerPrisma.$queryRaw(
           Prisma.sql`SELECT id, name FROM tenants WHERE status = 'ACTIVE';`
         );
 
@@ -70,7 +76,7 @@ export class JobScheduler {
 
         for (const tenant of tenants) {
           try {
-            const res: any = await prisma.$queryRaw(
+            const res: any = await workerPrisma.$queryRaw(
               Prisma.sql`SELECT fn_generate_expiry_notifications(${tenant.id}::uuid, 30) AS created_count;`
             );
             const count = parseInt(res?.[0]?.created_count || '0', 10);
@@ -86,7 +92,7 @@ export class JobScheduler {
         // 2. Fetch freshly generated notifications from the last hour to dispatch emails
         let emailsSent = 0;
         try {
-          const freshAlerts: any = await prisma.$queryRaw(Prisma.sql`
+          const freshAlerts: any = await workerPrisma.$queryRaw(Prisma.sql`
             SELECT 
               n.id, n.type, n.message, n.created_at,
               u.email, u.full_name,
@@ -147,7 +153,7 @@ export class JobScheduler {
   public async runRefreshMaterializedViewJob(): Promise<boolean> {
     const result = await this.withAdvisoryLock(LOCK_REFRESH_MV, 'RefreshMaterializedView', async () => {
       logger.info('Refreshing materialized view mv_monthly_access_stats...');
-      await prisma.$executeRaw(Prisma.sql`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;`);
+      await workerPrisma.$executeRaw(Prisma.sql`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;`);
       logger.info('Successfully refreshed materialized view mv_monthly_access_stats');
       return true;
     });
@@ -165,7 +171,7 @@ export class JobScheduler {
         logger.info('Checking licenses eligible for automated contract renewal...');
 
         // Find active un-deleted licenses due for renewal within 3 days
-        const eligibleLicenses: any = await prisma.$queryRaw(Prisma.sql`
+        const eligibleLicenses: any = await workerPrisma.$queryRaw(Prisma.sql`
           SELECT 
             l.id, l.tenant_id, l.name, l.start_date, l.end_date, l.cost,
             u.id AS admin_user_id
@@ -204,7 +210,7 @@ export class JobScheduler {
 
             const renewalNote = `Automated period renewal (+${diffDays} days) by AssetVault Background Worker`;
 
-            await prisma.$executeRaw(
+            await workerPrisma.$executeRaw(
               Prisma.sql`CALL sp_renew_license(${lic.id}::uuid, ${formattedNewEndDate}::date, ${lic.cost}::numeric, ${lic.admin_user_id}::uuid, ${renewalNote}::text, null);`
             );
 
@@ -258,6 +264,11 @@ export class JobScheduler {
     this.cronTasks.push(autoRenewTask);
 
     logger.info('✅ AssetVault Background Schedulers active [Daily 02:00 Notifications, Hourly MV Refresh, Daily 03:00 Auto-Renew]');
+  }
+
+  /** Close the dedicated maintenance connection during graceful shutdown. */
+  public async disconnectDatabase(): Promise<void> {
+    await workerPrisma.$disconnect();
   }
 
   /**
