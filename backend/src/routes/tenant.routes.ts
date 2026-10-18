@@ -23,7 +23,7 @@ const router = Router();
 router.use(authenticate, loadUser);
 
 // Platform-level tenant listing (Super Admin)
-router.get('/', authorize('tenants:read_platform'), tenantContext, validate(queryTenantSchema), tenantController.listTenants);
+router.get('/', authorize('tenants:read_platform'), tenantContext, validate({ query: queryTenantSchema }), tenantController.listTenants);
 
 // 1. Export entire tenant archive as JSON (Tenant Admin)
 router.get('/export', authorize('tenants:update_own'), tenantContext, tenantController.exportTenantData);
