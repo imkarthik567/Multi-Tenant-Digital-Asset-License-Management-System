@@ -72,8 +72,8 @@ To adhere strictly to the principle of least privilege, run the production boots
 
 ```bash
 # Execute 08_production_bootstrap.sql against your Supabase Direct URL
-APP_DB_PASSWORD="<STRONG_RANDOM_APP_PASSWORD>"
-psql "$DIRECT_URL" -v APP_PASSWORD="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
+APP_DB_PASSWORD="<STRONG_RANDOM_DBPASS>"
+psql "$DIRECT_URL" -v DBPASS="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
 ```
 
 The Docker/Render entrypoint runs this bootstrap after migrations. For manual setup, the same script sets a supplied password, enables login for `assetvault_app`, grants runtime DML access, and revokes schema-creation rights. Never use a fallback/default password.
@@ -92,7 +92,7 @@ SEED_DATABASE_URL="<YOUR_SUPABASE_DIRECT_URL>" \
 SEED_DEMO="false" \
 SUPER_ADMIN_EMAIL="admin@yourdomain.com" \
 SUPER_ADMIN_PASSWORD="<STRONG_ADMIN_PASSWORD>" \
-APP_DB_PASSWORD="<STRONG_RANDOM_APP_PASSWORD>" \
+APP_DB_PASSWORD="<STRONG_RANDOM_DBPASS>" \
 npm run db:seed
 ```
 
@@ -159,7 +159,7 @@ npm run db:seed
 | `SMTP_PASS` | Render | Optional | `your_smtp_password` | SMTP authentication password. |
 | `SMTP_FROM` | Render | Optional | `AssetVault <notifications@assetvault.io>` | Outgoing sender identity. |
 | `SUPER_ADMIN_EMAIL` | Render / Local | Yes | `superadmin@assetvault.io` | Initial global administrator login email. |
-| `SUPER_ADMIN_PASSWORD` | Render / Local | Yes | `ChangeMe123!` | Initial administrator password. Rotate upon first login. |
+| `SUPER_ADMIN_PASSWORD` | Render / Local | Yes | `<Set in secret store>` | Initial administrator password. Rotate upon first login. |
 | `SEED_DEMO` | Render | Optional | `false` | Set to `false` for production, `true` for demo tenants. |
 | `RENDER_DEPLOY_HOOK_URL`| GitHub Secret| Optional | `https://api.render.com/deploy/srv-xxx?key=yyy` | Triggered by CI/CD upon successful main builds. |
 | `RENDER_API_URL` | GitHub Secret| Optional | `https://assetvault-api.onrender.com` | Target URL polled by health verification & keepalive. |
