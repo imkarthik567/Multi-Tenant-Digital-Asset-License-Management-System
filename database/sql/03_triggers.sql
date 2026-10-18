@@ -76,6 +76,14 @@ BEGIN
         IF v_new_data IS NOT NULL THEN
             v_new_data := v_new_data - 'password_hash';
         END IF;
+    ELSIF TG_TABLE_NAME = 'licenses' THEN
+        -- Software license keys are secrets; never persist them in immutable audit snapshots.
+        IF v_old_data IS NOT NULL THEN
+            v_old_data := v_old_data - 'license_key';
+        END IF;
+        IF v_new_data IS NOT NULL THEN
+            v_new_data := v_new_data - 'license_key';
+        END IF;
     END IF;
 
     -- 3. Determine record ID
