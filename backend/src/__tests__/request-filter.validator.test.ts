@@ -24,7 +24,9 @@ describe('request date and cursor filters', () => {
     expect(audit.success && audit.data.cursor).toBe('456');
   });
 
-  it('rejects malformed cursor values', () => {
+  it('rejects malformed cursor values and limits', () => {
+    expect(queryAccessLogSchema.safeParse({ limit: 'abc' }).success).toBe(false);
+    expect(queryAuditLogSchema.safeParse({ limit: 'abc' }).success).toBe(false);
     expect(queryAccessLogSchema.safeParse({ cursor: 'abc' }).success).toBe(false);
     expect(queryAuditLogSchema.safeParse({ cursor: '-1' }).success).toBe(false);
   });
