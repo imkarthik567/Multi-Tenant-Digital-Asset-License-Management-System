@@ -7,7 +7,8 @@
 import { categoryRepository } from '../repositories/category.repository';
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/AppError';
 import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.util';
-import { prisma, Prisma } from '../config/prisma';
+import { prisma } from '../config/prisma';
+import { Prisma } from '@prisma/client';
 
 export interface CategoryTreeNode {
   id: string;
