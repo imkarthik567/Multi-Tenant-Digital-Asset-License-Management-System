@@ -147,7 +147,24 @@ echo "  - Checksum File     : ${CHECKSUM_PATH}"
 # 5. Rotate backups: retain only latest 7
 echo ""
 echo "[INFO] Enforcing 7-Day Backup Retention Policy..."
-DUMPS=( $(ls -t "${BACKUP_DIR}"/assetvault_*.dump 2>/dev/null || true) )
+DUMPS=()
+while IFS= read -r -d '' dump; do
+  DUMPS+=("${dump}")
+done < <(
+  node -e '
+    const fs = require("fs");
+    const path = require("path");
+    const dir = process.argv[1];
+    const dumps = fs.readdirSync(dir)
+      .filter(name => name.startsWith("assetvault_") && name.endsWith(".dump"))
+      .map(name => {
+        const file = path.join(dir, name);
+        return { file, modified: fs.statSync(file).mtimeMs };
+      })
+      .sort((a, b) => b.modified - a.modified);
+    for (const dump of dumps) process.stdout.write(dump.file + "\0");
+  ' "${BACKUP_DIR}"
+)
 COUNT=${#DUMPS[@]}
 
 if [[ ${COUNT} -gt 7 ]]; then
