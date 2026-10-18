@@ -208,7 +208,9 @@ export class AuthService {
     const refreshData = generateRefreshTokenData();
 
     // 4. Create tenant, admin, and initial session atomically.
-    const { tenant, user } = await prisma.$transaction(async (tx: any) => {
+    let registrationResult: any;
+    try {
+      registrationResult = await prisma.$transaction(async (tx: any) => {
       // Configure RLS admin override for onboarding transaction.
       await tx.$executeRaw(
         Prisma.sql`SELECT
@@ -252,8 +254,18 @@ export class AuthService {
         },
       });
 
-      return { tenant: createdTenant, user: createdUser };
-    });
+        return { tenant: createdTenant, user: createdUser };
+      });
+    } catch (err) {
+      // The preflight checks improve common conflict messages, while unique
+      // constraints remain authoritative when concurrent registrations race.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictError('Tenant slug or admin email is already taken. Please use unique values.');
+      }
+      throw err;
+    }
+
+    const { tenant, user } = registrationResult;
 
     // 5. Build the access token for the committed account and session
     const roleName = user.role.name as RoleName;
