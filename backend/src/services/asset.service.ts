@@ -46,6 +46,10 @@ export class AssetService {
   }
 
   public async createAsset(_prismaClient: any, tenantId: string, ownerId: string, data: any) {
+    if (data.fileUrl && !/^[a-fA-F0-9]{64}$/.test(data.checksumSha256 || '')) {
+      throw new BadRequestError('A valid SHA-256 checksum is required when a file URL is provided.');
+    }
+
     // Asset metadata, its initial file version, and tags form one logical
     // create operation. Keep all writes in one transaction so a failed
     // version or tag insert cannot leave a partially created asset.
@@ -84,8 +88,7 @@ export class AssetService {
             versionNo: 1,
             fileUrl: data.fileUrl,
             fileSizeBytes: BigInt(data.fileSizeBytes || 1048576),
-            checksumSha256:
-              data.checksumSha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+            checksumSha256: data.checksumSha256,
             uploadedBy: ownerId,
           },
         });
@@ -179,6 +182,11 @@ export class AssetService {
    * Transaction 2: Safely computes next version number and inserts asset_version
    */
   public async createVersion(tenantId: string, assetId: string, data: any, userId: string) {
+    const checksumSha256 = data.checksumSha256 || data.checksum;
+    if (!/^[a-fA-F0-9]{64}$/.test(checksumSha256 || '')) {
+      throw new BadRequestError('A valid SHA-256 checksum is required for each file version.');
+    }
+
     return prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 
@@ -212,7 +220,7 @@ export class AssetService {
           versionNo: nextVersionNo,
           fileUrl: data.fileUrl,
           fileSizeBytes: BigInt(data.fileSizeBytes || data.fileSize || 1024),
-          checksumSha256: data.checksumSha256 || data.checksum || '0'.repeat(64),
+          checksumSha256,
           changeNotes: data.changeNotes || data.changelog || null,
           uploadedBy: userId,
         },
