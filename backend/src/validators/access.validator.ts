@@ -18,7 +18,7 @@ export const queryAccessLogSchema = z
     action: z.nativeEnum(AccessAction).optional(),
     userId: z.string().uuid().optional(),
     assetId: z.string().uuid().optional(),
-    cursor: z.string().regex(/^\\d+$/, 'cursor must be a positive integer').optional(),
+    cursor: z.string().regex(/^\d+$/, 'cursor must be a positive integer').optional(),
     dateFrom: queryDateSchema.optional(),
     dateTo: queryDateSchema.optional(),
     sort: z.string().optional(),
