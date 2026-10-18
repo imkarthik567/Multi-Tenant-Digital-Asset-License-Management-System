@@ -415,8 +415,8 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
     });
 
     it('returns COMPLIANT for an asset covered by an active license', async () => {
-      const assetId = '4fd9a502-0782-4601-b44c-e72a9ce8690e';
-      const tenantIdForTest = '6b87730b-4f6c-45f8-b77d-000000000001';
+      const assetId = '00000000-0000-4000-8000-000000000001';
+      const tenantIdForTest = '00000000-0000-4000-8000-000000000002';
       const findByIdSpy = vi.spyOn(assetRepository, 'findById').mockResolvedValue({
         id: assetId,
         tenantId: tenantIdForTest,
