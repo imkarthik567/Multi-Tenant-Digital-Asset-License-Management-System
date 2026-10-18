@@ -64,7 +64,7 @@ export class CategoryService {
     return rootNodes;
   }
 
-  public async createCategory(prismaClient: any, tenantId: string, data: any) {
+  public async createCategory(_prismaClient: any, tenantId: string, data: any) {
     // Serialize hierarchy changes per tenant so a concurrent reparent cannot
     // invalidate the cycle check between its read and write.
     return prisma.$transaction(async (tx: any) => {
