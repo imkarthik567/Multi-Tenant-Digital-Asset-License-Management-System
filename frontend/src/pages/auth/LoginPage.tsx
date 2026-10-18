@@ -1,7 +1,7 @@
 // ==============================================================================
 // AssetVault: Enterprise Login Page
 // Course: BCSE307L Database Systems (Fall 2026-27)
-// Email/Password login, Google OAuth trigger, and quick seeded demo personas
+// Email/password login and optional Google OAuth
 // ==============================================================================
 
 import React, { useState } from 'react';
@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { ShieldCheck, Lock, Mail, AlertCircle, Sparkles } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, AlertCircle } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -34,13 +34,12 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'techcorp.admin@techcorp.io',
-      password: 'Password123!',
+      email: '',
+      password: '',
     },
   });
 
@@ -62,11 +61,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const fillCredentials = (email: string) => {
-    setValue('email', email);
-    setValue('password', 'Password123!');
-  };
-
   const handleGoogleLogin = () => {
     window.location.href = '/api/auth/google';
   };
@@ -85,48 +79,6 @@ export const LoginPage: React.FC = () => {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
             Multi-Tenant Digital Asset & License Management System
           </p>
-        </div>
-
-        {/* Seeded Demo Persona Quick Select */}
-        <div className="mb-6 p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Select Demo Persona:</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => fillCredentials('superadmin@assetvault.io')}
-              className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-left transition-all"
-            >
-              <span className="font-semibold text-purple-600 dark:text-purple-400 block truncate">Super Admin</span>
-              <span className="text-[10px] text-slate-400 block truncate">superadmin@assetvault.io</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials('techcorp.admin@techcorp.io')}
-              className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-left transition-all"
-            >
-              <span className="font-semibold text-primary-600 dark:text-primary-400 block truncate">Tenant Admin</span>
-              <span className="text-[10px] text-slate-400 block truncate">techcorp.admin@...</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials('techcorp.mgr1@techcorp.io')}
-              className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-left transition-all"
-            >
-              <span className="font-semibold text-indigo-600 dark:text-indigo-400 block truncate">Asset Manager</span>
-              <span className="text-[10px] text-slate-400 block truncate">techcorp.mgr1@...</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials('techcorp.dev1@techcorp.io')}
-              className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-left transition-all"
-            >
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400 block truncate">Member (Dev)</span>
-              <span className="text-[10px] text-slate-400 block truncate">techcorp.dev1@...</span>
-            </button>
-          </div>
         </div>
 
         {/* Login Form Box */}
