@@ -32,7 +32,8 @@ const startServer = async () => {
       }
       server.close(async () => {
         await prisma.$disconnect();
-        console.log('🔌 PostgreSQL disconnected. Process exited.');
+        if (enableWorker) await jobScheduler.disconnectDatabase();
+        console.log('🔌 PostgreSQL connections closed. Process exited.');
         process.exit(0);
       });
     };
@@ -42,6 +43,7 @@ const startServer = async () => {
   } catch (error) {
     console.error('❌ Failed to start AssetVault API server:', error);
     await prisma.$disconnect();
+    await jobScheduler.disconnectDatabase();
     process.exit(1);
   }
 };
