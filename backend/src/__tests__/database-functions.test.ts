@@ -26,6 +26,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
   let vendorAId: string;
   let vendorBId: string;
   let testLicenseId: string;
+  let testLicenseKey: string;
 
   beforeAll(async () => {
     // 1. Fetch TechCorp (Tenant A)
@@ -62,13 +63,14 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
     vendorBId = vendorB!.id;
 
     // 5. Create a dedicated isolated test license for stored procedure verification
+    testLicenseKey = `TEST-SP-${Date.now()}`;
     const testLicense = await systemPrisma.license.create({
       data: {
         tenantId: tenantAId,
         vendorId: vendorAId,
         licenseTypeId: 3, // SEAT_BASED
         name: 'SP Audit Verification Suite License',
-        licenseKey: `TEST-SP-${Date.now()}`,
+        licenseKey: testLicenseKey,
         totalSeats: 2,
         cost: 150.0,
         currency: 'USD',
@@ -308,6 +310,34 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
           );`
         )
       ).rejects.toThrow(/Cross-tenant violation/i);
+    });
+
+    it('redacts license keys from INSERT and UPDATE audit snapshots', async () => {
+      const rotatedKey = `TEST-SP-ROTATED-${Date.now()}`;
+
+      // Update the fixture license so the audit row contains both old and new snapshots.
+      await systemPrisma.license.update({
+        where: { id: testLicenseId },
+        data: { licenseKey: rotatedKey },
+      });
+
+      const audit = await systemPrisma.auditLog.findFirst({
+        where: {
+          tableName: 'licenses',
+          recordId: testLicenseId,
+          action: 'UPDATE',
+        },
+        orderBy: { performedAt: 'desc' },
+      });
+
+      expect(audit).not.toBeNull();
+      const oldSnapshot = JSON.stringify(audit!.oldData ?? {});
+      const newSnapshot = JSON.stringify(audit!.newData ?? {});
+      for (const snapshot of [oldSnapshot, newSnapshot]) {
+        expect(snapshot).not.toContain('license_key');
+        expect(snapshot).not.toContain(testLicenseKey);
+        expect(snapshot).not.toContain(rotatedKey);
+      }
     });
 
     it('trg_audit_vendors automatically captures vendor mutations', async () => {
