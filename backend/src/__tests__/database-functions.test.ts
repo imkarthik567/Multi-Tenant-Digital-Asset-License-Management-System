@@ -465,6 +465,37 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       expect(typeof stats.asset_type_breakdown).toBe('object');
     });
 
+    it('marks tenant reporting views as security-invoker views', async () => {
+      const viewOptions: any[] = await prisma.$queryRaw`
+        SELECT relname, reloptions
+        FROM pg_class
+        WHERE relkind = 'v'
+          AND relname IN (
+            'v_license_utilization',
+            'v_expiring_licenses',
+            'v_asset_catalog',
+            'v_vendor_spend',
+            'v_tenant_summary'
+          );
+      `;
+
+      expect(viewOptions).toHaveLength(5);
+      for (const view of viewOptions) {
+        expect(view.reloptions || []).toContain('security_invoker=true');
+      }
+    });
+
+    it('does not grant tenant runtime direct SELECT on the all-tenant materialized view', async () => {
+      const privileges: any[] = await prisma.$queryRaw`
+        SELECT
+          has_table_privilege('assetvault_app', 'mv_monthly_access_stats', 'SELECT') AS can_read_raw,
+          has_table_privilege('assetvault_app', 'v_monthly_access_stats_tenant', 'SELECT') AS can_read_filtered;
+      `;
+
+      expect(privileges[0].can_read_raw).toBe(false);
+      expect(privileges[0].can_read_filtered).toBe(true);
+    });
+
     it('refreshes materialized view mv_monthly_access_stats concurrently', async () => {
       await expect(
         prisma.$executeRaw`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;`
