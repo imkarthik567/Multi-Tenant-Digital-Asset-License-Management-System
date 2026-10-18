@@ -52,6 +52,11 @@ jobs:
       - name: Security Gate - SQL Injection Static Analysis
         run: npm run check:sqli
 
+      - name: Validate Shell Script Syntax
+        run: |
+          bash -n backend/docker-entrypoint.sh
+          find database/backup -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+
       - name: Static Type-Check & Linting
         run: npm run lint
 
