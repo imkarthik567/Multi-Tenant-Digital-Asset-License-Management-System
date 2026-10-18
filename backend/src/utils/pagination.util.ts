@@ -34,11 +34,18 @@ export const getPaginationParams = (
   defaultSort = 'createdAt',
   allowedSortFields: string[] = ['createdAt', 'updatedAt', 'name', 'id']
 ): PaginationParams => {
-  const rawPage = parseInt(req.query.page as string, 10);
-  const rawLimit = parseInt(req.query.limit as string, 10);
+  const parsePositiveInteger = (value: unknown): number | undefined => {
+    if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return undefined;
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+  };
 
-  const page = !isNaN(rawPage) && rawPage > 0 ? rawPage : 1;
-  const limit = !isNaN(rawLimit) && rawLimit > 0 ? Math.min(100, rawLimit) : 10;
+  const rawPage = parsePositiveInteger(req.query.page);
+  const rawLimit = parsePositiveInteger(req.query.limit);
+  const limit = rawLimit === undefined ? 10 : Math.min(100, rawLimit);
+  const requestedPage = rawPage ?? 1;
+  const requestedSkip = (requestedPage - 1) * limit;
+  const page = Number.isSafeInteger(requestedSkip) ? requestedPage : 1;
   const skip = (page - 1) * limit;
 
   const rawQ = req.query.q as string;
