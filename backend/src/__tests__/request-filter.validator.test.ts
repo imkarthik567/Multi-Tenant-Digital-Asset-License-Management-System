@@ -16,9 +16,13 @@ import {
 describe('request date and cursor filters', () => {
   it('rejects malformed dates before they reach database queries', () => {
     expect(queryAssetSchema.safeParse({ createdFrom: 'not-a-date' }).success).toBe(false);
+    expect(queryAssetSchema.safeParse({ createdFrom: '2026-02-31' }).success).toBe(false);
     expect(queryAccessLogSchema.safeParse({ dateFrom: 'not-a-date' }).success).toBe(false);
+    expect(queryAccessLogSchema.safeParse({ dateTo: '2026-02-31' }).success).toBe(false);
     expect(queryAuditLogSchema.safeParse({ dateTo: 'not-a-date' }).success).toBe(false);
+    expect(queryAuditLogSchema.safeParse({ dateFrom: '2026-02-31' }).success).toBe(false);
     expect(exportAuditLogQuerySchema.safeParse({ startDate: 'not-a-date' }).success).toBe(false);
+    expect(exportAuditLogQuerySchema.safeParse({ endDate: '2026-02-31' }).success).toBe(false);
   });
 
   it('accepts date-only filters and preserves supported audit cursors', () => {

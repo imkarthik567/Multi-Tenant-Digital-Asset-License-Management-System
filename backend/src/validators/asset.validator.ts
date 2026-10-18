@@ -5,6 +5,7 @@
 // ==============================================================================
 
 import { z } from 'zod';
+import { dateStringSchema } from './date.validator';
 import { AssetType, AssetStatus } from '@prisma/client';
 
 export const createAssetSchema = z
@@ -41,10 +42,7 @@ export const attachTagsSchema = z
   })
   .strip();
 
-const queryDateSchema = z.string().refine(
-  (value) => !Number.isNaN(new Date(value).getTime()),
-  'Must be a valid date'
-);
+const queryDateSchema = dateStringSchema;
 
 export const queryAssetSchema = z
   .object({

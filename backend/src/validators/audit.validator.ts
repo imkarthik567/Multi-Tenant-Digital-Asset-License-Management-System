@@ -4,12 +4,10 @@
 // ==============================================================================
 
 import { z } from 'zod';
+import { dateStringSchema } from './date.validator';
 import { AuditAction } from '@prisma/client';
 
-const queryDateSchema = z.string().refine(
-  (value) => !Number.isNaN(new Date(value).getTime()),
-  'Must be a valid date'
-);
+const queryDateSchema = dateStringSchema;
 
 export const queryAuditLogSchema = z
   .object({

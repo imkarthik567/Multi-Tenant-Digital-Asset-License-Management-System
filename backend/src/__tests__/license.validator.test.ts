@@ -6,6 +6,13 @@ import {
 } from '../validators/license.validator';
 
 describe('license date validation', () => {
+  it('rejects impossible calendar dates instead of normalizing them', () => {
+    expect(updateLicenseSchema.safeParse({ endDate: '2026-02-31' }).success).toBe(false);
+    expect(
+      renewLicenseSchema.safeParse({ newEndDate: '2026-02-31', cost: 0 }).success
+    ).toBe(false);
+  });
+
   it('rejects malformed create and update date strings', () => {
     const createResult = createLicenseSchema.safeParse({
       name: 'Example License',

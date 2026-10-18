@@ -6,11 +6,9 @@
 
 import { z } from 'zod';
 import { LicenseStatus } from '@prisma/client';
+import { dateStringSchema } from './date.validator';
 
-const licenseDateSchema = z
-  .string()
-  .refine((value) => !Number.isNaN(new Date(value).getTime()), 'Invalid date')
-  .transform((value) => new Date(value));
+const licenseDateSchema = dateStringSchema.transform((value) => new Date(value));
 
 const positiveIntegerQuery = z
   .string()
