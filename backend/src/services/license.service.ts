@@ -166,8 +166,8 @@ export class LicenseService {
 
   public async linkAsset(prismaClient: any, assetId: string, licenseId: string) {
     const [asset, license] = await Promise.all([
-      prismaClient.asset.findUnique({ where: { id: assetId } }),
-      prismaClient.license.findUnique({ where: { id: licenseId } }),
+      prismaClient.asset.findFirst({ where: { id: assetId, deletedAt: null } }),
+      prismaClient.license.findFirst({ where: { id: licenseId, deletedAt: null } }),
     ]);
 
     if (!asset) throw new NotFoundError('Asset not found');
