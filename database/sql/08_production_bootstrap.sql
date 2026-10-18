@@ -50,6 +50,10 @@ GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA public TO assetvault_app;
 
+-- The materialized view contains all tenants; expose only the filtered wrapper view.
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM assetvault_app;
+GRANT SELECT ON TABLE v_monthly_access_stats_tenant TO assetvault_app;
+
 -- 9. Configure default privileges for future objects created by migrations/admin
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO assetvault_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO assetvault_app;
