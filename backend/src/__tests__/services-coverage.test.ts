@@ -25,6 +25,11 @@ import { PaginationParams } from '../utils/pagination.util';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
+const testPassword = process.env.DEFAULT_SEED_PASSWORD;
+if (!testPassword) {
+  throw new Error('Set DEFAULT_SEED_PASSWORD before running seeded-user integration tests.');
+}
+
 describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
   let tenantId: string;
   let adminUserId: string;
@@ -173,7 +178,7 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
         {
           fullName: 'Coverage Test User',
           email: testEmail,
-          password: 'Password123!',
+          password: testPassword,
           roleName: 'MEMBER',
         },
         adminUserId
