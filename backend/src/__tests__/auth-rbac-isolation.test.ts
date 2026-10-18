@@ -20,6 +20,10 @@ import app from '../app';
 import { prismaForRequest } from '../config/prisma';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
+const testPassword = process.env.DEFAULT_SEED_PASSWORD;
+if (!testPassword) {
+  throw new Error('Set DEFAULT_SEED_PASSWORD before running seeded-user authentication tests.');
+}
 
 describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
   let techcorpAdminToken: string;
@@ -87,7 +91,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.admin@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     expect(res.status).toBe(200);
@@ -175,7 +179,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.mgr1@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     expect(loginRes.status).toBe(200);
@@ -211,7 +215,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.mgr2@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     const cookies1 = loginRes.headers['set-cookie'];
@@ -252,7 +256,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.dev3@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     const cookies = loginRes.headers['set-cookie'];
@@ -289,7 +293,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.dev1@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     expect(memberLogin.status).toBe(200);
