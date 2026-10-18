@@ -55,6 +55,25 @@ const parseEnv = () => {
     process.exit(1);
   }
 
+  if (result.data.NODE_ENV === 'production') {
+    const productionSecrets = [
+      result.data.JWT_ACCESS_SECRET,
+      result.data.JWT_REFRESH_SECRET,
+      result.data.COOKIE_SECRET,
+    ];
+    const unsafePlaceholder = /placeholder|change.?me|example|your[_ -]?(secret|key)|postgrespassword|password123/i;
+
+    if (productionSecrets.some((secret) => unsafePlaceholder.test(secret))) {
+      console.error('❌ FATAL: Replace template/example values with real random secrets in production.');
+      process.exit(1);
+    }
+
+    if (new Set(productionSecrets).size !== productionSecrets.length) {
+      console.error('❌ FATAL: JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, and COOKIE_SECRET must all be different.');
+      process.exit(1);
+    }
+  }
+
   if (
     result.data.NODE_ENV === 'production' &&
     (!process.env.METRICS_BEARER_TOKEN ||
