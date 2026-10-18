@@ -5,6 +5,7 @@ import { queryLicenseSchema } from '../validators/license.validator';
 import { queryTenantSchema } from '../validators/tenant.validator';
 import { planIdParamsSchema } from '../validators/plan.validator';
 import { compareVersionsQuerySchema, versionNoParamsSchema } from '../validators/version.validator';
+import { runExpiryCheckSchema } from '../validators/notification.validator';
 import {
   exportAuditLogQuerySchema,
   queryAuditLogSchema,
@@ -98,5 +99,20 @@ describe('asset version number inputs', () => {
     expect(versionNoParamsSchema.safeParse({ id: '00000000-0000-4000-8000-000000000001', versionNo: '2' }).success).toBe(true);
     const result = compareVersionsQuerySchema.safeParse({ v1: '2', v2: '3' });
     expect(result.success && result.data).toEqual({ from: 2, to: 3 });
+  });
+});
+
+
+describe('expiry check day count', () => {
+  it('rejects malformed and out-of-range lookahead values', () => {
+    expect(runExpiryCheckSchema.safeParse({ lookaheadDays: '2x' }).success).toBe(false);
+    expect(runExpiryCheckSchema.safeParse({ lookaheadDays: '1e2' }).success).toBe(false);
+    expect(runExpiryCheckSchema.safeParse({ lookaheadDays: '366' }).success).toBe(false);
+  });
+
+  it('accepts valid day counts and the legacy alias', () => {
+    const result = runExpiryCheckSchema.safeParse({ daysAhead: '30' });
+    expect(result.success && result.data.lookaheadDays).toBe(30);
+    expect(runExpiryCheckSchema.safeParse({ lookaheadDays: '1' }).success).toBe(true);
   });
 });
