@@ -14,6 +14,8 @@ RESTORE_SCRIPT="${SCRIPT_DIR}/restore.sh"
 DUMP_FILE=""
 KEEP_SCRATCH=false
 DOCKER_MODE=false
+# Avoid dropping an unrelated database that happens to use a fixed test name.
+SCRATCH_DB="${SCRATCH_DB:-assetvault_restore_test_$(date -u +%Y%m%d%H%M%S)_$}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,8 +41,8 @@ echo " AssetVault: Database Restore Verification Drill"
 echo "================================================================================"
 
 # 1. Restore into scratch DB
-echo "[STEP 1/3] Restoring backup archive into scratch database 'assetvault_restore_test'..."
-RESTORE_CMD=("${RESTORE_SCRIPT}" "--scratch" "-y")
+echo "[STEP 1/3] Restoring backup archive into scratch database '${SCRATCH_DB}'..."
+RESTORE_CMD=("${RESTORE_SCRIPT}" "--scratch" "--target-db" "${SCRATCH_DB}" "-y")
 if [[ -n "${DUMP_FILE}" ]]; then
   RESTORE_CMD+=("${DUMP_FILE}")
 fi
@@ -83,7 +85,7 @@ DB_PORT="${PGPORT:-5432}"
 DB_USER="${PGUSER:-${POSTGRES_USER:-postgres}}"
 DB_PASS="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 SOURCE_DB="${PGDATABASE:-${POSTGRES_DB:-assetvault_db}}"
-SCRATCH_DB="assetvault_restore_test"
+# SCRATCH_DB was generated before invoking restore.sh so the same name is reused for validation and cleanup.
 
 if [[ -n "${DATABASE_URL:-}" ]]; then
   PROTO="$(echo "${DATABASE_URL}" | grep :// | sed -e's,^\(.*://\).*,\1,g')"
