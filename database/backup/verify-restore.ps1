@@ -88,7 +88,8 @@ try {
     $restoreSucceeded = $true
 
     $tableQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT LIKE '_prisma%' ORDER BY table_name;"
-    $tables = @(Invoke-VerificationSql $ConnectionDetails.database $tableQuery -split "`r?`n" | Where-Object { $_ })
+    $tableList = Invoke-VerificationSql $ConnectionDetails.database $tableQuery
+    $tables = @($tableList -split "`r?`n" | Where-Object { $_ })
     if ($tables.Count -eq 0) {
         throw "No base tables found in source database '$($ConnectionDetails.database)'."
     }
