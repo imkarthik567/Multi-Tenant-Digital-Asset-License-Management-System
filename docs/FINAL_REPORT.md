@@ -283,7 +283,7 @@ Five automated workflows ensure continuous integration and deployment:
 2. `docker-publish.yml`: Builds and verifies container images and publishes to Docker Hub with Trivy vulnerability scanning.
 3. `deploy.yml`: Deploys API to Render Blueprint and Web SPA to Vercel.
 4. `keepalive.yml`: Healthcheck pings preventing free-tier dormancy.
-5. `db-backup.yml`: Automated database backup artifact generation and verification.
+5. `db-backup.yml`: Automated database backup artifact generation and checksum upload; restore validation is a separate drill using `database/backup/verify-restore.sh`.
 
 ---
 
@@ -291,7 +291,7 @@ Five automated workflows ensure continuous integration and deployment:
 
 > **Verification note (October 18, 2026):** GitHub Actions run [39135857240](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39135857240) passed on the rubric-fix branch. It completed secret scanning, SQL-injection static analysis, shell syntax checks, TypeScript/lint, migrations, custom SQL, seeding, Vitest, production seed compilation and production monorepo build. The Docker Build & Publish run [39135857203](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39135857203) also succeeded. This verifies the checked branch in CI, not the live cloud deployment or backup restore drill.
 
-The automated test suite (`npm test`) executes across six distinct suites:
+The automated test suite (`npm test`) currently executes across eight test files:
 
 ```
 Test Suite Execution Results:
