@@ -13,8 +13,15 @@ import { notificationStreamService } from '../services/notificationStream.servic
 
 // Scheduled maintenance spans tenants and must use the explicitly configured
 // maintenance connection. The web API uses the restricted assetvault_app role.
+const maintenanceUrl = env.DIRECT_URL || env.DATABASE_URL;
 const workerPrisma = new PrismaClient({
-  datasources: { db: { url: env.DIRECT_URL || env.DATABASE_URL } },
+  datasources: { db: { url: maintenanceUrl } },
+});
+
+// This client pins the advisory lock to a transaction-owned connection. Keep it
+// separate from workerPrisma, which executes job SQL through its own pool.
+const lockPrisma = new PrismaClient({
+  datasources: { db: { url: maintenanceUrl } },
 });
 
 // Advisory lock keys (32-bit unique integers)
@@ -34,23 +41,29 @@ export class JobScheduler {
     action: () => Promise<T>
   ): Promise<T | null> {
     try {
-      const lockResult: any = await workerPrisma.$queryRaw(
-        Prisma.sql`SELECT pg_try_advisory_lock(${lockId}) AS locked;`
+      // Transaction-level advisory locks are tied to one pinned connection and
+      // are always released on commit/rollback. Do not acquire/release a
+      // session-level lock in two separate pooled Prisma queries.
+      return await lockPrisma.$transaction(
+        async (tx) => {
+          const lockResult = await tx.$queryRaw<Array<{ locked: boolean }>>(
+            Prisma.sql`SELECT pg_try_advisory_xact_lock(${lockId}) AS locked;`
+          );
+          const isLocked = Boolean(lockResult[0]?.locked);
+
+          if (!isLocked) {
+            logger.info(
+              { jobName, lockId },
+              'Advisory lock held by another worker instance. Skipping execution.'
+            );
+            return null;
+          }
+
+          logger.info({ jobName, lockId }, `Acquired advisory lock ${lockId}. Executing job...`);
+          return await action();
+        },
+        { maxWait: 10_000, timeout: 30 * 60 * 1000 }
       );
-      const isLocked = Boolean(lockResult?.[0]?.locked);
-
-      if (!isLocked) {
-        logger.info({ jobName, lockId }, 'Advisory lock held by another worker instance. Skipping execution.');
-        return null;
-      }
-
-      logger.info({ jobName, lockId }, `Acquired advisory lock ${lockId}. Executing job...`);
-      try {
-        return await action();
-      } finally {
-        await workerPrisma.$queryRaw(Prisma.sql`SELECT pg_advisory_unlock(${lockId});`);
-        logger.debug({ jobName, lockId }, `Released advisory lock ${lockId}.`);
-      }
     } catch (err: any) {
       logger.error({ err, jobName, lockId }, `Error in job execution with advisory lock ${lockId}`);
       return null;
@@ -268,7 +281,7 @@ export class JobScheduler {
 
   /** Close the dedicated maintenance connection during graceful shutdown. */
   public async disconnectDatabase(): Promise<void> {
-    await workerPrisma.$disconnect();
+    await Promise.all([workerPrisma.$disconnect(), lockPrisma.$disconnect()]);
   }
 
   /**
