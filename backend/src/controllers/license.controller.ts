@@ -52,7 +52,12 @@ export class LicenseController {
   });
 
   public updateLicense = asyncHandler(async (req: Request, res: Response) => {
-    const license = await licenseService.updateLicense(req.prisma, req.params.id as string, req.body);
+    const license = await licenseService.updateLicense(
+      req.prisma,
+      req.params.id as string,
+      req.body,
+      { tenantId: req.user!.tenantId || undefined, userId: req.user!.id }
+    );
     sendResponse(res, 200, license);
   });
 
