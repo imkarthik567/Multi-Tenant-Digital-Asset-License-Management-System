@@ -26,6 +26,10 @@ if (!testPassword) {
   throw new Error('Set DEFAULT_SEED_PASSWORD before running seeded-user integration tests.');
 }
 const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@assetvault.io';
+const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
+if (!superAdminPassword) {
+  throw new Error('Set SUPER_ADMIN_PASSWORD before running super-admin integration tests.');
+}
 
 describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
   let adminToken: string;
@@ -60,7 +64,7 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
     // 3. Authenticate Platform Super Admin
     const superAdminRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: superAdminEmail, password: testPassword });
+      .send({ email: superAdminEmail, password: superAdminPassword });
     expect(superAdminRes.status).toBe(200);
     superAdminToken = superAdminRes.body.data.accessToken;
 
