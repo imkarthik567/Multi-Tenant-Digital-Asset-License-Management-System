@@ -28,7 +28,6 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
   let innovatelabsTenantId: string;
   let techcorpAssetId: string;
   let innovatelabsAssetId: string;
-  let registrationTestSlug: string | null = null;
 
   beforeAll(async () => {
     // 1. Retrieve TechCorp and InnovateLabs tenant IDs
@@ -385,7 +384,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
 
   it('11. Tenant self-registration records the initial authenticated login timestamp', async () => {
     const suffix = `1792312784150-${Math.floor(Math.random() * 10000)}`;
-    registrationTestSlug = `last-login-qa-${suffix}`;
+    const registrationTestSlug = `last-login-qa-${suffix}`;
     const adminEmail = `last-login-user-${suffix}@example.com`;
 
     const res = await request(app)
@@ -411,16 +410,6 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
   });
 
   afterAll(async () => {
-    if (registrationTestSlug) {
-      const registrationTenant = await systemPrisma.tenant.findUnique({
-        where: { slug: registrationTestSlug },
-        select: { id: true },
-      });
-      if (registrationTenant) {
-        await systemPrisma.tenant.delete({ where: { id: registrationTenant.id } });
-      }
-    }
-
     const testAssets = await systemPrisma.asset.findMany({
       where: {
         OR: [
