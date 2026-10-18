@@ -158,18 +158,37 @@ export class CategoryService {
   }
 
   public async deleteCategory(prismaClient: any, id: string) {
-    const category = await this.getCategoryById(prismaClient, id);
+    const existing = await this.getCategoryById(prismaClient, id);
 
-    // Block deletion if it has children or assets (Course requirement: return 409)
-    if (category.children && category.children.length > 0) {
-      throw new ConflictError('Cannot delete category with child subcategories. Please reassign or delete subcategories first.');
-    }
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${existing.tenantId}, true),
+          set_config('app.current_user_id', '', true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
 
-    if (category._count?.assets > 0) {
-      throw new ConflictError('Cannot delete category with associated digital assets. Please reassign assets first.');
-    }
+      // Lock the referenced category row while checking and deleting. Inserts
+      // that attach a child or asset must take a foreign-key key-share lock.
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM categories WHERE id = ${id}::UUID FOR UPDATE;`
+      );
 
-    return categoryRepository.delete(prismaClient, id);
+      const category = await categoryRepository.findById(tx, id);
+      if (!category) {
+        throw new NotFoundError('Category not found');
+      }
+
+      if (category.children && category.children.length > 0) {
+        throw new ConflictError('Cannot delete category with child subcategories. Please reassign or delete subcategories first.');
+      }
+
+      if (category._count?.assets > 0) {
+        throw new ConflictError('Cannot delete category with associated digital assets. Please reassign assets first.');
+      }
+
+      return categoryRepository.delete(tx, id);
+    });
   }
 }
 
