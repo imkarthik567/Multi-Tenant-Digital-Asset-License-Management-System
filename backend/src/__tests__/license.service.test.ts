@@ -2,6 +2,63 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { licenseRepository } from '../repositories/license.repository';
 import { licenseService } from '../services/license.service';
 
+describe('license partial date updates', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const id = '00000000-0000-4000-8000-000000000041';
+  const tenantId = '00000000-0000-4000-8000-000000000042';
+  const lockedDateRows = [{ start_date: new Date('2026-01-01'), end_date: new Date('2026-01-31') }];
+
+  it('validates the stored end date when a partial update advances startDate', async () => {
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      $queryRaw: vi.fn().mockResolvedValue(lockedDateRows),
+    };
+    const prismaClient = {
+      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+    vi.spyOn(licenseRepository, 'findById').mockResolvedValue({ id, tenantId } as any);
+    const updateSpy = vi.spyOn(licenseRepository, 'update').mockResolvedValue({ id } as any);
+
+    await expect(
+      licenseService.updateLicense(
+        prismaClient,
+        id,
+        { startDate: new Date('2026-02-01') },
+        { tenantId, userId: 'user-id' }
+      )
+    ).rejects.toThrow('End date must be after start date');
+
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('allows a partial update to clear the stored end date explicitly', async () => {
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      $queryRaw: vi.fn().mockResolvedValue(lockedDateRows),
+    };
+    const prismaClient = {
+      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+    vi.spyOn(licenseRepository, 'findById').mockResolvedValue({ id, tenantId } as any);
+    const updated = { id, startDate: new Date('2026-02-01'), endDate: null };
+    const updateSpy = vi.spyOn(licenseRepository, 'update').mockResolvedValue(updated as any);
+
+    await expect(
+      licenseService.updateLicense(
+        prismaClient,
+        id,
+        { startDate: updated.startDate, endDate: null },
+        { tenantId, userId: 'user-id' }
+      )
+    ).resolves.toBe(updated);
+
+    expect(updateSpy).toHaveBeenCalledWith(tx, id, expect.objectContaining({ endDate: null }));
+  });
+});
+
 describe('license seat-capacity updates', () => {
   afterEach(() => {
     vi.restoreAllMocks();
