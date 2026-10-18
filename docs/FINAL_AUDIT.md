@@ -1,11 +1,13 @@
 # AssetVault - Course Brief & Marking Scheme Final Audit
 **Course:** BCSE307L Database Systems (Fall 2026-27)  
 **Examiner Evaluation Mode:** Demanding Examiner Strict Audit  
-**Date of Audit:** October 14, 2026  
-**Auditor:** Automated Rigorous Code & Catalog Inspector (Antigravity Agent)  
-**Overall Project Status:** **100% PASS (ALL CRITERIA VERIFIED ON RUNNING SYSTEM)**  
+**Date of Audit:** October 18, 2026  
+**Auditor:** Source-level repository review  
+**Overall Project Status:** **IN PROGRESS — source-level review; live-system verification and rubric gaps remain**  
 
 ---
+
+> **Verification scope:** This document contains historical project claims and evidence descriptions. During the current review, source files and workflow configuration were inspected, but the production database was not queried and a full local/runtime test was not executed. Catalog counts, live deployment behavior, backup recovery, repository privacy, and collaborator access must be independently re-verified before this can be marked fully compliant.
 
 ## 1. Requirement-by-Requirement Verification Matrix
 
@@ -19,7 +21,7 @@
 | **Team Members & Responsibilities** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L106-L125) | **PASS** | Structured responsibility distribution matrix across Database Architecture, Backend API, Frontend SPA, and DevOps/QA. |
 | **Technology Stack** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L126-L155) | **PASS** | PostgreSQL 16, Prisma ORM, Node.js/Express TypeScript, React 18/Vite/Tailwind, Docker, Prometheus/Grafana. |
 | **Major Deliverables** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L156-L180) | **PASS** | Schema DDL, REST API, Web Dashboard, Backup/Restore Tooling, Test Suites, Deployment Blueprints. |
-| **Gantt Chart** | [`docs/gantt-chart.md`](./PROJECT_SCHEDULE_GANTT.md), [`docs/gantt.svg`](./gantt.svg) | **PASS** | Complete 12-week Gantt timeline in Markdown and vector SVG formats. |
+| **Gantt Chart** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md) Mermaid Gantt, [`gantt.svg`](./gantt.svg) | **PRESENT** | Timeline is embedded in the proposal and a vector graphic exists. |
 
 ---
 
