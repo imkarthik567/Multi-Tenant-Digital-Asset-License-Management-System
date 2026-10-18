@@ -444,9 +444,15 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
 
     const createdUser = await systemPrisma.user.findUnique({
       where: { email: adminEmail },
-      select: { lastLoginAt: true },
+      select: { id: true, lastLoginAt: true },
     });
     expect(createdUser?.lastLoginAt).toBeInstanceOf(Date);
+
+    const initialSession = await systemPrisma.refreshToken.findFirst({
+      where: { userId: createdUser!.id, revokedAt: null },
+      select: { id: true },
+    });
+    expect(initialSession).not.toBeNull();
   });
 
   afterAll(async () => {
