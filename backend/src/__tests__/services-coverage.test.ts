@@ -486,6 +486,36 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       }
     });
 
+    it('rolls back all tag links when any requested tag is missing', async () => {
+      if (!testAssetId) {
+        throw new Error('Test precondition failed: TechCorp asset missing');
+      }
+
+      const tag = await systemPrisma.tag.create({
+        data: {
+          tenantId,
+          name: `atomic-attach-${Date.now()}`,
+        },
+      });
+
+      try {
+        await expect(
+          assetService.attachTags(tenantId, adminUserId, testAssetId, [
+            tag.id,
+            '00000000-0000-4000-8000-000000000099',
+          ])
+        ).rejects.toThrow('Tag not found');
+
+        const relation = await systemPrisma.assetTag.findUnique({
+          where: { assetId_tagId: { assetId: testAssetId, tagId: tag.id } },
+        });
+        expect(relation).toBeNull();
+      } finally {
+        await systemPrisma.assetTag.deleteMany({ where: { tagId: tag.id } });
+        await systemPrisma.tag.delete({ where: { id: tag.id } });
+      }
+    });
+
     it('rolls back an asset if an initial tag cannot be created', async () => {
       const assetCode = `ATOMIC-CREATE-${Date.now()}`;
 
