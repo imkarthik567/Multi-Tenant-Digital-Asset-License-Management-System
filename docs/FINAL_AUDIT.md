@@ -116,7 +116,7 @@
 | **Docker Compose Orchestration** | `docker-compose.yml` | **PASS** | Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies. |
 | **Git Hygiene & Commit History** | `git log --oneline` | **PASS** | Clean history with Conventional Commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `ci:`); dual-branch model (`main`, `dev`). |
 | **CI/CD Automation (5 Workflows)** | `.github/workflows/` | **PASS** | `ci.yml`, `docker-publish.yml`, `deploy.yml`, `keepalive.yml`, and `db-backup.yml`. |
-| **Automated Test Coverage** | `backend/src/__tests__/` | **IN PROGRESS** | Latest observed CI completed type-check/lint, secret scan, SQL injection scan, migrations and seed, then reported 132 passed and 1 failed. Re-run the workflow after the password-validation fixture fix before recording a pass. |
+| **Automated Tests** | `backend/src/__tests__/`, [CI run](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39135857240) | **PASS IN CI** | Latest run: 8 test files, 139 tests passed, 0 failed; secret scan, SQLi scan, shell syntax, lint/type-check, database migrations/seeding, seed compilation and production build passed. Coverage was 69.60% statements / 71.68% lines; statement coverage is below a 70% target. Live deployment and restore are not verified by this run. |
 
 ---
 
