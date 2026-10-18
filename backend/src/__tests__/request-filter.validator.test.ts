@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { queryAccessLogSchema } from '../validators/access.validator';
 import { queryAssetSchema } from '../validators/asset.validator';
+import { queryLicenseSchema } from '../validators/license.validator';
 import {
   exportAuditLogQuerySchema,
   queryAuditLogSchema,
@@ -29,5 +30,27 @@ describe('request date and cursor filters', () => {
     expect(queryAuditLogSchema.safeParse({ limit: 'abc' }).success).toBe(false);
     expect(queryAccessLogSchema.safeParse({ cursor: 'abc' }).success).toBe(false);
     expect(queryAuditLogSchema.safeParse({ cursor: '-1' }).success).toBe(false);
+  });
+});
+
+describe('license numeric filters', () => {
+  it('rejects malformed and out-of-range numeric filters', () => {
+    expect(queryLicenseSchema.safeParse({ licenseTypeId: '2x' }).success).toBe(false);
+    expect(queryLicenseSchema.safeParse({ licenseTypeId: '2147483648' }).success).toBe(false);
+    expect(queryLicenseSchema.safeParse({ expiringWithinDays: '-1' }).success).toBe(false);
+    expect(queryLicenseSchema.safeParse({ minCost: 'NaN' }).success).toBe(false);
+    expect(queryLicenseSchema.safeParse({ maxCost: '1e2' }).success).toBe(false);
+    expect(queryLicenseSchema.safeParse({ minCost: '10', maxCost: '9.99' }).success).toBe(false);
+  });
+
+  it('accepts valid zero-day and decimal cost filters', () => {
+    const result = queryLicenseSchema.safeParse({
+      licenseTypeId: '12',
+      expiringWithinDays: '0',
+      minCost: '0',
+      maxCost: '99.99',
+    });
+
+    expect(result.success).toBe(true);
   });
 });
