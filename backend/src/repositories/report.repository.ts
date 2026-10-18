@@ -122,28 +122,15 @@ export class ReportRepository {
     return this.withTenantContext(prismaClient, tenantId, (tx) =>
       tx.$queryRaw<any[]>(
         Prisma.sql`
-          WITH monthly_costs AS (
-            SELECT
-              TO_CHAR(COALESCE(l.start_date, l.created_at), 'YYYY-MM') AS month_year,
-              SUM(l.cost) AS monthly_spend
-            FROM licenses l
-            WHERE l.tenant_id = ${tenantId}::uuid
-              AND l.deleted_at IS NULL
-            GROUP BY TO_CHAR(COALESCE(l.start_date, l.created_at), 'YYYY-MM')
-          )
-          SELECT
-            month_year,
-            COALESCE(monthly_spend, 0)::NUMERIC(12,2) AS monthly_spend,
-            SUM(COALESCE(monthly_spend, 0)) OVER (
-              ORDER BY month_year ASC
-              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-            )::NUMERIC(12,2) AS running_total_spend
-          FROM monthly_costs
+          SELECT month_year, monthly_spend, running_total_spend
+          FROM v_monthly_spend
+          WHERE tenant_id = ${tenantId}::uuid
           ORDER BY month_year ASC;
         `
       )
     );
   }
+
   /**
    * 6. Top 10 Most Downloaded Assets (Window Function RANK() OVER (...))
    */
@@ -151,33 +138,16 @@ export class ReportRepository {
     return this.withTenantContext(prismaClient, tenantId, (tx) =>
       tx.$queryRaw<any[]>(
         Prisma.sql`
-          WITH asset_downloads AS (
-            SELECT
-              a.id AS asset_id,
-              a.name AS asset_name,
-              a.asset_code,
-              COUNT(aal.id) AS download_count
-            FROM assets a
-            LEFT JOIN asset_access_logs aal
-              ON aal.asset_id = a.id
-              AND aal.action = 'DOWNLOAD'
-            WHERE a.tenant_id = ${tenantId}::uuid
-              AND a.deleted_at IS NULL
-            GROUP BY a.id, a.name, a.asset_code
-          )
-          SELECT
-            asset_id,
-            asset_name,
-            asset_code,
-            download_count,
-            RANK() OVER (ORDER BY download_count DESC) AS rank
-          FROM asset_downloads
-          ORDER BY rank ASC, asset_name ASC
-          LIMIT 10;
+          SELECT asset_id, asset_name, asset_code, download_count, rank
+          FROM v_top_downloaded_assets
+          WHERE tenant_id = ${tenantId}::uuid
+            AND rank <= 10
+          ORDER BY rank ASC, asset_name ASC;
         `
       )
     );
   }
+
   /**
    * 7. Unlicensed & Expired Assets Report (v_asset_catalog)
    */
