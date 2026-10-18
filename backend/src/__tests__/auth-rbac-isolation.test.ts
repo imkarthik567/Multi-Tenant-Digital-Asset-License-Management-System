@@ -399,7 +399,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
         contactEmail: `last-login-contact-${suffix}@example.com`,
         adminFullName: 'Last Login QA User',
         adminEmail,
-        password: 'Strong-QA-Pass123!',
+        password: testPassword,
       });
 
     expect(res.status).toBe(201);
