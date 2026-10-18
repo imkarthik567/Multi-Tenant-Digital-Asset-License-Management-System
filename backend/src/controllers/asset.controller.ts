@@ -82,7 +82,7 @@ export class AssetController {
   });
 
   public getVersionByNo = asyncHandler(async (req: Request, res: Response) => {
-    const versionNo = parseInt(req.params.versionNo as string, 10);
+    const versionNo = Number(req.params.versionNo);
     const version = await assetService.getVersionByNo(req.prisma, req.params.id as string, versionNo);
     sendResponse(res, 200, version);
   });
