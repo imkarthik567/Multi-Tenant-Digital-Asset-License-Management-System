@@ -273,15 +273,15 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
     const rejected = first.status === 401 ? first : second;
     expect(rejected.body.error.message).toContain('Compromised refresh token reuse detected');
 
-    const user = await systemPrisma.user.findUnique({
-      where: { email: 'techcorp.dev2@techcorp.io' },
-      select: { id: true },
-    });
-    expect(user).toBeDefined();
-    const activeTokens = await systemPrisma.refreshToken.count({
-      where: { userId: user!.id, revokedAt: null },
-    });
-    expect(activeTokens).toBe(0);
+    const successful = first.status === 200 ? first : second;
+    const rotatedCookies = successful.headers['set-cookie'];
+    const rotatedCookie = Array.isArray(rotatedCookies) ? rotatedCookies[0] : rotatedCookies;
+    const rotatedToken = rotatedCookie.match(/refreshToken=([^;]+)/)![1];
+
+    const replayedReplacement = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${rotatedToken}`]);
+    expect(replayedReplacement.status).toBe(401);
   });
 
   // ----------------------------------------------------------------------------
