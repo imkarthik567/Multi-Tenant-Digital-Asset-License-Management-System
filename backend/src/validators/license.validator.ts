@@ -58,7 +58,7 @@ export const updateLicenseSchema = z
 
 export const renewLicenseSchema = z
   .object({
-    newEndDate: z.string().transform((str) => new Date(str)),
+    newEndDate: licenseDateSchema,
     cost: z.number().min(0, 'Renewal cost must be non-negative'),
     notes: z.string().max(1000).optional(),
   })
