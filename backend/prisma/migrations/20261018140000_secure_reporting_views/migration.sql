@@ -9,6 +9,54 @@ ALTER VIEW v_license_utilization SET (security_invoker = true);
 ALTER VIEW v_expiring_licenses SET (security_invoker = true);
 ALTER VIEW v_asset_catalog SET (security_invoker = true);
 ALTER VIEW v_vendor_spend SET (security_invoker = true);
+
+CREATE OR REPLACE VIEW v_vendor_spend WITH (security_invoker = true) AS
+WITH license_totals AS (
+    SELECT
+        l.tenant_id,
+        l.vendor_id,
+        COUNT(l.id) AS license_count,
+        COALESCE(SUM(l.cost), 0)::NUMERIC(12,2) AS total_initial_cost,
+        COALESCE(SUM(l.total_seats), 0)::BIGINT AS total_seats_contracted
+    FROM licenses l
+    WHERE l.deleted_at IS NULL
+    GROUP BY l.tenant_id, l.vendor_id
+),
+renewal_totals AS (
+    SELECT
+        l.tenant_id,
+        l.vendor_id,
+        COALESCE(SUM(lr.cost), 0)::NUMERIC(12,2) AS total_renewal_cost
+    FROM licenses l
+    JOIN license_renewals lr ON lr.license_id = l.id
+    WHERE l.deleted_at IS NULL
+    GROUP BY l.tenant_id, l.vendor_id
+)
+SELECT
+    v.tenant_id,
+    v.id AS vendor_id,
+    v.name AS vendor_name,
+    v.contact_email,
+    COALESCE(lt.license_count, 0)::BIGINT AS license_count,
+    COALESCE(lt.total_initial_cost, 0)::NUMERIC(12,2) AS total_initial_cost,
+    COALESCE(rt.total_renewal_cost, 0)::NUMERIC(12,2) AS total_renewal_cost,
+    (
+      COALESCE(lt.total_initial_cost, 0) +
+      COALESCE(rt.total_renewal_cost, 0)
+    )::NUMERIC(12,2) AS grand_total_spend,
+    COALESCE(lt.total_seats_contracted, 0)::BIGINT AS total_seats_contracted,
+    ROUND(
+      (
+        COALESCE(lt.total_initial_cost, 0) +
+        COALESCE(rt.total_renewal_cost, 0)
+      ) / NULLIF(lt.total_seats_contracted, 0),
+      2
+    ) AS avg_cost_per_seat
+FROM vendors v
+LEFT JOIN license_totals lt
+  ON lt.tenant_id = v.tenant_id AND lt.vendor_id = v.id
+LEFT JOIN renewal_totals rt
+  ON rt.tenant_id = v.tenant_id AND rt.vendor_id = v.id;
 ALTER VIEW v_tenant_summary SET (security_invoker = true);
 
 CREATE OR REPLACE VIEW v_monthly_spend WITH (security_invoker = true) AS
