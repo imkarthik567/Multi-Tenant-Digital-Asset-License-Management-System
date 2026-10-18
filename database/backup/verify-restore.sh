@@ -102,25 +102,28 @@ cleanup_scratch() {
   local original_status="$?"
   local cleanup_status=0
   trap - EXIT
-  if [[ "${KEEP_SCRATCH}" != "true" ]]; then
+  if [[ "${KEEP_SCRATCH}" != "true" && "${RESTORE_SUCCEEDED}" == "true" ]]; then
     echo ""
     echo "[STEP 3/3] Dropping transient scratch database '${SCRATCH_DB}'..."
     if [[ "${DOCKER_MODE}" == "true" ]]; then
-      docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -v ON_ERROR_STOP=1 -U "${DB_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${SCRATCH_DB};" > /dev/null || cleanup_status=$?
+      docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -v ON_ERROR_STOP=1 -U "${DB_USER}" -d postgres -c "DROP DATABASE ${SCRATCH_DB};" > /dev/null || cleanup_status=$?
     else
-      psql "$(pg_uri_with_database "${source_url}" "postgres")" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ${SCRATCH_DB};" > /dev/null || cleanup_status=$?
+      psql "$(pg_uri_with_database "${source_url}" "postgres")" -v ON_ERROR_STOP=1 -c "DROP DATABASE ${SCRATCH_DB};" > /dev/null || cleanup_status=$?
     fi
     if [[ "${cleanup_status}" -eq 0 ]]; then
       echo "[INFO] Scratch database cleaned up."
     else
       echo "[ERROR] Could not clean up scratch database '${SCRATCH_DB}'." >&2
     fi
+  elif [[ "${KEEP_SCRATCH}" != "true" ]]; then
+    echo "[WARN] Restore did not complete; leaving any scratch database untouched for safety." >&2
   fi
   if [[ "${original_status}" -eq 0 && "${cleanup_status}" -ne 0 ]]; then
     original_status="${cleanup_status}"
   fi
   exit "${original_status}"
 }
+RESTORE_SUCCEEDED=false
 trap cleanup_scratch EXIT
 
 # 1. Restore into scratch DB
@@ -133,7 +136,7 @@ if [[ "${DOCKER_MODE}" == "true" ]]; then
   RESTORE_CMD+=("--docker")
 fi
 "${RESTORE_CMD[@]}"
-
+RESTORE_SUCCEEDED=true
 
 run_sql() {
   local target_db="$1"
