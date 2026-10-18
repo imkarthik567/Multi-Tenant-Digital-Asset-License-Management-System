@@ -122,19 +122,28 @@ export class AuthService {
 
     const refreshData = generateRefreshTokenData();
 
-    await systemPrisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: refreshData.tokenHash,
-        expiresAt: refreshData.expiresAt,
-        userAgent: metadata.userAgent,
-        ipAddress: metadata.ipAddress,
-      },
-    });
-
-    await systemPrisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+    // Persist the new session and login timestamp together so a failed write
+    // cannot leave an orphaned refresh token or a false successful login.
+    await prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', '', true),
+          set_config('app.current_user_id', '', true),
+          set_config('app.is_super_admin', 'true', true);`
+      );
+      await tx.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: refreshData.tokenHash,
+          expiresAt: refreshData.expiresAt,
+          userAgent: metadata.userAgent,
+          ipAddress: metadata.ipAddress,
+        },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      });
     });
 
     return {
@@ -194,13 +203,19 @@ export class AuthService {
       throw new BadRequestError('TENANT_ADMIN role is not configured.');
     }
 
-    // 3. Hash password with BCrypt (cost 12)
+    // 3. Hash password and prepare the initial session before the transaction.
     const passwordHash = await hashPassword(input.password);
+    const refreshData = generateRefreshTokenData();
 
-    // 4. Atomic transaction across Tenant, User, and AuditLog
+    // 4. Create tenant, admin, and initial session atomically.
     const { tenant, user } = await prisma.$transaction(async (tx: any) => {
-      // Configure RLS admin override for onboarding transaction
-      await tx.$executeRaw((Prisma as any).sql`SELECT set_config('app.is_super_admin', 'true', true);`);
+      // Configure RLS admin override for onboarding transaction.
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', '', true),
+          set_config('app.current_user_id', '', true),
+          set_config('app.is_super_admin', 'true', true);`
+      );
 
       const createdTenant = await tx.tenant.create({
         data: {
@@ -227,10 +242,20 @@ export class AuthService {
         include: { role: true },
       });
 
+      await tx.refreshToken.create({
+        data: {
+          userId: createdUser.id,
+          tokenHash: refreshData.tokenHash,
+          expiresAt: refreshData.expiresAt,
+          userAgent: metadata.userAgent,
+          ipAddress: metadata.ipAddress,
+        },
+      });
+
       return { tenant: createdTenant, user: createdUser };
     });
 
-    // 5. Issue session tokens
+    // 5. Build the access token for the committed account and session
     const roleName = user.role.name as RoleName;
     const accessToken = generateAccessToken({
       id: user.id,
@@ -240,18 +265,6 @@ export class AuthService {
       roleId: user.roleId,
       role: roleName,
       isSuperAdmin: false,
-    });
-
-    const refreshData = generateRefreshTokenData();
-
-    await systemPrisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: refreshData.tokenHash,
-        expiresAt: refreshData.expiresAt,
-        userAgent: metadata.userAgent,
-        ipAddress: metadata.ipAddress,
-      },
     });
 
     return {
