@@ -51,6 +51,7 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA public TO assetvault_app;
 
 -- The materialized view contains all tenants; expose only the filtered wrapper view.
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM assetvault_app;
 GRANT SELECT ON TABLE v_monthly_access_stats_tenant TO assetvault_app;
 
