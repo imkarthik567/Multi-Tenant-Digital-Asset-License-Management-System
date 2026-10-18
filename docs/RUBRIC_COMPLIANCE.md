@@ -19,7 +19,7 @@
 
 ## Mandatory gates that need a human or live environment
 
-- [ ] **Private repository:** The repository was reported as public at the time of review. Change visibility through GitHub **Settings → General → Danger Zone → Change repository visibility → Make private**. This cannot be fixed by editing source files.
+- [ ] **Private repository:** GitHub repository metadata was checked on October 18, 2026 and returned `private=false` / `visibility=public`. Change visibility through GitHub **Settings → General → Danger Zone → Change repository visibility → Make private**. This cannot be fixed by editing source files.
 - [ ] **Collaborators:** Confirm every team member who needs to review or submit the work has repository access.
 - [ ] **Branch/commit requirements:** Verify `main` and `dev` and at least 10 meaningful commits remain visible after final changes. Pull requests are recommended by the PDF.
 - [ ] **Docker Hub:** Add `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` as repository Actions secrets. The workflow now fails non-PR publication if they are missing. Confirm both API and web images are actually pushed.
