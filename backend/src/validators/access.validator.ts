@@ -14,7 +14,7 @@ const queryDateSchema = z.string().refine(
 export const queryAccessLogSchema = z
   .object({
     page: z.string().optional(),
-    limit: z.string().optional(),
+    limit: z.string().regex(/^\d+$/, 'limit must be a positive integer').optional(),
     action: z.nativeEnum(AccessAction).optional(),
     userId: z.string().uuid().optional(),
     assetId: z.string().uuid().optional(),
