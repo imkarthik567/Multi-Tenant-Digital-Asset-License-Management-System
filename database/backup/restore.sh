@@ -126,7 +126,8 @@ DB_PASS="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 DB_NAME="${TARGET_DB:-${PGDATABASE:-${POSTGRES_DB:-assetvault_db}}}"
 
 if [[ "${SCRATCH_MODE}" == "true" ]]; then
-  DB_NAME="assetvault_restore_test"
+  # Prefer an explicitly supplied scratch name; otherwise keep the safe default.
+  DB_NAME="${TARGET_DB:-assetvault_restore_test}"
 fi
 
 if [[ -n "${DATABASE_URL:-}" && -z "${TARGET_DB}" && "${SCRATCH_MODE}" != "true" ]]; then
