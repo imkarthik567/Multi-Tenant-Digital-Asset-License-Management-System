@@ -56,3 +56,10 @@ export const queryTenantSchema = z
       .optional(),
   })
   .strip();
+
+
+export const tenantIdQuerySchema = z
+  .object({
+    tenantId: z.string().uuid().optional(),
+  })
+  .strip();
