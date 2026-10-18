@@ -62,10 +62,10 @@ Supabase provides two distinct connection strings in **Project Settings** -> **D
    ```
 2. **Direct Connection (Port 5432)**: Used only for migrations, initial role bootstrap, seeding, and trusted background maintenance (`DIRECT_URL`). Keep this privileged credential separate from the runtime URL:
    ```
-   postgresql://postgres.[project-ref]:[DB_PASSWORD]@db.[project-ref].supabase.co:5432/postgres?schema=public
+   postgresql://postgres.[project-ref]:[DB_PASSWORD]@db.[project-ref].supabase.co:5432/postgres
    ```
 
-Set `APP_DB_PASSWORD` to a strong random value of at least 32 characters. The startup entrypoint uses `DIRECT_URL` to create/update the restricted role, then the HTTP API connects using `DATABASE_URL`. Do not configure `DATABASE_URL` with the `postgres` administrator credentials.
+Set `APP_DB_PASSWORD` to a strong random value of at least 32 characters and use the same value for the password embedded in the restricted `DATABASE_URL`. Prefer a `DIRECT_URL` without Prisma-only query parameters (notably `schema=public`) because it is used by the psql bootstrap command; the entrypoint defensively removes the `schema` parameter before invoking psql. The startup entrypoint uses `DIRECT_URL` to create/update the restricted role, then the HTTP API connects using `DATABASE_URL`. Do not configure `DATABASE_URL` with the `postgres` administrator credentials.
 
 ### C. Create Restricted Runtime Role (`assetvault_app`)
 To adhere strictly to the principle of least privilege, run the production bootstrap script using the Supabase SQL Editor or `psql`:
