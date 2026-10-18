@@ -100,12 +100,29 @@ $ChecksumPath   = Join-Path $BackupDir "$CustomDumpName.sha256"
 
 # 6. Execute Backups
 if ($Docker) {
-    Write-Host "[1/3] Generating custom format binary dump (-Fc) via Docker..." -ForegroundColor Yellow
-    docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_dump -U $DbUser -d $DbName -Fc > $CustomDumpPath
-    if ($LASTEXITCODE -ne 0) { throw "Docker pg_dump custom format failed with code $LASTEXITCODE" }
-    Write-Host "[2/3] Generating readable plain SQL dump (-Fp) via Docker..." -ForegroundColor Yellow
-    docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_dump -U $DbUser -d $DbName -Fp > $PlainSqlPath
-    if ($LASTEXITCODE -ne 0) { throw "Docker pg_dump plain SQL failed with code $LASTEXITCODE" }
+    # Keep dump bytes inside the container until docker cp transfers them. Redirecting
+    # native binary output through Windows PowerShell 5 can transcode and corrupt it.
+    $containerId = (& docker compose ps -q db).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($containerId)) {
+        throw "Unable to locate the running database container for Docker backup."
+    }
+    $containerCustomPath = "/tmp/assetvault_backup_$([Guid]::NewGuid().ToString('N')).dump"
+    $containerSqlPath = "$containerCustomPath.sql"
+    try {
+        Write-Host "[1/3] Generating custom format binary dump (-Fc) via Docker..." -ForegroundColor Yellow
+        & docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_dump -U $DbUser -d $DbName -Fc -f $containerCustomPath
+        if ($LASTEXITCODE -ne 0) { throw "Docker pg_dump custom format failed with code $LASTEXITCODE" }
+        & docker cp "${containerId}:$containerCustomPath" $CustomDumpPath
+        if ($LASTEXITCODE -ne 0) { throw "Could not copy the custom dump archive from the database container." }
+
+        Write-Host "[2/3] Generating readable plain SQL dump (-Fp) via Docker..." -ForegroundColor Yellow
+        & docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_dump -U $DbUser -d $DbName -Fp -f $containerSqlPath
+        if ($LASTEXITCODE -ne 0) { throw "Docker pg_dump plain SQL failed with code $LASTEXITCODE" }
+        & docker cp "${containerId}:$containerSqlPath" $PlainSqlPath
+        if ($LASTEXITCODE -ne 0) { throw "Could not copy the plain SQL dump from the database container." }
+    } finally {
+        & docker compose exec -T db rm -f $containerCustomPath $containerSqlPath | Out-Null
+    }
 } else {
     Write-Host "[1/3] Generating custom format binary dump (-Fc)..." -ForegroundColor Yellow
     & $PgDumpExe $ConnectionUrl -Fc -f $CustomDumpPath
