@@ -220,7 +220,16 @@ export class LicenseService {
       throw new ConflictError('Asset is already covered by this license.');
     }
 
-    return licenseRepository.linkAsset(prismaClient, assetId, licenseId);
+    try {
+      return await licenseRepository.linkAsset(prismaClient, assetId, licenseId);
+    } catch (error: any) {
+      // The preflight check is useful for normal duplicates, but concurrent
+      // requests can still collide at the unique constraint.
+      if (error?.code === 'P2002') {
+        throw new ConflictError('Asset is already covered by this license.');
+      }
+      throw error;
+    }
   }
 
   public async unlinkAsset(prismaClient: any, assetId: string, licenseId: string) {
