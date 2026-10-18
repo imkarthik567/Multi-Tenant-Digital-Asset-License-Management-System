@@ -6,7 +6,7 @@
 [![Monitoring: Prometheus & Grafana](https://img.shields.io/badge/Monitoring-Prometheus%20%2B%20Grafana-F46800?logo=grafana&logoColor=white)](#)
 [![Database: PostgreSQL 16](https://img.shields.io/badge/Database-PostgreSQL%2016-336791?logo=postgresql)](https://www.postgresql.org/)
 [![ORM: Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748?logo=prisma)](https://www.prisma.io/)
-[![Backend: Express TypeScript](https://img.shields.io/badge/Backend-Node.js%2020%20+%20Express-68A063?logo=node.js)](https://nodejs.org/)
+[![Backend: Express TypeScript](https://img.shields.io/badge/Backend-Node.js%2022%20+%20Express-68A063?logo=node.js)](https://nodejs.org/)
 [![Frontend: React 18](https://img.shields.io/badge/Frontend-React%2018%20+%20Vite-61DAFB?logo=react)](https://react.dev/)
 [![Docker: Multi--Stage](https://img.shields.io/badge/Docker-Alpine%20Multi--Stage-2496ED?logo=docker)](https://www.docker.com/)
 [![License: Academic](https://img.shields.io/badge/License-Academic%20(VIT)-blue.svg)](#)
@@ -114,7 +114,7 @@ AssetVault adopts a **Pooled Schema Multi-Tenant Model**:
 
 ## 6. Prerequisites
 
-* **Node.js:** v20.0.0 or higher
+* **Node.js:** v22.0.0 or higher
 * **npm:** v10.0.0 or higher
 * **PostgreSQL:** v16 or v18 (or Docker Desktop)
 * **Git:** v2.30.0 or higher
@@ -234,7 +234,7 @@ Demo tenant users are seeded by `prisma/seed.ts` in local development (and in pr
 
 | Email Address | Role | Tenant Organization | Capabilities |
 |---|---|---|---|
-| `superadmin@assetvault.internal` | `SUPER_ADMIN` | Global Platform | Cross-tenant metrics, manage subscription plans, suspend/activate tenants. |
+| Configured via `SUPER_ADMIN_EMAIL` | `SUPER_ADMIN` | Global Platform | Cross-tenant metrics, manage subscription plans, suspend/activate tenants. |
 | `techcorp.admin@techcorp.io` | `TENANT_ADMIN` | TechCorp Dynamics | Manage team members, review audit ledger, compliance score remediation, JSON export. |
 | `techcorp.mgr1@techcorp.io` | `ASSET_MANAGER` | TechCorp Dynamics | Create/edit assets, upload new versions, provision licenses, allocate seats. |
 | `techcorp.member1@techcorp.io` | `MEMBER` | TechCorp Dynamics | Browse asset catalog, download covered assets, view self-assigned license seats. |
