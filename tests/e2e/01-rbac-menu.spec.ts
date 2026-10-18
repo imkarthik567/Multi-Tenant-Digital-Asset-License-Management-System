@@ -1,3 +1,18 @@
+const seededDemoPassword = (): string => {
+  const password = process.env.DEFAULT_SEED_PASSWORD;
+  if (!password) {
+    throw new Error('Set DEFAULT_SEED_PASSWORD in the untracked .env before running seeded-user tests.');
+  }
+  return password;
+};
+
+const loginAs = async (page: any, email: string) => {
+  await page.goto('/login');
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('input[type="password"]').fill(seededDemoPassword());
+  await page.click('button[type="submit"]');
+};
+
 import { test, expect } from '@playwright/test';
 
 test.describe('E2E Journey 1: Authentication & Role-Based Access Control Navigation', () => {
@@ -7,12 +22,8 @@ test.describe('E2E Journey 1: Authentication & Role-Based Access Control Navigat
     // -------------------------------------------------------------------------
     // 1. Log in as Tenant Admin
     // -------------------------------------------------------------------------
-    await page.goto('/login');
+    await loginAs(page, 'techcorp.admin@techcorp.io');
     await expect(page).toHaveTitle(/AssetVault/i);
-
-    // Quick select Tenant Admin persona
-    await page.click('button:has-text("Tenant Admin")');
-    await page.click('button[type="submit"]');
 
     // Wait for Dashboard to mount
     await expect(page).toHaveURL(/\//);
@@ -37,8 +48,7 @@ test.describe('E2E Journey 1: Authentication & Role-Based Access Control Navigat
     // -------------------------------------------------------------------------
     // 3. Log in as Member (Developer)
     // -------------------------------------------------------------------------
-    await page.click('button:has-text("Member (Dev)")');
-    await page.click('button[type="submit"]');
+    await loginAs(page, 'techcorp.dev1@techcorp.io');
 
     await expect(page).toHaveURL(/\//);
     await expect(page.locator('text=TechCorp Dynamics').first()).toBeVisible({ timeout: 15000 });
