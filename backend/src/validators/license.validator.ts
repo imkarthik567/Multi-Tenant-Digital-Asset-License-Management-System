@@ -12,6 +12,21 @@ const licenseDateSchema = z
   .refine((value) => !Number.isNaN(new Date(value).getTime()), 'Invalid date')
   .transform((value) => new Date(value));
 
+const positiveIntegerQuery = z
+  .string()
+  .regex(/^[1-9]\\d*$/, 'Must be a positive integer')
+  .refine((value) => Number(value) <= 2147483647, 'Must fit a PostgreSQL integer');
+
+const nonNegativeIntegerQuery = z
+  .string()
+  .regex(/^(0|[1-9]\\d*)$/, 'Must be a non-negative integer')
+  .refine((value) => Number(value) <= 2147483647, 'Must fit a PostgreSQL integer');
+
+const nonNegativeCostQuery = z
+  .string()
+  .regex(/^\\d+(?:\\.\\d{1,2})?$/, 'Must be a non-negative amount with at most two decimal places')
+  .refine((value) => Number(value) <= 9999999999.99, 'Must fit the license cost range');
+
 export const createLicenseSchema = z
   .object({
     name: z.string().min(2).max(100).trim(),
@@ -73,10 +88,14 @@ export const queryLicenseSchema = z
     order: z.enum(['asc', 'desc']).optional(),
     status: z.nativeEnum(LicenseStatus).optional(),
     vendorId: z.string().uuid().optional(),
-    licenseTypeId: z.string().optional(),
-    expiringWithinDays: z.string().optional(),
-    minCost: z.string().optional(),
-    maxCost: z.string().optional(),
+    licenseTypeId: positiveIntegerQuery.optional(),
+    expiringWithinDays: nonNegativeIntegerQuery.optional(),
+    minCost: nonNegativeCostQuery.optional(),
+    maxCost: nonNegativeCostQuery.optional(),
     fullyAllocated: z.enum(['true', 'false']).optional(),
   })
-  .strip();
+  .strip()
+  .refine(
+    (data) => data.minCost === undefined || data.maxCost === undefined || Number(data.minCost) <= Number(data.maxCost),
+    { message: 'minCost must be less than or equal to maxCost', path: ['maxCost'] }
+  );
