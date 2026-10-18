@@ -268,7 +268,7 @@ In accordance with production enterprise standards, AssetVault utilizes native d
   - Automatically compares table row counts between production and restored scratch databases, outputting a verification PASS/FAIL matrix.
 
 ### 9.2 Containerization & Orchestration
-- **API Container (`backend/Dockerfile`):** Multi-stage Node 20 Alpine container running as a non-privileged `node` user with production dependencies only and built-in Docker healthcheck (`GET /api/health`).
+- **API Container (`backend/Dockerfile`):** Multi-stage Node 22 Alpine container running as a non-privileged `node` user with production dependencies only and built-in Docker healthcheck (`GET /api/health`).
 - **Web Container (`frontend/Dockerfile`):** Multi-stage build producing static production bundles served via NGINX Alpine with HTTP/2 and gzip compression.
 - **Docker Compose (`docker-compose.yml`):** Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies.
 
@@ -284,6 +284,8 @@ Five automated workflows ensure continuous integration and deployment:
 
 ## 10. Test Verification Results
 
+> **Verification note (October 18, 2026):** The results below are a historical snapshot, not a claim that the current review branch passes. A recent CI run completed type-check/lint, secret scanning, SQL injection scanning, migrations and seeding successfully, then reported **132 tests passed and 1 failed**. The remaining failure is a tenant-registration test that must preserve the endpoint's password-complexity requirement. Check the linked Actions run and rerun CI after the latest test fix before submission.
+
 The automated test suite (`npm test`) executes across six distinct suites:
 
 ```
@@ -295,10 +297,10 @@ Test Suite Execution Results:
 ✓ backend/src/__tests__/advanced-features.test.ts (19 tests) - 100% PASS
 ✓ backend/src/__tests__/database-functions.test.ts (17 tests) - 100% PASS
 
-Total: 6 Test Files, 126 Tests Passed, 0 Failed (100% Pass Rate)
+Historical snapshot only: 6 Test Files, 126 Tests Passed, 0 Failed. Not yet re-verified for the current branch.
 Static SQL Injection Check (check:sqli): 0 Violations
-Secret Scanner (check:secrets): 0 Leaks Found
-TypeScript Compilation (lint): 0 Errors (API & Web)
+Secret Scanner (check:secrets): passed on the latest reviewed CI revision
+TypeScript Compilation (lint): passed on the latest reviewed CI revision
 ```
 
 ---
