@@ -29,7 +29,10 @@ fi
 
 if [ "${NODE_ENV:-production}" = "production" ]; then
   echo "[AssetVault API] Configuring restricted assetvault_app runtime role..."
-  psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -v DBPASS="$APP_DB_PASSWORD" \
+  # Prisma connection strings may include ?schema=public, which is not a libpq
+  # connection parameter. Remove only that Prisma-specific parameter for psql.
+  PSQL_DIRECT_URL="$(node -e 'const u = new URL(process.argv[1]); u.searchParams.delete("schema"); process.stdout.write(u.toString());' "$DIRECT_URL")"
+  psql "$PSQL_DIRECT_URL" -v ON_ERROR_STOP=1 -v DBPASS="$APP_DB_PASSWORD" \
     -f /app/database/sql/08_production_bootstrap.sql || {
       echo "[AssetVault API] FATAL: Restricted runtime-role bootstrap failed."
       exit 1
