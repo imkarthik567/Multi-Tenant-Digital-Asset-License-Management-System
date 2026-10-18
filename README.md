@@ -151,7 +151,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 Paste these into `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET` inside `.env` and `backend/.env`. Use three different random values; production startup rejects placeholders and reused values.
 
-Before seeding, set `SUPER_ADMIN_EMAIL` and a strong `SUPER_ADMIN_PASSWORD` in your untracked `.env`. Local demo users are only created when demo seeding is enabled; set `DEFAULT_SEED_PASSWORD` to a unique local-only password. These values have no default in source control.
+Before seeding, set `SUPER_ADMIN_EMAIL` and a strong `SUPER_ADMIN_PASSWORD` in your untracked `.env`. Local demo users require `DEFAULT_SEED_PASSWORD` as well. Set `APP_DB_PASSWORD` to a unique random value of at least 32 characters, and use the same password (URL-encoded) in `DATABASE_URL`; `DIRECT_URL` must have migration/admin privileges. These values have no default credentials in source control.
 
 ### Step 4: Configure Google OAuth 2.0 (Optional for Local Testing)
 1. Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
@@ -164,12 +164,17 @@ Before seeding, set `SUPER_ADMIN_EMAIL` and a strong `SUPER_ADMIN_PASSWORD` in y
 # Install dependencies
 npm install
 
-# Push relational schema to PostgreSQL
-npx prisma db push --schema backend/prisma/schema.prisma
+# Apply versioned migrations (includes views, procedures, triggers and RLS SQL)
+# DIRECT_URL must use a database administrator/migration role with DDL privileges.
+npx prisma migrate deploy --schema backend/prisma/schema.prisma
 
-# Set SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD, and (for local demo users)
-# DEFAULT_SEED_PASSWORD in the untracked .env before seeding.
-# Seed baseline plans and the configured Super Admin; local mode also seeds demo data.
+# Configure the restricted runtime role after migrations have created the base schema.
+# APP_DB_PASSWORD must match the password in DATABASE_URL; use a direct URL with no
+# Prisma-only query parameters when running psql.
+psql "$DIRECT_URL" -v DBPASS="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
+
+# Required before seed: SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD.
+# For local demo users, also set DEFAULT_SEED_PASSWORD. Seed uses DIRECT_URL by default.
 node node_modules/ts-node/dist/bin.js backend/prisma/seed.ts
 ```
 
