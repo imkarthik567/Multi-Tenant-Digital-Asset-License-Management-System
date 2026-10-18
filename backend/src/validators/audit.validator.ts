@@ -15,7 +15,7 @@ export const queryAuditLogSchema = z
   .object({
     page: z.string().optional(),
     limit: z.string().optional(),
-    cursor: z.string().regex(/^\\d+$/, 'cursor must be a positive integer').optional(),
+    cursor: z.string().regex(/^\d+$/, 'cursor must be a positive integer').optional(),
     tableName: z.string().optional(),
     action: z.nativeEnum(AuditAction).optional(),
     userId: z.string().uuid().optional(),
