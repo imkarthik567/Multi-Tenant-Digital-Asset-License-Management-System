@@ -14,17 +14,17 @@ const licenseDateSchema = z
 
 const positiveIntegerQuery = z
   .string()
-  .regex(/^[1-9]\\d*$/, 'Must be a positive integer')
+  .regex(/^[1-9]\d*$/, 'Must be a positive integer')
   .refine((value) => Number(value) <= 2147483647, 'Must fit a PostgreSQL integer');
 
 const nonNegativeIntegerQuery = z
   .string()
-  .regex(/^(0|[1-9]\\d*)$/, 'Must be a non-negative integer')
+  .regex(/^(0|[1-9]\d*)$/, 'Must be a non-negative integer')
   .refine((value) => Number(value) <= 2147483647, 'Must fit a PostgreSQL integer');
 
 const nonNegativeCostQuery = z
   .string()
-  .regex(/^\\d+(?:\\.\\d{1,2})?$/, 'Must be a non-negative amount with at most two decimal places')
+  .regex(/^\d+(?:\.\d{1,2})?$/, 'Must be a non-negative amount with at most two decimal places')
   .refine((value) => Number(value) <= 9999999999.99, 'Must fit the license cost range');
 
 export const createLicenseSchema = z
