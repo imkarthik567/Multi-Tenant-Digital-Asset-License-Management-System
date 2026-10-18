@@ -35,57 +35,56 @@ done
 
 mkdir -p "${BACKUP_DIR}"
 
-# 1. Load environment variables from .env if not present
+# 1. Load environment variables from .env if not present.
+# Backups must use a privileged direct URL, not the tenant-scoped application URL,
+# otherwise RLS can silently produce incomplete archives.
 load_env() {
   local env_file="$1"
   if [[ -f "${env_file}" ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
-      line="$(echo "${line}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
       if [[ -n "${line}" && ! "${line}" =~ ^# && "${line}" =~ = ]]; then
         local key="${line%%=*}"
         local val="${line#*=}"
-        val="${val%\"}"
-        val="${val#\"}"
-        val="${val%\'}"
-        val="${val#\'}"
-        if [[ -z "${!key:-}" ]]; then
-          export "${key}=${val}"
-        fi
+        val="${val%\"}"; val="${val#\"}"
+        val="${val%\\'}"; val="${val#\\'}"
+        if [[ -z "${!key:-}" ]]; then export "${key}=${val}"; fi
       fi
     done < "${env_file}"
   fi
 }
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
+if [[ -z "${DATABASE_DIRECT_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}" ]]; then
   load_env "${PROJECT_ROOT}/.env"
-  if [[ -z "${DATABASE_URL:-}" ]]; then
-    load_env "${PROJECT_ROOT}/backend/.env"
-  fi
+  load_env "${PROJECT_ROOT}/backend/.env"
 fi
 
-# 2. Parse connection parameters
-DB_HOST="${PGHOST:-localhost}"
-DB_PORT="${PGPORT:-5432}"
-DB_USER="${PGUSER:-${POSTGRES_USER:-postgres}}"
-DB_PASS="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
-DB_NAME="${TARGET_DB:-${PGDATABASE:-${POSTGRES_DB:-assetvault_db}}}"
+# Use Docker-specific direct credentials when backing up the local Compose database.
+source_url="${DATABASE_DIRECT_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}"
+if [[ "${DOCKER_MODE}" == "true" && -n "${DOCKER_DIRECT_URL:-}" ]]; then
+  source_url="${DOCKER_DIRECT_URL}"
+fi
+if [[ -z "${source_url}" ]]; then
+  echo "[ERROR] A privileged connection URL is required. Set DATABASE_DIRECT_URL (preferred), DIRECT_URL, or DATABASE_URL."
+  exit 2
+fi
 
-if [[ -n "${DATABASE_URL:-}" && -z "${TARGET_DB}" ]]; then
-  PROTO="$(echo "${DATABASE_URL}" | grep :// | sed -e's,^\(.*://\).*,\1,g')"
-  URL_NO_PROTO="${DATABASE_URL#$PROTO}"
-  USER_PASS="$(echo "${URL_NO_PROTO}" | grep @ | cut -d@ -f1 || true)"
-  if [[ -n "${USER_PASS}" ]]; then
-    DB_USER="${USER_PASS%%:*}"
-    DB_PASS="${USER_PASS#*:}"
-  fi
-  HOST_PORT_DB="$(echo "${URL_NO_PROTO}" | sed -e "s,^.*@,,g")"
-  HOST_PORT="${HOST_PORT_DB%%/*}"
-  DB_HOST="${HOST_PORT%%:*}"
-  if [[ "${HOST_PORT}" =~ : ]]; then
-    DB_PORT="${HOST_PORT#*:}"
-  fi
-  RAW_DB="${HOST_PORT_DB#*/}"
-  DB_NAME="${RAW_DB%%\?*}"
+# Shared helper strips Prisma-only parameters (schema/pgbouncer) without logging secrets.
+# shellcheck source=connection.sh
+source "${SCRIPT_DIR}/connection.sh"
+source_url="$(normalize_pg_uri "${source_url}")"
+DB_USER="$(pg_uri_field "${source_url}" username)"
+DB_PASS="$(pg_uri_field "${source_url}" password)"
+DB_HOST="$(pg_uri_field "${source_url}" hostname)"
+DB_PORT="$(pg_uri_field "${source_url}" port)"
+SOURCE_DB="$(pg_uri_database "${source_url}")"
+DB_NAME="${TARGET_DB:-${SOURCE_DB}}"
+if [[ -z "${DB_USER}" || -z "${DB_NAME}" ]]; then
+  echo "[ERROR] Connection URL must include a database name and user."
+  exit 2
+fi
+if [[ "${DB_NAME}" != "${SOURCE_DB}" ]]; then
+  source_url="$(pg_uri_with_database "${source_url}" "${DB_NAME}")"
 fi
 
 export PGPASSWORD="${DB_PASS}"
@@ -106,10 +105,10 @@ CHECKSUM_PATH="${BACKUP_DIR}/${CUSTOM_DUMP}.sha256"
 # 3. Perform backups
 if [[ "${DOCKER_MODE}" == "true" ]]; then
   echo "[1/3] Generating custom format binary dump (-Fc) via Docker..."
-  docker compose exec -T db pg_dump -U "${DB_USER}" -d "${DB_NAME}" -Fc > "${CUSTOM_PATH}"
+  docker compose exec -T -e PGPASSWORD="${DB_PASS}" db pg_dump -U "${DB_USER}" -d "${DB_NAME}" -Fc > "${CUSTOM_PATH}"
 
   echo "[2/3] Generating readable plain SQL dump (-Fp) via Docker..."
-  docker compose exec -T db pg_dump -U "${DB_USER}" -d "${DB_NAME}" -Fp > "${PLAIN_PATH}"
+  docker compose exec -T -e PGPASSWORD="${DB_PASS}" db pg_dump -U "${DB_USER}" -d "${DB_NAME}" -Fp > "${PLAIN_PATH}"
 else
   PG_DUMP_CMD="pg_dump"
   if ! command -v pg_dump &> /dev/null; then
@@ -122,10 +121,10 @@ else
   fi
 
   echo "[1/3] Generating custom format binary dump (-Fc)..."
-  "${PG_DUMP_CMD}" -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -Fc -f "${CUSTOM_PATH}"
+  "${PG_DUMP_CMD}" "${source_url}" -Fc -f "${CUSTOM_PATH}"
 
   echo "[2/3] Generating readable plain SQL dump (-Fp)..."
-  "${PG_DUMP_CMD}" -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -Fp -f "${PLAIN_PATH}"
+  "${PG_DUMP_CMD}" "${source_url}" -Fp -f "${PLAIN_PATH}"
 fi
 
 # 4. Generate SHA-256 Checksum
@@ -135,7 +134,8 @@ if command -v sha256sum &> /dev/null; then
 elif command -v shasum &> /dev/null; then
   (cd "${BACKUP_DIR}" && shasum -a 256 "${CUSTOM_DUMP}" > "${CUSTOM_DUMP}.sha256")
 else
-  echo "[WARN] Neither sha256sum nor shasum found; skipped checksum"
+  echo "[ERROR] Neither sha256sum nor shasum is installed; refusing to report a checksummed backup."
+  exit 1
 fi
 
 echo ""
