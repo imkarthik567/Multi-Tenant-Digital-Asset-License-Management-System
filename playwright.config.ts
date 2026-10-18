@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Playwright runs in its own process; load ignored local env files explicitly.
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 export default defineConfig({
   testDir: './tests/e2e',
