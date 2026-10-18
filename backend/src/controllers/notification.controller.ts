@@ -38,7 +38,7 @@ export class NotificationController {
   });
 
   public runExpiryCheck = asyncHandler(async (req: Request, res: Response) => {
-    const lookaheadDays = req.body.lookaheadDays ? parseInt(req.body.lookaheadDays, 10) : 30;
+    const lookaheadDays = req.body.lookaheadDays as number;
     const result = await notificationService.triggerExpiryCheck(
       req.user!.tenantId!,
       req.user!.id,
