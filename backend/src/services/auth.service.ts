@@ -282,74 +282,95 @@ export class AuthService {
     }
 
     const tokenHash = hashToken(rawRefreshToken);
-
-    const storedToken = await systemPrisma.refreshToken.findUnique({
-      where: { tokenHash },
-      include: {
-        user: {
-          include: {
-            role: true,
-            tenant: { include: { plan: true } },
-          },
-        },
-      },
-    });
-
-    if (!storedToken) {
-      throw new UnauthorizedError('Invalid refresh token');
-    }
-
-    // Reuse Detection: If the token was already revoked, revoke ALL sessions for this user!
-    if (storedToken.revokedAt !== null) {
-      logger.warn(
-        { userId: storedToken.userId, tokenId: storedToken.id },
-        'SECURITY ALERT: Revoked refresh token reuse detected! Invalidating all user sessions.'
+    const rotation = await prisma.$transaction(async (tx: any) => {
+      // Keep the token's conditional revoke and replacement insert in one
+      // transaction. The conditional update is the single-use compare-and-swap.
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', '', true),
+          set_config('app.current_user_id', '', true),
+          set_config('app.is_super_admin', 'true', true);`
       );
 
-      await systemPrisma.refreshToken.updateMany({
-        where: { userId: storedToken.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
+      const storedToken = await tx.refreshToken.findUnique({
+        where: { tokenHash },
+        include: {
+          user: {
+            include: {
+              role: true,
+              tenant: { include: { plan: true } },
+            },
+          },
+        },
       });
 
+      if (!storedToken) {
+        return { kind: 'missing' as const };
+      }
+
+      const revokeActiveSessions = async () => {
+        await tx.refreshToken.updateMany({
+          where: { userId: storedToken.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      };
+
+      if (storedToken.revokedAt !== null) {
+        await revokeActiveSessions();
+        return { kind: 'reuse' as const, userId: storedToken.userId, tokenId: storedToken.id };
+      }
+
+      if (new Date() > storedToken.expiresAt) {
+        throw new UnauthorizedError('Refresh token has expired. Please log in again.');
+      }
+
+      const user = storedToken.user;
+      if (!user.isActive) {
+        throw new UnauthorizedError('User account has been deactivated.');
+      }
+      if (user.tenant && user.tenant.status === 'SUSPENDED') {
+        throw new ForbiddenError('Organization account is suspended.');
+      }
+
+      // Exactly one concurrent request can change revokedAt from NULL. A
+      // loser treats the attempted second use as replay and invalidates sessions.
+      const consumed = await tx.refreshToken.updateMany({
+        where: { id: storedToken.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      if (consumed.count !== 1) {
+        await revokeActiveSessions();
+        return { kind: 'reuse' as const, userId: storedToken.userId, tokenId: storedToken.id };
+      }
+
+      const newRefreshData = generateRefreshTokenData();
+      await tx.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: newRefreshData.tokenHash,
+          expiresAt: newRefreshData.expiresAt,
+          userAgent: metadata.userAgent,
+          ipAddress: metadata.ipAddress,
+        },
+      });
+
+      return { kind: 'rotated' as const, user, newRefreshData };
+    });
+
+    if (rotation.kind === 'missing') {
+      throw new UnauthorizedError('Invalid refresh token');
+    }
+    if (rotation.kind === 'reuse') {
+      logger.warn(
+        { userId: rotation.userId, tokenId: rotation.tokenId },
+        'SECURITY ALERT: Revoked refresh token reuse detected! Invalidating all user sessions.'
+      );
       throw new UnauthorizedError(
         'Compromised refresh token reuse detected. All active sessions have been revoked. Please log in again.'
       );
     }
 
-    // Expiry check
-    if (new Date() > storedToken.expiresAt) {
-      throw new UnauthorizedError('Refresh token has expired. Please log in again.');
-    }
-
-    // User status checks
-    const user = storedToken.user;
-    if (!user.isActive) {
-      throw new UnauthorizedError('User account has been deactivated.');
-    }
-
-    if (user.tenant && user.tenant.status === 'SUSPENDED') {
-      throw new ForbiddenError('Organization account is suspended.');
-    }
-
-    // Revoke old token (Token Rotation)
-    await systemPrisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: { revokedAt: new Date() },
-    });
-
-    // Issue new refresh token & access token
-    const newRefreshData = generateRefreshTokenData();
-
-    await systemPrisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: newRefreshData.tokenHash,
-        expiresAt: newRefreshData.expiresAt,
-        userAgent: metadata.userAgent,
-        ipAddress: metadata.ipAddress,
-      },
-    });
-
+    const user = rotation.user;
     const roleName = user.role.name as RoleName;
     const accessToken = generateAccessToken({
       id: user.id,
@@ -363,7 +384,7 @@ export class AuthService {
 
     return {
       accessToken,
-      newRawRefreshToken: newRefreshData.rawToken,
+      newRawRefreshToken: rotation.newRefreshData.rawToken,
     };
   }
 
