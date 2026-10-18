@@ -9,6 +9,7 @@ import { complianceService } from '../services/compliance.service';
 import { costOptimizationService } from '../services/costOptimization.service';
 import { sendResponse } from '../utils/response.util';
 import { asyncHandler } from '../utils/asyncHandler';
+import { BadRequestError } from '../errors/AppError';
 
 export class ReportController {
   public getDashboard = asyncHandler(async (req: Request, res: Response) => {
@@ -57,13 +58,15 @@ export class ReportController {
   });
 
   public getComplianceReport = asyncHandler(async (req: Request, res: Response) => {
-    const tenantId = req.user!.tenantId || req.query.tenantId as string;
+    const tenantId = req.user!.tenantId || (req.query.tenantId as string | undefined);
+    if (!tenantId) throw new BadRequestError('tenantId is required for platform reports');
     const data = await complianceService.getTenantCompliance(tenantId);
     sendResponse(res, 200, data);
   });
 
   public getUnusedSeatsReport = asyncHandler(async (req: Request, res: Response) => {
-    const tenantId = req.user!.tenantId || req.query.tenantId as string;
+    const tenantId = req.user!.tenantId || (req.query.tenantId as string | undefined);
+    if (!tenantId) throw new BadRequestError('tenantId is required for platform reports');
     const data = await costOptimizationService.getUnusedSeatsReport(tenantId);
     sendResponse(res, 200, data);
   });
