@@ -419,6 +419,24 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       }
     });
 
+    it('rolls back an asset if an initial tag cannot be created', async () => {
+      const assetCode = `ATOMIC-CREATE-${Date.now()}`;
+
+      await expect(
+        assetService.createAsset(systemPrisma, tenantId, adminUserId, {
+          name: 'Atomic Asset Creation Regression',
+          assetCode,
+          assetType: 'DOCUMENT',
+          tags: ['T'.repeat(51)],
+        })
+      ).rejects.toThrow();
+
+      const persistedAsset = await systemPrisma.asset.findFirst({
+        where: { tenantId, assetCode },
+      });
+      expect(persistedAsset).toBeNull();
+    });
+
     it('returns COMPLIANT for an asset covered by an active license', async () => {
       const assetId = '00000000-0000-4000-8000-000000000001';
       const tenantIdForTest = '00000000-0000-4000-8000-000000000002';
