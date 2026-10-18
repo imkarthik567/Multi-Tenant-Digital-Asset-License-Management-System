@@ -77,5 +77,6 @@ WHERE tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uu
 
 -- The raw materialized view has rows from every tenant and does not apply RLS.
 -- The runtime API must only read the tenant-filtered wrapper above.
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM assetvault_app;
 GRANT SELECT ON TABLE v_monthly_access_stats_tenant TO assetvault_app;
