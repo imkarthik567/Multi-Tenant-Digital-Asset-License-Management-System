@@ -170,9 +170,19 @@ fi
 if [[ "${SCRATCH_MODE}" == "true" ]]; then
   echo "[2/3] Setting up scratch database '${DB_NAME}'..."
   if [[ "${DOCKER_MODE}" == "true" ]]; then
-    docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -v ON_ERROR_STOP=1 -U "${DB_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
+    EXISTING_SCRATCH="$(docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -v ON_ERROR_STOP=1 -U "${DB_USER}" -d postgres -t -A -c "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}';")"
+    if [[ -n "${EXISTING_SCRATCH//[[:space:]]/}" ]]; then
+      echo "[ERROR] Scratch database '${DB_NAME}' already exists; refusing to overwrite it." >&2
+      exit 2
+    fi
+    docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -v ON_ERROR_STOP=1 -U "${DB_USER}" -d postgres -c "CREATE DATABASE ${DB_NAME};"
   else
-    psql "${ADMIN_URL}" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
+    EXISTING_SCRATCH="$(psql "${ADMIN_URL}" -v ON_ERROR_STOP=1 -t -A -c "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}';")"
+    if [[ -n "${EXISTING_SCRATCH//[[:space:]]/}" ]]; then
+      echo "[ERROR] Scratch database '${DB_NAME}' already exists; refusing to overwrite it." >&2
+      exit 2
+    fi
+    psql "${ADMIN_URL}" -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${DB_NAME};"
   fi
 fi
 
