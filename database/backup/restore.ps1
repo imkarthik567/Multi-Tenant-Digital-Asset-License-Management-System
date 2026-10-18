@@ -178,9 +178,23 @@ if ($Docker) {
         Get-Content $DumpFile | docker compose exec -T -e "PGPASSWORD=$DbPass" db psql -v ON_ERROR_STOP=1 -U $DbUser -d $DbName
         if ($LASTEXITCODE -ne 0) { throw "Docker psql restoration failed with code $LASTEXITCODE" }
     } else {
-        # Stream custom dump to pg_restore in container
-        Get-Content -Encoding Byte $DumpFile | docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_restore -U $DbUser -d $DbName --exit-on-error --clean --if-exists --no-owner
-        if ($LASTEXITCODE -ne 0) { throw "Docker pg_restore failed with code $LASTEXITCODE" }
+        # Copy the binary archive into the container. PowerShell's native pipeline
+        # converts byte arrays to text on Windows PowerShell 5 and corrupts dumps.
+        $containerId = (& docker compose ps -q db).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($containerId)) {
+            throw "Unable to locate the running database container for Docker restore."
+        }
+        $containerDumpPath = "/tmp/assetvault_restore_$([Guid]::NewGuid().ToString('N')).dump"
+        $resolvedDumpPath = (Resolve-Path $DumpFile).Path
+        try {
+            & docker cp $resolvedDumpPath "${containerId}:$containerDumpPath"
+            if ($LASTEXITCODE -ne 0) { throw "Could not copy the dump archive into the database container." }
+
+            & docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_restore -U $DbUser -d $DbName --exit-on-error --clean --if-exists --no-owner $containerDumpPath
+            if ($LASTEXITCODE -ne 0) { throw "Docker pg_restore failed with code $LASTEXITCODE" }
+        } finally {
+            & docker compose exec -T db rm -f $containerDumpPath | Out-Null
+        }
     }
 } else {
     if ($isPlainSql) {
