@@ -17,7 +17,7 @@ export const createLicenseSchema = z
     cost: z.number().min(0).default(0),
     currency: z.string().length(3).default('USD'),
     startDate: z.string().transform((str) => new Date(str)),
-    endDate: z.string().optional().nullable().transform((str) => (str ? new Date(str) : null)),
+    endDate: z.string().optional().nullable().transform((str) => (str === undefined ? undefined : str ? new Date(str) : null)),
     autoRenew: z.boolean().default(false),
   })
   .strip()
