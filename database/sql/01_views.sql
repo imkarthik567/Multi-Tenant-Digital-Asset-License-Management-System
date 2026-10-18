@@ -283,7 +283,7 @@ LEFT JOIN (
 ) lr ON lr.tenant_id = t.id;
 
 -- ------------------------------------------------------------------------------
--- 6. Materialized View: mv_monthly_access_stats & Refresh Routine
+-- 8. Materialized View: mv_monthly_access_stats & Refresh Routine
 -- Pre-aggregated monthly access metrics per tenant for fast reporting.
 -- ------------------------------------------------------------------------------
 DROP MATERIALIZED VIEW IF EXISTS mv_monthly_access_stats CASCADE;
