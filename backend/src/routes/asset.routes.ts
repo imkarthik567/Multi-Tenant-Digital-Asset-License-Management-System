@@ -15,6 +15,7 @@ import {
   createAssetSchema,
   updateAssetSchema,
   attachTagsSchema,
+  queryAssetSchema,
 } from '../validators/asset.validator';
 import { createVersionSchema, compareVersionsQuerySchema } from '../validators/version.validator';
 
@@ -44,7 +45,7 @@ router.post(
 );
 
 // 2. Asset Core CRUD
-router.get('/', authorize('assets:read'), tenantContext, assetController.listAssets);
+router.get('/', authorize('assets:read'), tenantContext, validate({ query: queryAssetSchema }), assetController.listAssets);
 router.get('/:id', authorize('assets:read'), tenantContext, assetController.getAssetById);
 router.post('/', authorize('assets:create'), tenantContext, validate(createAssetSchema), assetController.createAsset);
 router.patch('/:id', authorize('assets:update'), tenantContext, validate(updateAssetSchema), assetController.updateAsset);
