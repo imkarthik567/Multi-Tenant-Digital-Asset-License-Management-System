@@ -194,7 +194,7 @@ describe('AssetVault Advanced Enterprise Features Suite', () => {
       expect(res.headers['content-disposition']).toContain('attachment; filename=');
 
       const csvContent = res.text;
-      expect(csvContent).toContain('ID,Timestamp,Action,Table Name,Record ID');
+      expect(csvContent).toContain('"ID","Timestamp","Action","Table Name","Record ID"');
     });
 
     it('supports action filtering on CSV audit log export', async () => {
@@ -203,7 +203,7 @@ describe('AssetVault Advanced Enterprise Features Suite', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.text).toContain('ID,Timestamp,Action');
+      expect(res.text).toContain('"ID","Timestamp","Action"');
     });
   });
 
