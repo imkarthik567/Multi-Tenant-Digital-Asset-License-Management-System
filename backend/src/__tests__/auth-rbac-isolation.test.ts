@@ -455,6 +455,27 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
     expect(initialSession).not.toBeNull();
   });
 
+  it('concurrent tenant registrations return a conflict for the duplicate request', async () => {
+    const suffix = `signup-race-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const payload = {
+      tenantName: `Signup Race ${suffix}`,
+      slug: suffix,
+      contactEmail: `contact-${suffix}@example.com`,
+      adminFullName: 'Signup Race Admin',
+      adminEmail: `admin-${suffix}@example.com`,
+      password: 'Strong-QA-Pass123!',
+    };
+
+    const responses = await Promise.all([
+      request(app).post('/api/auth/register-tenant').send(payload),
+      request(app).post('/api/auth/register-tenant').send(payload),
+    ]);
+
+    expect(responses.map((response) => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
+    expect(await systemPrisma.tenant.count({ where: { slug: suffix } })).toBe(1);
+    expect(await systemPrisma.user.count({ where: { email: payload.adminEmail } })).toBe(1);
+  });
+
   afterAll(async () => {
     const testAssets = await systemPrisma.asset.findMany({
       where: {
