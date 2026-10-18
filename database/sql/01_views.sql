@@ -264,7 +264,8 @@ SELECT
   active_accessing_users,
   distinct_assets_accessed
 FROM mv_monthly_access_stats
-WHERE tenant_id = fn_current_tenant_id() OR fn_is_super_admin();
+WHERE tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid
+   OR COALESCE(current_setting('app.is_super_admin', true) = 'true', FALSE);
 
 -- Routine to refresh the materialized view
 CREATE OR REPLACE FUNCTION fn_refresh_monthly_access_stats()
