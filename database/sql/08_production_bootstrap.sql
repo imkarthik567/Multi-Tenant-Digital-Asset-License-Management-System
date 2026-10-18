@@ -55,12 +55,18 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE O
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO assetvault_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON ROUTINES TO assetvault_app;
 
--- 10. Verification query: output granted privileges
-SELECT 
-  grantee, 
-  schema_name, 
-  privilege_type 
-FROM information_schema.schema_privileges 
-WHERE grantee = 'assetvault_app';
+-- 10. Verification queries (use PostgreSQL's supported information-schema views).
+SELECT
+  'public' AS schema_name,
+  has_schema_privilege('assetvault_app', 'public', 'USAGE') AS has_usage,
+  has_schema_privilege('assetvault_app', 'public', 'CREATE') AS has_create;
+
+SELECT
+  table_schema,
+  table_name,
+  privilege_type
+FROM information_schema.role_table_grants
+WHERE grantee = 'assetvault_app'
+ORDER BY table_schema, table_name, privilege_type;
 
 SELECT 'Production bootstrap role configuration completed successfully.' AS status;
