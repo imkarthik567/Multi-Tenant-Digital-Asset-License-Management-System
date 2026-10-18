@@ -3,6 +3,7 @@ import { queryAccessLogSchema } from '../validators/access.validator';
 import { queryAssetSchema } from '../validators/asset.validator';
 import { queryLicenseSchema } from '../validators/license.validator';
 import { queryTenantSchema } from '../validators/tenant.validator';
+import { planIdParamsSchema } from '../validators/plan.validator';
 import {
   exportAuditLogQuerySchema,
   queryAuditLogSchema,
@@ -66,5 +67,18 @@ describe('tenant numeric filters', () => {
 
   it('accepts valid positive plan IDs', () => {
     expect(queryTenantSchema.safeParse({ planId: '12' }).success).toBe(true);
+  });
+});
+
+
+describe('plan ID route parameters', () => {
+  it('rejects malformed, nonpositive, and out-of-range IDs', () => {
+    expect(planIdParamsSchema.safeParse({ id: '3x' }).success).toBe(false);
+    expect(planIdParamsSchema.safeParse({ id: '0' }).success).toBe(false);
+    expect(planIdParamsSchema.safeParse({ id: '2147483648' }).success).toBe(false);
+  });
+
+  it('accepts a valid positive plan ID', () => {
+    expect(planIdParamsSchema.safeParse({ id: '3' }).success).toBe(true);
   });
 });
