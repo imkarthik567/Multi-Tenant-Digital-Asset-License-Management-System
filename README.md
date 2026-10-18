@@ -262,7 +262,7 @@ Demo tenant users are seeded by `prisma/seed.ts` in local development (and in pr
 | `DOCKER_DATABASE_URL` | Docker-network URL for the restricted runtime role (host `db`) | Required for Docker Compose |
 | `DOCKER_DIRECT_URL` | Docker-network direct/admin URL for migrations and maintenance (host `db`) | Required for Docker Compose |
 | `POSTGRES_USER` | PostgreSQL superuser username | `postgres` |
-| `POSTGRES_PASSWORD` | PostgreSQL superuser password | `postgrespassword` |
+| `POSTGRES_PASSWORD` | Local PostgreSQL administrator password | Set a local-only value in the untracked `.env` |
 | `POSTGRES_DB` | Target PostgreSQL database name | `assetvault_db` |
 | `JWT_ACCESS_SECRET` | 32+ byte cryptographic secret for access tokens | *(Random Hex String)* |
 | `JWT_REFRESH_SECRET` | 32+ byte cryptographic secret for refresh tokens | *(Random Hex String)* |
