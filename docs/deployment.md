@@ -147,7 +147,7 @@ npm run db:seed
 | `JWT_ACCESS_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Signs short-lived access JWTs (15m expiry). |
 | `JWT_REFRESH_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Validates refresh tokens (7d expiry). |
 | `COOKIE_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Signs httpOnly cookies. |
-| `COOKIE_SAMESITE` | Render | No | `lax` | Set to `lax` (default) or `none` if cross-site. |
+| `COOKIE_SAMESITE` | Render | Yes | `none` | Required for the default Vercel (`vercel.app`) + Render (`onrender.com`) cross-site deployment; the refresh cookie is `Secure` in production. Use `strict`/`lax` only when frontend and API are same-site. |
 | `ENABLE_IN_PROCESS_WORKER` | Render | Yes | `true` | Runs cron jobs inside the API process with advisory locks. |
 | `METRICS_BEARER_TOKEN` | Render | Yes | `assetvault-metrics-secret-token` | Protects `/metrics` Prometheus telemetry endpoint. |
 | `GOOGLE_CLIENT_ID` | Render | Optional | `12345.apps.googleusercontent.com` | Google OAuth Client ID for enterprise SSO. |
