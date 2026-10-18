@@ -49,6 +49,10 @@ export const queryTenantSchema = z
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).optional(),
     status: z.nativeEnum(TenantStatus).optional(),
-    planId: z.string().optional(),
+    planId: z
+      .string()
+      .regex(/^[1-9]\\d*$/, 'Plan ID must be a positive integer')
+      .refine((value) => Number(value) <= 2147483647, 'Plan ID exceeds the supported range')
+      .optional(),
   })
   .strip();
