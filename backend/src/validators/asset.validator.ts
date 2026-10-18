@@ -41,6 +41,11 @@ export const attachTagsSchema = z
   })
   .strip();
 
+const queryDateSchema = z.string().refine(
+  (value) => !Number.isNaN(new Date(value).getTime()),
+  'Must be a valid date'
+);
+
 export const queryAssetSchema = z
   .object({
     page: z.string().optional(),
@@ -54,7 +59,7 @@ export const queryAssetSchema = z
     tag: z.string().optional(),
     ownerId: z.string().uuid().optional(),
     complianceStatus: z.enum(['COMPLIANT', 'EXPIRED_LICENSE', 'UNLICENSED']).optional(),
-    createdFrom: z.string().datetime().optional(),
-    createdTo: z.string().datetime().optional(),
+    createdFrom: queryDateSchema.optional(),
+    createdTo: queryDateSchema.optional(),
   })
   .strip();
