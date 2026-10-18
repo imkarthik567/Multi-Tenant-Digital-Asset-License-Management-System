@@ -156,7 +156,7 @@ Before seeding, set `SUPER_ADMIN_EMAIL` and a strong `SUPER_ADMIN_PASSWORD` in y
 ### Step 4: Configure Google OAuth 2.0 (Optional for Local Testing)
 1. Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
 2. Create a new OAuth 2.0 Client ID under **APIs & Services > Credentials**.
-3. Set **Authorized redirect URIs** to `http://localhost:5000/api/auth/google/callback`.
+3. Set **Authorized redirect URIs** to `http://localhost:5000/api/v1/auth/google/callback`.
 4. Copy the Client ID and Secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 
 ### Step 5: Database Schema Initialization & Seeding
@@ -271,7 +271,7 @@ Demo tenant users are seeded by `prisma/seed.ts` in local development (and in pr
 | `COOKIE_SECRET` | Secret used for signing HTTP-only cookies | *(Random Hex String)* |
 | `GOOGLE_CLIENT_ID` | Google Cloud OAuth Client ID | `*.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Google Cloud OAuth Client Secret | *(Secret String)* |
-| `GOOGLE_CALLBACK_URL` | OAuth redirect endpoint | `http://localhost:5000/api/auth/google/callback` |
+| `GOOGLE_CALLBACK_URL` | OAuth redirect endpoint | `http://localhost:5000/api/v1/auth/google/callback` |
 | `CLIENT_URL` | Allowed client origin for CORS policies | `http://localhost:5173` |
 | `VITE_API_URL` | Backend URL for Vite frontend client proxy | `http://localhost:5000` |
 | `RUN_WORKER` | Enables background cron scheduler | `true` |
