@@ -314,6 +314,42 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       }
     });
 
+    it('keeps category deletion atomic with concurrent child creation', async () => {
+      const suffix = Date.now();
+      const parentName = `Delete-Race-Parent-${suffix}`;
+      const childName = `Delete-Race-Child-${suffix}`;
+      const parent = await categoryService.createCategory(systemPrisma, tenantId, {
+        name: parentName,
+      });
+
+      try {
+        const results = await Promise.allSettled([
+          categoryService.deleteCategory(systemPrisma, parent.id),
+          categoryService.createCategory(systemPrisma, tenantId, {
+            name: childName,
+            parentId: parent.id,
+          }),
+        ]);
+
+        expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+        expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      } finally {
+        const child = await systemPrisma.category.findFirst({
+          where: { tenantId, name: childName },
+        });
+        if (child) {
+          await categoryService.deleteCategory(systemPrisma, child.id);
+        }
+
+        const remainingParent = await systemPrisma.category.findFirst({
+          where: { tenantId, name: parentName },
+        });
+        if (remainingParent) {
+          await categoryService.deleteCategory(systemPrisma, remainingParent.id);
+        }
+      }
+    });
+
     it('creates, retrieves, and updates a category', async () => {
       const catName = `Category-${Date.now()}`;
       const created = await categoryService.createCategory(systemPrisma, tenantId, {
