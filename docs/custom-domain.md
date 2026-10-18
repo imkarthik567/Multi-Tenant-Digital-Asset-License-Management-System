@@ -71,9 +71,9 @@ GOOGLE_CALLBACK_URL="https://assetvault-api.duckdns.org/api/v1/auth/google/callb
 ### In Vercel (Frontend Web App):
 Update the API base URL in **Project Settings** -> **Environment Variables**:
 ```bash
-VITE_API_BASE_URL="https://assetvault-api.duckdns.org/api"
+VITE_API_URL="https://assetvault-api.duckdns.org/api"
 ```
-Or, if you use Vercel's reverse proxy rewrites in [`frontend/vercel.json`](../frontend/vercel.json), update the rewrite destination:
+Or, if you use Vercel's reverse proxy rewrites in [`vercel.json`](../vercel.json), update the rewrite destination:
 ```json
 {
   "source": "/api/(.*)",
