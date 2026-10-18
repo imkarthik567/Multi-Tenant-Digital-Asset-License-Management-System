@@ -188,11 +188,16 @@ To guarantee sub-second execution over millions of records, AssetVault implement
 ## 6. Advanced Database Programmability
 
 ### 6.1 Database Views & Materialized Views
-- **Standard View `v_asset_catalog`:** Encapsulates multi-table joins across assets, categories, users, versions, tags, and licenses into a unified virtual catalog. Used by repository layer to fetch asset listings without repetitive complex SQL joins.
-- **Materialized View `mv_monthly_access_stats`:** Aggregates download counts, checkout volumes, and unique active users per asset grouped by calendar month. To maintain high performance without blocking read queries, background cron workers refresh this view non-blockingly using:
+- **Tenant-facing analytical views:** `v_license_utilization`, `v_expiring_licenses`, `v_asset_catalog`, and `v_vendor_spend` provide usage, expiry, catalog-compliance, and spend summaries. They are configured with PostgreSQL's `security_invoker` option so base-table row-level security is evaluated with the caller's privileges.
+- **Window-function views:** `v_monthly_spend` computes month-by-month spend and the tenant-local running total; `v_top_downloaded_assets` ranks assets by downloads within each tenant.
+- **Platform overview:** `v_tenant_summary` aggregates tenant sizes and license spend; access to it should be restricted to the Super Admin route and executed with an explicit trusted platform context.
+- **Monthly access materialization:** `mv_monthly_access_stats` aggregates tenant-level download, checkout, view/check-in and active-user metrics by month. It is not directly selectable by the runtime role. A security-barrier wrapper view, `v_monthly_access_stats_tenant`, filters by the transaction-local tenant ID or the explicit Super Admin context.
+- **Concurrent refresh:** background maintenance refreshes the materialized view without blocking ordinary readers:
   ```sql
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;
   ```
+
+> **Verification status:** The view definitions, permissions and regression tests have been added on the rubric-fix branch. The latest CI run must pass the privilege and cross-tenant tests before these controls should be described as verified on a running system.
 
 ### 6.2 Stored Procedures & Concurrency Control
 AssetVault implements three stored procedures in PL/pgSQL:
