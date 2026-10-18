@@ -77,7 +77,8 @@ if [[ -f "${CHECKSUM_FILE}" ]]; then
   elif command -v shasum &> /dev/null; then
     ACTUAL_HASH="$(shasum -a 256 "${DUMP_FILE}" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
   else
-    ACTUAL_HASH="${EXPECTED_HASH}"
+    echo "[ERROR] Neither sha256sum nor shasum is installed; refusing to restore without checking the archive checksum."
+    exit 1
   fi
 
   if [[ "${EXPECTED_HASH}" != "${ACTUAL_HASH}" ]]; then
@@ -91,70 +92,59 @@ else
   echo "[WARN] No .sha256 checksum file found next to ${DUMP_NAME}; proceeding without verification"
 fi
 
-# 3. Load Environment Variables from .env
+# 3. Load a privileged connection URL. Restore must not use the tenant-scoped
+# runtime account because RLS can prevent complete restoration.
 load_env() {
   local env_file="$1"
   if [[ -f "${env_file}" ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
-      line="$(echo "${line}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
       if [[ -n "${line}" && ! "${line}" =~ ^# && "${line}" =~ = ]]; then
         local key="${line%%=*}"
         local val="${line#*=}"
-        val="${val%\"}"
-        val="${val#\"}"
-        val="${val%\'}"
-        val="${val#\'}"
-        if [[ -z "${!key:-}" ]]; then
-          export "${key}=${val}"
-        fi
+        val="${val%\"}"; val="${val#\"}"
+        val="${val%\\'}"; val="${val#\\'}"
+        if [[ -z "${!key:-}" ]]; then export "${key}=${val}"; fi
       fi
     done < "${env_file}"
   fi
 }
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
+if [[ -z "${DATABASE_DIRECT_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}" ]]; then
   load_env "${PROJECT_ROOT}/.env"
-  if [[ -z "${DATABASE_URL:-}" ]]; then
-    load_env "${PROJECT_ROOT}/backend/.env"
-  fi
+  load_env "${PROJECT_ROOT}/backend/.env"
 fi
 
-DB_HOST="${PGHOST:-localhost}"
-DB_PORT="${PGPORT:-5432}"
-DB_USER="${PGUSER:-${POSTGRES_USER:-postgres}}"
-DB_PASS="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
-DB_NAME="${TARGET_DB:-${PGDATABASE:-${POSTGRES_DB:-assetvault_db}}}"
+source_url="${DATABASE_DIRECT_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}"
+if [[ "${DOCKER_MODE}" == "true" && -n "${DOCKER_DIRECT_URL:-}" ]]; then
+  source_url="${DOCKER_DIRECT_URL}"
+fi
+if [[ -z "${source_url}" ]]; then
+  echo "[ERROR] A privileged connection URL is required. Set DATABASE_DIRECT_URL (preferred), DIRECT_URL, or DATABASE_URL."
+  exit 2
+fi
 
+# shellcheck source=connection.sh
+source "${SCRIPT_DIR}/connection.sh"
+source_url="$(normalize_pg_uri "${source_url}")"
+DB_USER="$(pg_uri_field "${source_url}" username)"
+DB_PASS="$(pg_uri_field "${source_url}" password)"
+DB_HOST="$(pg_uri_field "${source_url}" hostname)"
+DB_PORT="$(pg_uri_field "${source_url}" port)"
+SOURCE_DB="$(pg_uri_database "${source_url}")"
 if [[ "${SCRATCH_MODE}" == "true" ]]; then
-  # Prefer an explicitly supplied scratch name; otherwise keep the safe default.
   DB_NAME="${TARGET_DB:-assetvault_restore_test}"
+else
+  DB_NAME="${TARGET_DB:-${SOURCE_DB}}"
 fi
 
-if [[ -n "${DATABASE_URL:-}" && -z "${TARGET_DB}" && "${SCRATCH_MODE}" != "true" ]]; then
-  PROTO="$(echo "${DATABASE_URL}" | grep :// | sed -e's,^\(.*://\).*,\1,g')"
-  URL_NO_PROTO="${DATABASE_URL#$PROTO}"
-  USER_PASS="$(echo "${URL_NO_PROTO}" | grep @ | cut -d@ -f1 || true)"
-  if [[ -n "${USER_PASS}" ]]; then
-    DB_USER="${USER_PASS%%:*}"
-    DB_PASS="${USER_PASS#*:}"
-  fi
-  HOST_PORT_DB="$(echo "${URL_NO_PROTO}" | sed -e "s,^.*@,,g")"
-  HOST_PORT="${HOST_PORT_DB%%/*}"
-  DB_HOST="${HOST_PORT%%:*}"
-  if [[ "${HOST_PORT}" =~ : ]]; then
-    DB_PORT="${HOST_PORT#*:}"
-  fi
-  RAW_DB="${HOST_PORT_DB#*/}"
-  DB_NAME="${RAW_DB%%\?*}"
-fi
-
-# The name is interpolated into DROP/CREATE DATABASE statements below. Accept
-# only unquoted identifier syntax so a typo or crafted value cannot execute SQL.
 if [[ ! "${DB_NAME}" =~ ^[A-Za-z_][A-Za-z0-9_]{0,62}$ ]]; then
   echo "[ERROR] Invalid target database name '${DB_NAME}'. Use a simple PostgreSQL identifier (letters, digits, underscores; 63 characters max)."
   exit 2
 fi
 
+ADMIN_URL="$(pg_uri_with_database "${source_url}" "postgres")"
+TARGET_URL="$(pg_uri_with_database "${source_url}" "${DB_NAME}")"
 export PGPASSWORD="${DB_PASS}"
 
 echo "================================================================================"
@@ -179,9 +169,9 @@ fi
 if [[ "${SCRATCH_MODE}" == "true" ]]; then
   echo "[2/3] Setting up scratch database '${DB_NAME}'..."
   if [[ "${DOCKER_MODE}" == "true" ]]; then
-    docker compose exec -T db psql -U "${DB_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
+    docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -U "${DB_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
   else
-    psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
+    psql "${ADMIN_URL}" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ${DB_NAME};" -c "CREATE DATABASE ${DB_NAME};"
   fi
 fi
 
@@ -189,9 +179,9 @@ fi
 echo "[3/3] Restoring schema and database rows..."
 if [[ "${DOCKER_MODE}" == "true" ]]; then
   if [[ "${DUMP_FILE}" =~ \.sql$ ]]; then
-    docker compose exec -T db psql -U "${DB_USER}" -d "${DB_NAME}" < "${DUMP_FILE}"
+    docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -v ON_ERROR_STOP=1 -U "${DB_USER}" -d "${DB_NAME}" < "${DUMP_FILE}"
   else
-    docker compose exec -T db pg_restore -U "${DB_USER}" -d "${DB_NAME}" --clean --if-exists --no-owner < "${DUMP_FILE}"
+    docker compose exec -T -e PGPASSWORD="${DB_PASS}" db pg_restore -U "${DB_USER}" -d "${DB_NAME}" --clean --if-exists --no-owner < "${DUMP_FILE}"
   fi
 else
   PG_RESTORE_CMD="pg_restore"
@@ -205,9 +195,9 @@ else
   fi
 
   if [[ "${DUMP_FILE}" =~ \.sql$ ]]; then
-    psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f "${DUMP_FILE}"
+    psql "${TARGET_URL}" -v ON_ERROR_STOP=1 -f "${DUMP_FILE}"
   else
-    "${PG_RESTORE_CMD}" -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" --clean --if-exists --no-owner "${DUMP_FILE}"
+    "${PG_RESTORE_CMD}" --dbname="${TARGET_URL}" --exit-on-error --clean --if-exists --no-owner "${DUMP_FILE}"
   fi
 fi
 
