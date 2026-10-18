@@ -283,6 +283,37 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       expect(res.data).toBeDefined();
     });
 
+    it('prevents concurrent reparenting from creating a category cycle', async () => {
+      const suffix = Date.now();
+      const first = await categoryService.createCategory(systemPrisma, tenantId, {
+        name: `Cycle-A-${suffix}`,
+      });
+      const second = await categoryService.createCategory(systemPrisma, tenantId, {
+        name: `Cycle-B-${suffix}`,
+      });
+
+      try {
+        const results = await Promise.allSettled([
+          categoryService.updateCategory(systemPrisma, first.id, { parentId: second.id }),
+          categoryService.updateCategory(systemPrisma, second.id, { parentId: first.id }),
+        ]);
+
+        expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+        expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+
+        const [updatedFirst, updatedSecond] = await Promise.all([
+          categoryService.getCategoryById(systemPrisma, first.id),
+          categoryService.getCategoryById(systemPrisma, second.id),
+        ]);
+        expect(updatedFirst.parentId === second.id && updatedSecond.parentId === first.id).toBe(false);
+      } finally {
+        await categoryService.updateCategory(systemPrisma, first.id, { parentId: null });
+        await categoryService.updateCategory(systemPrisma, second.id, { parentId: null });
+        await categoryService.deleteCategory(systemPrisma, first.id);
+        await categoryService.deleteCategory(systemPrisma, second.id);
+      }
+    });
+
     it('creates, retrieves, and updates a category', async () => {
       const catName = `Category-${Date.now()}`;
       const created = await categoryService.createCategory(systemPrisma, tenantId, {
