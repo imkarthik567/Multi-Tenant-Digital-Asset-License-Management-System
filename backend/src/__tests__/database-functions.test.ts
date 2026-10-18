@@ -549,9 +549,12 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       ]);
 
       expect(viewRows).toHaveLength(1);
-      expect(Number(viewRows[0].total_initial_cost)).toBe(Number(expectedRows[0].total_initial_cost));
-      expect(Number(viewRows[0].total_renewal_cost)).toBe(Number(expectedRows[0].total_renewal_cost));
-      expect(Number(viewRows[0].total_seats_contracted)).toBe(Number(expectedRows[0].total_seats_contracted));
+      expect(expectedRows).toHaveLength(1);
+      const viewRow = viewRows[0]!;
+      const expectedRow = expectedRows[0]!;
+      expect(Number(viewRow.total_initial_cost)).toBe(Number(expectedRow.total_initial_cost));
+      expect(Number(viewRow.total_renewal_cost)).toBe(Number(expectedRow.total_renewal_cost));
+      expect(Number(viewRow.total_seats_contracted)).toBe(Number(expectedRow.total_seats_contracted));
     });
 
     it('marks tenant reporting views as security-invoker views', async () => {
