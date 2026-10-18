@@ -4,7 +4,7 @@ import { queryAssetSchema } from '../validators/asset.validator';
 import { queryLicenseSchema } from '../validators/license.validator';
 import { queryTenantSchema } from '../validators/tenant.validator';
 import { planIdParamsSchema } from '../validators/plan.validator';
-import { compareVersionsQuerySchema, versionNoParamsSchema } from '../validators/version.validator';
+import { compareVersionsQuerySchema, createVersionSchema, versionNoParamsSchema } from '../validators/version.validator';
 import { runExpiryCheckSchema } from '../validators/notification.validator';
 import {
   exportAuditLogQuerySchema,
@@ -114,5 +114,26 @@ describe('expiry check day count', () => {
     const result = runExpiryCheckSchema.safeParse({ daysAhead: '30' });
     expect(result.success && result.data.lookaheadDays).toBe(30);
     expect(runExpiryCheckSchema.safeParse({ lookaheadDays: '1' }).success).toBe(true);
+  });
+});
+
+
+describe('asset version file size precision', () => {
+  it('rejects byte counts beyond JavaScript safe integer precision', () => {
+    const result = createVersionSchema.safeParse({
+      fileUrl: 'https://assets.example.test/version.bin',
+      fileSize: '9007199254740992',
+      checksum: 'a'.repeat(64),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts the largest safely representable byte count', () => {
+    const result = createVersionSchema.safeParse({
+      fileUrl: 'https://assets.example.test/version.bin',
+      fileSize: '9007199254740991',
+      checksum: 'a'.repeat(64),
+    });
+    expect(result.success).toBe(true);
   });
 });
