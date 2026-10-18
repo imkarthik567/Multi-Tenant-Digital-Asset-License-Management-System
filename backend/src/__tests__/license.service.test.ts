@@ -64,3 +64,23 @@ describe('license seat-capacity updates', () => {
     expect(updateSpy).toHaveBeenCalledOnce();
   });
 });
+
+describe('license asset links', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns a conflict when concurrent duplicate links hit the unique constraint', async () => {
+    const assetId = '00000000-0000-4000-8000-000000000030';
+    const licenseId = '00000000-0000-4000-8000-000000000031';
+    const prismaClient = {
+      asset: { findFirst: vi.fn().mockResolvedValue({ id: assetId }) },
+      license: { findFirst: vi.fn().mockResolvedValue({ id: licenseId }) },
+      assetLicense: { findUnique: vi.fn().mockResolvedValue(null) },
+    };
+    vi.spyOn(licenseRepository, 'linkAsset').mockRejectedValue({ code: 'P2002' } as any);
+
+    await expect(licenseService.linkAsset(prismaClient, assetId, licenseId))
+      .rejects.toThrow('Asset is already covered by this license.');
+  });
+});
