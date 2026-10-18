@@ -12,6 +12,10 @@ import { parseCsv, toCsv } from '../utils/csv.util';
 import { prisma } from '../config/prisma';
 import { AssetType, Prisma } from '@prisma/client';
 
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+}
+
 export class AssetService {
   public async listAssets(
     prismaClient: any,
@@ -70,16 +74,26 @@ export class AssetService {
         throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
       }
 
-      const asset = await assetRepository.create(tx, {
-        name: data.name,
-        assetCode: data.assetCode,
-        assetType: data.assetType,
-        description: data.description || null,
-        status: (data.status as any) || 'ACTIVE',
-        category: data.categoryId ? { connect: { id: data.categoryId } } : undefined,
-        owner: { connect: { id: ownerId } },
-        tenant: { connect: { id: tenantId } },
-      });
+      let asset;
+      try {
+        asset = await assetRepository.create(tx, {
+          name: data.name,
+          assetCode: data.assetCode,
+          assetType: data.assetType,
+          description: data.description || null,
+          status: (data.status as any) || 'ACTIVE',
+          category: data.categoryId ? { connect: { id: data.categoryId } } : undefined,
+          owner: { connect: { id: ownerId } },
+          tenant: { connect: { id: tenantId } },
+        });
+      } catch (error) {
+        // The pre-check above cannot prevent a concurrent create from winning
+        // between the check and insert. Preserve the API's conflict semantics.
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
+        }
+        throw error;
+      }
 
       if (data.fileUrl) {
         await tx.assetVersion.create({
@@ -335,17 +349,27 @@ export class AssetService {
           throw new ConflictError(`Duplicate asset code '${rowData.assetCode}' encountered at database stage.`);
         }
 
-        const created = await tx.asset.create({
-          data: {
-            tenantId,
-            ownerId: userId,
-            name: rowData.name,
-            assetCode: rowData.assetCode,
-            assetType: rowData.assetType,
-            description: rowData.description,
-            status: 'ACTIVE',
-          },
-        });
+        let created;
+        try {
+          created = await tx.asset.create({
+            data: {
+              tenantId,
+              ownerId: userId,
+              name: rowData.name,
+              assetCode: rowData.assetCode,
+              assetType: rowData.assetType,
+              description: rowData.description,
+              status: 'ACTIVE',
+            },
+          });
+        } catch (error) {
+          // Concurrent imports can both pass findFirst; map the database
+          // uniqueness guard to the same client-facing conflict as the pre-check.
+          if (isUniqueConstraintViolation(error)) {
+            throw new ConflictError(`Duplicate asset code '${rowData.assetCode}' encountered at database stage.`);
+          }
+          throw error;
+        }
         createdRecords.push(created);
       }
 
