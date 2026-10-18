@@ -50,23 +50,36 @@ export const createVersionSchema = z.preprocess(
     .passthrough()
 );
 
+const positiveVersionNumber = z.preprocess(
+  (value: unknown) =>
+    typeof value === 'string' && /^[1-9]\d*$/.test(value) ? Number(value) : value,
+  z.number().int().positive().max(2147483647)
+);
+
+export const versionNoParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+    versionNo: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'Version number must be a positive integer')
+      .refine((value) => Number(value) <= 2147483647, 'Version number exceeds the supported range'),
+  })
+  .strip();
+
 export const compareVersionsQuerySchema = z.preprocess(
   (val: any) => {
     if (val && typeof val === 'object') {
       const rawFrom = val.from !== undefined ? val.from : val.v1;
       const rawTo = val.to !== undefined ? val.to : val.v2;
 
-      return {
-        from: typeof rawFrom === 'string' ? parseInt(rawFrom, 10) : rawFrom,
-        to: typeof rawTo === 'string' ? parseInt(rawTo, 10) : rawTo,
-      };
+      return { from: rawFrom, to: rawTo };
     }
     return val;
   },
   z
     .object({
-      from: z.number().int().positive('from must be a valid positive integer version number'),
-      to: z.number().int().positive('to must be a valid positive integer version number'),
+      from: positiveVersionNumber,
+      to: positiveVersionNumber,
     })
     .strip()
 );
