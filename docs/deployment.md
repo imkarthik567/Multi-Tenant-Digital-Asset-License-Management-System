@@ -129,7 +129,7 @@ npm run db:seed
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
 4. Set Environment Variables:
-   - `VITE_API_BASE_URL`: `https://assetvault-api.onrender.com/api` (or `/api` if using Vercel rewrites)
+   - `VITE_API_URL`: `https://assetvault-api.onrender.com/api` (or `/api` if using Vercel rewrites)
 5. Deploy. Vercel automatically honors [`frontend/vercel.json`](../frontend/vercel.json) for SPA routing and API reverse-proxying.
 
 ---
