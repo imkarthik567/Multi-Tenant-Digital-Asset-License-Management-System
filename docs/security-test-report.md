@@ -1,10 +1,12 @@
 # AssetVault - Security Penetration & "Break-It" Test Report
 **Course:** BCSE307L Database Systems (Fall 2026-27)  
 **Examiner Evaluation Target:** Security Defenses, Isolation, Concurrency Integrity, & Attack Resilience  
-**Date of Execution:** October 14, 2026  
+**Date of Execution:** October 14, 2026 (historical report)  
 **Test Suite:** `backend/src/__tests__/break-it-security.test.ts` (100% Pass: 22/22 Tests Passing)  
 
 ---
+
+> **Current review status (October 18, 2026):** The 22/22 result above documents the October 14 run only. In a later CI run on the rubric-fix branch, database migrations and seed, lint/type-check, secret scanning and SQL-injection static analysis passed, while the then-current Vitest run had one tenant-registration test failure (132 passed / 1 failed). The fixture has since been corrected to satisfy the registration password-complexity rule; a complete green run is still required before reporting current 22/22 status as reverified.
 
 ## 1. Executive Security Summary
 
