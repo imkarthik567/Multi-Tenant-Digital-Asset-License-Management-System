@@ -153,24 +153,52 @@ WHERE a.deleted_at IS NULL;
 -- Aggregates procurement and renewal financial spend per vendor and tenant.
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW v_vendor_spend WITH (security_invoker = true) AS
-SELECT 
+WITH license_totals AS (
+    SELECT
+        l.tenant_id,
+        l.vendor_id,
+        COUNT(l.id) AS license_count,
+        COALESCE(SUM(l.cost), 0)::NUMERIC(12,2) AS total_initial_cost,
+        COALESCE(SUM(l.total_seats), 0)::BIGINT AS total_seats_contracted
+    FROM licenses l
+    WHERE l.deleted_at IS NULL
+    GROUP BY l.tenant_id, l.vendor_id
+),
+renewal_totals AS (
+    SELECT
+        l.tenant_id,
+        l.vendor_id,
+        COALESCE(SUM(lr.cost), 0)::NUMERIC(12,2) AS total_renewal_cost
+    FROM licenses l
+    JOIN license_renewals lr ON lr.license_id = l.id
+    WHERE l.deleted_at IS NULL
+    GROUP BY l.tenant_id, l.vendor_id
+)
+SELECT
     v.tenant_id,
     v.id AS vendor_id,
     v.name AS vendor_name,
     v.contact_email,
-    COUNT(DISTINCT l.id) AS license_count,
-    COALESCE(SUM(l.cost), 0)::NUMERIC(12,2) AS total_initial_cost,
-    COALESCE(SUM(lr.cost), 0)::NUMERIC(12,2) AS total_renewal_cost,
-    (COALESCE(SUM(l.cost), 0) + COALESCE(SUM(lr.cost), 0))::NUMERIC(12,2) AS grand_total_spend,
-    COALESCE(SUM(l.total_seats), 0) AS total_seats_contracted,
+    COALESCE(lt.license_count, 0)::BIGINT AS license_count,
+    COALESCE(lt.total_initial_cost, 0)::NUMERIC(12,2) AS total_initial_cost,
+    COALESCE(rt.total_renewal_cost, 0)::NUMERIC(12,2) AS total_renewal_cost,
+    (
+      COALESCE(lt.total_initial_cost, 0) +
+      COALESCE(rt.total_renewal_cost, 0)
+    )::NUMERIC(12,2) AS grand_total_spend,
+    COALESCE(lt.total_seats_contracted, 0)::BIGINT AS total_seats_contracted,
     ROUND(
-        (COALESCE(SUM(l.cost), 0) + COALESCE(SUM(lr.cost), 0)) / NULLIF(SUM(l.total_seats), 0),
-        2
+      (
+        COALESCE(lt.total_initial_cost, 0) +
+        COALESCE(rt.total_renewal_cost, 0)
+      ) / NULLIF(lt.total_seats_contracted, 0),
+      2
     ) AS avg_cost_per_seat
 FROM vendors v
-LEFT JOIN licenses l ON l.vendor_id = v.id AND l.deleted_at IS NULL
-LEFT JOIN license_renewals lr ON lr.license_id = l.id
-GROUP BY v.tenant_id, v.id, v.name, v.contact_email;
+LEFT JOIN license_totals lt
+  ON lt.tenant_id = v.tenant_id AND lt.vendor_id = v.id
+LEFT JOIN renewal_totals rt
+  ON rt.tenant_id = v.tenant_id AND rt.vendor_id = v.id;
 
 -- ------------------------------------------------------------------------------
 -- 5. View: v_monthly_spend
