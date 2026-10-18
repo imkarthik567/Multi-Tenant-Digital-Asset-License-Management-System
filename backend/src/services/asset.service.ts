@@ -45,51 +45,67 @@ export class AssetService {
     };
   }
 
-  public async createAsset(prismaClient: any, tenantId: string, ownerId: string, data: any) {
-    const existing = await assetRepository.findByCode(prismaClient, data.assetCode);
-    if (existing) {
-      throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
-    }
+  public async createAsset(_prismaClient: any, tenantId: string, ownerId: string, data: any) {
+    // Asset metadata, its initial file version, and tags form one logical
+    // create operation. Keep all writes in one transaction so a failed
+    // version or tag insert cannot leave a partially created asset.
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${ownerId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
 
-    const asset = await assetRepository.create(prismaClient, {
-      name: data.name,
-      assetCode: data.assetCode,
-      assetType: data.assetType,
-      description: data.description || null,
-      status: (data.status as any) || 'ACTIVE',
-      category: data.categoryId ? { connect: { id: data.categoryId } } : undefined,
-      owner: { connect: { id: ownerId } },
-      tenant: { connect: { id: tenantId } },
-    });
-
-    if (data.fileUrl) {
-      await prismaClient.assetVersion.create({
-        data: {
-          assetId: asset.id,
-          versionNo: 1,
-          fileUrl: data.fileUrl,
-          fileSizeBytes: BigInt(data.fileSizeBytes || 1048576),
-          checksumSha256:
-            data.checksumSha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          uploadedBy: ownerId,
-        },
+      // Asset codes remain unique after soft deletion, matching the database's
+      // (tenant_id, asset_code) unique constraint.
+      const existing = await tx.asset.findFirst({
+        where: { assetCode: data.assetCode, tenantId },
       });
-    }
-
-    if (Array.isArray(data.tags) && data.tags.length > 0) {
-      for (const tagItem of data.tags) {
-        if (!tagItem || typeof tagItem !== 'string' || !tagItem.trim()) continue;
-        const tagName = tagItem.trim();
-        const tag = await prismaClient.tag.upsert({
-          where: { tenantId_name: { tenantId, name: tagName } },
-          create: { tenantId, name: tagName },
-          update: {},
-        });
-        await assetRepository.attachTag(prismaClient, asset.id, tag.id);
+      if (existing) {
+        throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
       }
-    }
 
-    return asset;
+      const asset = await assetRepository.create(tx, {
+        name: data.name,
+        assetCode: data.assetCode,
+        assetType: data.assetType,
+        description: data.description || null,
+        status: (data.status as any) || 'ACTIVE',
+        category: data.categoryId ? { connect: { id: data.categoryId } } : undefined,
+        owner: { connect: { id: ownerId } },
+        tenant: { connect: { id: tenantId } },
+      });
+
+      if (data.fileUrl) {
+        await tx.assetVersion.create({
+          data: {
+            assetId: asset.id,
+            versionNo: 1,
+            fileUrl: data.fileUrl,
+            fileSizeBytes: BigInt(data.fileSizeBytes || 1048576),
+            checksumSha256:
+              data.checksumSha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+            uploadedBy: ownerId,
+          },
+        });
+      }
+
+      if (Array.isArray(data.tags) && data.tags.length > 0) {
+        for (const tagItem of data.tags) {
+          if (!tagItem || typeof tagItem !== 'string' || !tagItem.trim()) continue;
+          const tagName = tagItem.trim();
+          const tag = await tx.tag.upsert({
+            where: { tenantId_name: { tenantId, name: tagName } },
+            create: { tenantId, name: tagName },
+            update: {},
+          });
+          await assetRepository.attachTag(tx, asset.id, tag.id);
+        }
+      }
+
+      return asset;
+    });
   }
 
   public async updateAsset(prismaClient: any, id: string, data: any) {
