@@ -249,6 +249,42 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
   });
 
   // ----------------------------------------------------------------------------
+  // Test 5b: Concurrent refresh reuse has one winner and revokes the session family
+  // ----------------------------------------------------------------------------
+  it('rejects concurrent reuse of one refresh token and revokes both resulting sessions', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'techcorp.dev2@techcorp.io',
+        password: testPassword,
+      });
+
+    expect(loginRes.status).toBe(200);
+    const cookies = loginRes.headers['set-cookie'];
+    const cookie = Array.isArray(cookies) ? cookies[0] : cookies;
+    const token = cookie.match(/refreshToken=([^;]+)/)![1];
+
+    const [first, second] = await Promise.all([
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([200, 401]);
+    const rejected = first.status === 401 ? first : second;
+    expect(rejected.body.error.message).toContain('Compromised refresh token reuse detected');
+
+    const user = await systemPrisma.user.findUnique({
+      where: { email: 'techcorp.dev2@techcorp.io' },
+      select: { id: true },
+    });
+    expect(user).toBeDefined();
+    const activeTokens = await systemPrisma.refreshToken.count({
+      where: { userId: user!.id, revokedAt: null },
+    });
+    expect(activeTokens).toBe(0);
+  });
+
+  // ----------------------------------------------------------------------------
   // Test 6: Logout revokes refresh token and clears cookie
   // ----------------------------------------------------------------------------
   it('6. Logout revokes refresh token and clears cookie, preventing future refreshes', async () => {
