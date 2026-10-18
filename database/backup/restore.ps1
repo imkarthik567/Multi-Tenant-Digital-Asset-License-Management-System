@@ -24,7 +24,7 @@ $BackupDir = Join-Path $ProjectRoot "backups"
 # 2. Resolve Dump File
 if ([string]::IsNullOrWhiteSpace($DumpFile)) {
     # Find latest dump file in backups directory
-    $latestDump = Get-ChildItem -Path $BackupDir -Filter "assetvault_*.dump" -ErrorAction SilentlyContinue | Sort-Object CreationTime -Descending | Select-Object -First 1
+    $latestDump = Get-ChildItem -Path $BackupDir -Filter "assetvault_*.dump" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $latestDump) {
         throw "No backup file specified and no .dump files found in $BackupDir"
     }
