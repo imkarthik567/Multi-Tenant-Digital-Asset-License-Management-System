@@ -56,24 +56,27 @@ AssetVault is designed for zero-cost, high-reliability deployment on modern free
 
 ### B. Connection String Architecture
 Supabase provides two distinct connection strings in **Project Settings** -> **Database**:
-1. **Transaction Pooler (Port 6543)**: Used for application runtime (`DATABASE_URL`). Add `?pgbouncer=true` to the connection string so Prisma disables prepared statement caching:
+1. **Transaction Pooler (Port 6543)**: Used for application runtime (`DATABASE_URL`) and must authenticate as the restricted `assetvault_app` role. On Supabase, use the role-qualified username required by your project/pooler:
    ```
-   postgresql://postgres.[project-ref]:[DB_PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&schema=public
+   postgresql://assetvault_app.[project-ref]:[APP_DB_PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&schema=public
    ```
-2. **Direct Connection (Port 5432)**: Used for running schema migrations and DDL operations (`DIRECT_URL`):
+2. **Direct Connection (Port 5432)**: Used only for migrations, initial role bootstrap, seeding, and trusted background maintenance (`DIRECT_URL`). Keep this privileged credential separate from the runtime URL:
    ```
-   postgresql://postgres.[project-ref]:[DB_PASSWORD]@aws-0-[region].pooler.supabase.com:5432/postgres?schema=public
+   postgresql://postgres.[project-ref]:[DB_PASSWORD]@db.[project-ref].supabase.co:5432/postgres?schema=public
    ```
+
+Set `APP_DB_PASSWORD` to a strong random value of at least 32 characters. The startup entrypoint uses `DIRECT_URL` to create/update the restricted role, then the HTTP API connects using `DATABASE_URL`. Do not configure `DATABASE_URL` with the `postgres` administrator credentials.
 
 ### C. Create Restricted Runtime Role (`assetvault_app`)
 To adhere strictly to the principle of least privilege, run the production bootstrap script using the Supabase SQL Editor or `psql`:
 
 ```bash
 # Execute 08_production_bootstrap.sql against your Supabase Direct URL
-psql "$DIRECT_URL" -v APP_PASSWORD="'<STRONG_APP_PASSWORD_HERE>'" -f database/sql/08_production_bootstrap.sql
+APP_DB_PASSWORD="<STRONG_RANDOM_APP_PASSWORD>"
+psql "$DIRECT_URL" -v APP_PASSWORD="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
 ```
 
-This creates the `assetvault_app` role with standard CRUD permissions and revokes `CREATE/DROP` DDL capabilities.
+The Docker/Render entrypoint runs this bootstrap after migrations. For manual setup, the same script sets a supplied password, enables login for `assetvault_app`, grants runtime DML access, and revokes schema-creation rights. Never use a fallback/default password.
 
 ### D. Apply Migrations & Reference Data
 From your local terminal or CI/CD runner:
@@ -84,10 +87,12 @@ DIRECT_URL="<YOUR_SUPABASE_DIRECT_URL>" npx prisma migrate deploy --schema backe
 
 # 2. Seed system roles, subscription plans, license types and initial Super Admin
 DIRECT_URL="<YOUR_SUPABASE_DIRECT_URL>" \
-DATABASE_URL="<YOUR_SUPABASE_POOLED_URL>" \
+DATABASE_URL="<YOUR_RESTRICTED_ASSETVAULT_APP_POOLED_URL>" \
+SEED_DATABASE_URL="<YOUR_SUPABASE_DIRECT_URL>" \
 SEED_DEMO="false" \
 SUPER_ADMIN_EMAIL="admin@yourdomain.com" \
 SUPER_ADMIN_PASSWORD="<STRONG_ADMIN_PASSWORD>" \
+APP_DB_PASSWORD="<STRONG_RANDOM_APP_PASSWORD>" \
 npm run db:seed
 ```
 
@@ -99,7 +104,7 @@ npm run db:seed
 1. Fork or push your AssetVault repository to GitHub.
 2. In [dashboard.render.com](https://dashboard.render.com), click **New** -> **Blueprint**.
 3. Connect your repository. Render automatically reads root [`render.yaml`](../render.yaml).
-4. Fill in the prompted secret values (Render will auto-generate strong random strings for `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET`).
+4. Set `DATABASE_URL` to the restricted `assetvault_app` pooler URL, `DIRECT_URL` to the privileged direct URL, and `APP_DB_PASSWORD` to a strong random password of at least 32 characters. Render can auto-generate `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET`; they must remain distinct.
 5. Click **Apply**.
 
 ### Option B: Manual Web Service
