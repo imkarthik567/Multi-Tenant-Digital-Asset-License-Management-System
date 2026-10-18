@@ -16,7 +16,7 @@ There are no shared demo passwords or one-click credential-fill controls in the 
 | TechCorp (Tenant A) | `TENANT_ADMIN` | `techcorp.admin@techcorp.io` |
 | TechCorp (Tenant A) | `ASSET_MANAGER` | `techcorp.mgr1@techcorp.io` |
 | TechCorp (Tenant A) | `MEMBER` | `techcorp.dev1@techcorp.io` |
-| InnovateLabs (Tenant B) | `TENANT_ADMIN` | Confirm seeded address in the database |
+| InnovateLabs (Tenant B) | `TENANT_ADMIN` | `innovatelabs.admin@innovatelabs.io` |
 
 ---
 
