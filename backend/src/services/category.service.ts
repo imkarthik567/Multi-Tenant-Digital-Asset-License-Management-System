@@ -74,7 +74,7 @@ export class CategoryService {
           set_config('app.current_user_id', '', true),
           set_config('app.is_super_admin', 'false', true);`
       );
-      await tx.$queryRaw(
+      await tx.$executeRaw(
         Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId}, 0));`
       );
 
@@ -112,7 +112,7 @@ export class CategoryService {
           set_config('app.current_user_id', '', true),
           set_config('app.is_super_admin', 'false', true);`
       );
-      await tx.$queryRaw(
+      await tx.$executeRaw(
         Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${existing.tenantId}, 0));`
       );
 
