@@ -16,10 +16,14 @@ export const createAssetSchema = z
     categoryId: z.preprocess((v) => (v === '' ? null : v), z.string().uuid().optional().nullable()),
     fileUrl: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
     fileSizeBytes: z.number().int().positive().optional(),
-    checksumSha256: z.string().length(64).optional(),
+    checksumSha256: z.string().trim().regex(/^[a-fA-F0-9]{64}$/, 'checksumSha256 must be a 64-character hexadecimal SHA-256 checksum').optional(),
     tags: z.array(z.string()).optional(),
   })
-  .strip();
+  .strip()
+  .refine((data) => !data.fileUrl || Boolean(data.checksumSha256), {
+    message: 'checksumSha256 is required when fileUrl is provided',
+    path: ['checksumSha256'],
+  });
 
 export const updateAssetSchema = z
   .object({
