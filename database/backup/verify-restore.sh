@@ -85,6 +85,19 @@ DB_PASS="$(pg_uri_field "${source_url}" password)"
 SOURCE_DB="$(pg_uri_database "${source_url}")"
 export PGPASSWORD="${DB_PASS}"
 
+# Refuse to overwrite a database that already exists, including when SCRATCH_DB
+# was explicitly set. The default name is unique; this guard protects custom names.
+SCRATCH_EXISTS_QUERY="SELECT 1 FROM pg_database WHERE datname = '${SCRATCH_DB}';"
+if [[ "${DOCKER_MODE}" == "true" ]]; then
+  EXISTING_SCRATCH="$(docker compose exec -T -e PGPASSWORD="${DB_PASS}" db psql -v ON_ERROR_STOP=1 -U "${DB_USER}" -d postgres -t -A -c "${SCRATCH_EXISTS_QUERY}")"
+else
+  EXISTING_SCRATCH="$(psql "$(pg_uri_with_database "${source_url}" "postgres")" -v ON_ERROR_STOP=1 -t -A -c "${SCRATCH_EXISTS_QUERY}")"
+fi
+if [[ -n "${EXISTING_SCRATCH//[[:space:]]/}" ]]; then
+  echo "[ERROR] Scratch database '${SCRATCH_DB}' already exists; refusing to drop or overwrite it." >&2
+  exit 2
+fi
+
 cleanup_scratch() {
   local original_status="$?"
   local cleanup_status=0
@@ -161,7 +174,8 @@ ALL_PASSED=true
 
 while IFS= read -r tbl || [[ -n "${tbl}" ]]; do
   [[ -z "${tbl}" ]] && continue
-  COUNT_SQL="SELECT COUNT(*) FROM \"${tbl}\";"
+  escaped_tbl="${tbl//\"/\"\"}"
+  COUNT_SQL="SELECT COUNT(*) FROM \"${escaped_tbl}\";"
   SRC_COUNT="$(run_sql "${SOURCE_DB}" "${COUNT_SQL}")"
   SCRATCH_COUNT="$(run_sql "${SCRATCH_DB}" "${COUNT_SQL}")"
 
