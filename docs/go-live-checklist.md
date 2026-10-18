@@ -42,7 +42,7 @@
 
 ## 5. Docker, CI/CD and backup/recovery
 
-- [x] Docker image build, scan and publish workflow succeeded on the latest reviewed branch revision ([run 39136189118](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189118)).
+- [x] Docker images built and Trivy-scanned successfully on the latest reviewed branch revision ([run 39136189118](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189118)). GitHub Container Registry steps ran; **Docker Hub login/publish steps were skipped for the pull-request event**, so Hub images still need credentials and confirmation.
 - [ ] Configure `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in repository Actions secrets, then verify the API and web images are published to the intended Docker Hub repositories.
 - [ ] Run `.github/workflows/db-backup.yml` with `DATABASE_DIRECT_URL` (preferred) or `DATABASE_URL` configured and confirm an artifact/checksum is created.
 - [ ] Execute a restore to a scratch database and compare table counts/data, not just a successful `pg_dump`.
