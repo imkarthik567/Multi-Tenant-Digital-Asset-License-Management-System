@@ -516,6 +516,42 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       }
     });
 
+    it('rejects an initial file version without a valid checksum', async () => {
+      const assetCode = `CHECKSUM-REQUIRED-${Date.now()}`;
+
+      await expect(
+        assetService.createAsset(systemPrisma, tenantId, adminUserId, {
+          name: 'Checksum Required Asset',
+          assetCode,
+          assetType: 'DOCUMENT',
+          fileUrl: 'https://storage.assetvault.io/checksum-required.bin',
+        })
+      ).rejects.toThrow('A valid SHA-256 checksum is required');
+
+      const persistedAsset = await systemPrisma.asset.findFirst({
+        where: { tenantId, assetCode },
+      });
+      expect(persistedAsset).toBeNull();
+    });
+
+    it('rejects an asset version without a valid checksum', async () => {
+      if (!testAssetId) {
+        throw new Error('Test precondition failed: TechCorp asset missing');
+      }
+
+      await expect(
+        assetService.createVersion(
+          tenantId,
+          testAssetId,
+          {
+            fileUrl: 'https://storage.assetvault.io/checksum-required-version.bin',
+            fileSizeBytes: 128,
+          },
+          adminUserId
+        )
+      ).rejects.toThrow('A valid SHA-256 checksum is required');
+    });
+
     it('rolls back an asset if an initial tag cannot be created', async () => {
       const assetCode = `ATOMIC-CREATE-${Date.now()}`;
 
