@@ -33,7 +33,7 @@
 
 | Bonus requirement | Source evidence | Current state |
 |---|---|---|
-| CI/CD pipeline (+1) | `.github/workflows/ci.yml`, `docker-publish.yml`, `deploy.yml` | Configured; latest draft-branch CI run passed (139/139 tests) and Docker build/scan/publish succeeded; live deployment remains a separate check. |
+| CI/CD pipeline (+1) | `.github/workflows/ci.yml`, `docker-publish.yml`, `deploy.yml` | Configured; latest code verification passed (155/155 tests across 10 files), and Docker build/Trivy scans passed; Docker Hub publishing was skipped for the pull-request event; live deployment remains a separate check. |
 | Custom domain (+1) | [Custom-domain guide](custom-domain.md) | Guide exists; live domain and HTTPS are not verified. |
 | Additional industry practice (+1) | RLS, audit logging, automated tests, Prometheus/Grafana configuration, backup/restore tooling | Several practices are implemented in source; runtime evidence is still required. |
 
