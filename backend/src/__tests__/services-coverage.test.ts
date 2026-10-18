@@ -527,6 +527,28 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       expect(licenseCsv).toContain('license_name');
     });
 
+    it('rejects asset-license links when either record is soft-deleted', async () => {
+      const findAsset = vi.fn().mockResolvedValue(null);
+      const findLicense = vi.fn().mockResolvedValue(null);
+      const prismaMock = {
+        asset: { findFirst: findAsset },
+        license: { findFirst: findLicense },
+      };
+
+      await expect(licenseService.linkAsset(prismaMock, 'asset-id', 'license-id'))
+        .rejects.toThrow('Asset not found');
+      expect(findAsset).toHaveBeenCalledWith({
+        where: { id: 'asset-id', deletedAt: null },
+      });
+      expect(findLicense).toHaveBeenCalledWith({
+        where: { id: 'license-id', deletedAt: null },
+      });
+
+      findAsset.mockResolvedValue({ id: 'asset-id' });
+      await expect(licenseService.linkAsset(prismaMock, 'asset-id', 'license-id'))
+        .rejects.toThrow('License not found');
+    });
+
     it('retrieves license renewals and covered assets', async () => {
       if (testLicenseId) {
         const renewals = await licenseService.findRenewals(systemPrisma, testLicenseId);
