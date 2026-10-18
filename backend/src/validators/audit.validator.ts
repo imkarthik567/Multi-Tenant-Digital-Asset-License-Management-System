@@ -6,6 +6,11 @@
 import { z } from 'zod';
 import { AuditAction } from '@prisma/client';
 
+const queryDateSchema = z.string().refine(
+  (value) => !Number.isNaN(new Date(value).getTime()),
+  'Must be a valid date'
+);
+
 export const queryAuditLogSchema = z
   .object({
     page: z.string().optional(),
@@ -13,7 +18,19 @@ export const queryAuditLogSchema = z
     tableName: z.string().optional(),
     action: z.nativeEnum(AuditAction).optional(),
     userId: z.string().uuid().optional(),
-    dateFrom: z.string().optional(),
-    dateTo: z.string().optional(),
+    dateFrom: queryDateSchema.optional(),
+    dateTo: queryDateSchema.optional(),
+  })
+  .strip();
+
+export const exportAuditLogQuerySchema = z
+  .object({
+    action: z.string().optional(),
+    tableName: z.string().optional(),
+    userId: z.string().uuid().optional(),
+    dateFrom: queryDateSchema.optional(),
+    dateTo: queryDateSchema.optional(),
+    startDate: queryDateSchema.optional(),
+    endDate: queryDateSchema.optional(),
   })
   .strip();
