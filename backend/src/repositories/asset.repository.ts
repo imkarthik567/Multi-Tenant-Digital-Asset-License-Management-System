@@ -105,14 +105,24 @@ export class AssetRepository {
     const orderDirection = params.order === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
     const orderClause = Prisma.sql`ORDER BY ${Prisma.raw(sortColumn)} ${orderDirection}`;
 
-    const [data, countResult] = await Promise.all([
-      prisma.$queryRaw(
-        Prisma.sql`SELECT * FROM v_asset_catalog ${whereClause} ${orderClause} LIMIT ${params.limit} OFFSET ${params.skip};`
-      ),
-      prisma.$queryRaw(
-        Prisma.sql`SELECT COUNT(*)::int AS count FROM v_asset_catalog ${whereClause};`
-      ),
-    ]);
+    // Raw SQL bypasses the model-level tenant extension; bind the tenant GUC
+    // inside the same transaction so v_asset_catalog's security_invoker option
+    // evaluates the underlying table RLS policies for this request.
+    const [data, countResult] = await prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+      return Promise.all([
+        tx.$queryRaw(
+          Prisma.sql`SELECT * FROM v_asset_catalog ${whereClause} ${orderClause} LIMIT ${params.limit} OFFSET ${params.skip};`
+        ),
+        tx.$queryRaw(
+          Prisma.sql`SELECT COUNT(*)::int AS count FROM v_asset_catalog ${whereClause};`
+        ),
+      ]);
+    });
 
     const total = (countResult as any[])[0]?.count || 0;
     return { data: data as AssetCatalogViewRow[], total };
@@ -125,13 +135,20 @@ export class AssetRepository {
   ): Promise<{ compliance_status: string; covering_licenses_count: number } | null> {
     // Use the same database view as the asset list so detail pages get the
     // canonical compliance calculation, scoped to the owning tenant.
-    const rows = (await prisma.$queryRaw(
-      Prisma.sql`SELECT compliance_status, covering_licenses_count
-                  FROM v_asset_catalog
-                  WHERE asset_id = ${id}::uuid
-                    AND tenant_id = ${tenantId}::uuid
-                  LIMIT 1`
-    )) as Array<{ compliance_status: string; covering_licenses_count: number }>;
+    const rows = (await prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+      return tx.$queryRaw(
+        Prisma.sql`SELECT compliance_status, covering_licenses_count
+                    FROM v_asset_catalog
+                    WHERE asset_id = ${id}::uuid
+                      AND tenant_id = ${tenantId}::uuid
+                    LIMIT 1`
+      );
+    })) as Array<{ compliance_status: string; covering_licenses_count: number }>;
     return rows[0] ?? null;
   }
 
