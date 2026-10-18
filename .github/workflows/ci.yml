@@ -66,6 +66,11 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
           DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
         run: |
+          # Use disposable per-run credentials; do not commit shared test passwords.
+          export SUPER_ADMIN_EMAIL="ci-superadmin@assetvault.test"
+          export SUPER_ADMIN_PASSWORD="$(openssl rand -hex 32)"
+          export DEFAULT_SEED_PASSWORD="$(openssl rand -hex 32)"
+          export SEED_DEMO="true"
           npx prisma migrate deploy --schema backend/prisma/schema.prisma
           psql -h localhost -p 5432 -U postgres -d assetvault_test_db -f database/sql/01_views.sql
           psql -h localhost -p 5432 -U postgres -d assetvault_test_db -f database/sql/02_functions_procedures.sql
