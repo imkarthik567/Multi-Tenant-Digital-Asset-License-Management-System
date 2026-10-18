@@ -116,7 +116,7 @@ Write-Host "  - SHA-256 Checksum  : $($hashResult.Hash)" -ForegroundColor Gray
 
 # 8. Retention Policy: Retain Only Latest 7 Backups
 Write-Host "`n[INFO] Enforcing 7-Day Backup Retention Policy..." -ForegroundColor Cyan
-$allDumps = Get-ChildItem -Path $BackupDir -Filter "assetvault_*.dump" | Sort-Object CreationTime -Descending
+$allDumps = Get-ChildItem -Path $BackupDir -Filter "assetvault_*.dump" | Sort-Object LastWriteTime -Descending
 
 if ($allDumps.Count -gt 7) {
     $staleDumps = $allDumps | Select-Object -Skip 7
