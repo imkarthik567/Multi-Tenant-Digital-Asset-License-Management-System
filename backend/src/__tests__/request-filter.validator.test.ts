@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { Request } from 'express';
+import { getPaginationParams } from '../utils/pagination.util';
 import { queryAccessLogSchema } from '../validators/access.validator';
 import { queryAssetSchema } from '../validators/asset.validator';
 import { queryLicenseSchema } from '../validators/license.validator';
@@ -135,5 +137,27 @@ describe('asset version file size precision', () => {
       checksum: 'a'.repeat(64),
     });
     expect(result.success).toBe(true);
+  });
+});
+
+
+describe('pagination parameters', () => {
+  const requestWithQuery = (query: Record<string, string>) => ({ query } as unknown as Request);
+
+  it('falls back to defaults for malformed numeric strings', () => {
+    const params = getPaginationParams(requestWithQuery({ page: '2x', limit: '3x' }));
+    expect(params).toMatchObject({ page: 1, limit: 10, skip: 0 });
+  });
+
+  it('accepts whole numbers and caps page size at 100', () => {
+    const params = getPaginationParams(requestWithQuery({ page: '4', limit: '250' }));
+    expect(params).toMatchObject({ page: 4, limit: 100, skip: 300 });
+  });
+
+  it('falls back when a requested page would produce an unsafe offset', () => {
+    const params = getPaginationParams(
+      requestWithQuery({ page: '9007199254740992', limit: '100' })
+    );
+    expect(params).toMatchObject({ page: 1, limit: 100, skip: 0 });
   });
 });
