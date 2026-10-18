@@ -321,3 +321,13 @@ WITH CHECK (
           AND u.tenant_id = fn_current_tenant_id()
     )
 );
+
+
+-- ------------------------------------------------------------------------------
+-- Final reporting-view privilege hardening
+-- This block intentionally runs after all broad schema/table grants in this file.
+-- The materialized view contains rows across tenants and must not be selectable by
+-- the app runtime role; callers receive only the GUC-filtered wrapper view.
+-- ------------------------------------------------------------------------------
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM assetvault_app;
+GRANT SELECT ON TABLE v_monthly_access_stats_tenant TO assetvault_app;
