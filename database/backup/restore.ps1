@@ -160,10 +160,19 @@ if (-not $Yes -and -not $Scratch) {
 if ($Scratch) {
     Write-Host "[2/3] Preparing scratch database '$DbName'..." -ForegroundColor Cyan
     if ($Docker) {
-        docker compose exec -T -e "PGPASSWORD=$DbPass" db psql -v ON_ERROR_STOP=1 -U $DbUser -d postgres -c "DROP DATABASE IF EXISTS $DbName;" -c "CREATE DATABASE $DbName;"
+        $existingScratch = & docker compose exec -T -e "PGPASSWORD=$DbPass" db psql -v ON_ERROR_STOP=1 -U $DbUser -d postgres -t -A -c "SELECT 1 FROM pg_database WHERE datname = '$DbName';"
+    } else {
+        $existingScratch = & $PsqlExe $AdminUrl -v ON_ERROR_STOP=1 -t -A -c "SELECT 1 FROM pg_database WHERE datname = '$DbName';"
+    }
+    if ($LASTEXITCODE -ne 0) { throw "Could not check whether scratch database '$DbName' exists." }
+    if (-not [string]::IsNullOrWhiteSpace(($existingScratch -join "").Trim())) {
+        throw "Scratch database '$DbName' already exists; refusing to overwrite it."
+    }
+    if ($Docker) {
+        & docker compose exec -T -e "PGPASSWORD=$DbPass" db psql -v ON_ERROR_STOP=1 -U $DbUser -d postgres -c "CREATE DATABASE $DbName;"
         if ($LASTEXITCODE -ne 0) { throw "Docker scratch database create failed with code $LASTEXITCODE" }
     } else {
-        & $PsqlExe $AdminUrl -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $DbName;" -c "CREATE DATABASE $DbName;"
+        & $PsqlExe $AdminUrl -v ON_ERROR_STOP=1 -c "CREATE DATABASE $DbName;"
         if ($LASTEXITCODE -ne 0) { throw "Scratch database create failed with code $LASTEXITCODE" }
     }
 }
