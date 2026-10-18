@@ -36,8 +36,11 @@ services:
       # Set DATABASE_URL to Transaction Pooler URL (e.g. port 6543 with ?pgbouncer=true)
       - key: DATABASE_URL
         sync: false
-      # Set DIRECT_URL to Direct Connection URL (port 5432) for Prisma Migrations
+      # DATABASE_URL must connect as the restricted assetvault_app role.
+      # DIRECT_URL is a privileged direct connection used by migrations/bootstrap/maintenance only.
       - key: DIRECT_URL
+        sync: false
+      - key: APP_DB_PASSWORD
         sync: false
 
       # --- Client & CORS Allowed Origins ---
