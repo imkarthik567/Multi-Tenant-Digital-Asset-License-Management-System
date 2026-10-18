@@ -267,6 +267,10 @@ FROM mv_monthly_access_stats
 WHERE tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid
    OR COALESCE(current_setting('app.is_super_admin', true) = 'true', FALSE);
 
+-- Materialized statistics contain multiple tenants and must not be queried directly.
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM assetvault_app;
+GRANT SELECT ON TABLE v_monthly_access_stats_tenant TO assetvault_app;
+
 -- Routine to refresh the materialized view
 CREATE OR REPLACE FUNCTION fn_refresh_monthly_access_stats()
 RETURNS VOID AS $$
