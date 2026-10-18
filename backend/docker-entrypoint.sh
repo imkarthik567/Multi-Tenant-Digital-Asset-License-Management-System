@@ -29,7 +29,7 @@ fi
 
 if [ "${NODE_ENV:-production}" = "production" ]; then
   echo "[AssetVault API] Configuring restricted assetvault_app runtime role..."
-  psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -v APP_PASSWORD="$APP_DB_PASSWORD" \
+  psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -v DBPASS="$APP_DB_PASSWORD" \
     -f /app/database/sql/08_production_bootstrap.sql || {
       echo "[AssetVault API] FATAL: Restricted runtime-role bootstrap failed."
       exit 1
