@@ -35,3 +35,13 @@ export const queryPlanSchema = z
     isActive: z.enum(['true', 'false']).optional(),
   })
   .strip();
+
+
+export const planIdParamsSchema = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'Plan ID must be a positive integer')
+      .refine((value) => Number(value) <= 2147483647, 'Plan ID exceeds the supported range'),
+  })
+  .strip();
