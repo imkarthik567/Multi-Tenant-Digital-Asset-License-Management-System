@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma, prismaForRequest } from '../config/prisma';
 import { Prisma } from '@prisma/client';
+import { costOptimizationService } from '../services/costOptimization.service';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
@@ -689,6 +690,26 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       });
 
       expect((allTenantsAssets as any[])[0].total).toBeGreaterThan(0);
+    });
+    it('does not classify a ten-day-old allocation with no access logs as dormant', async () => {
+      const recentAllocationAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+      const allocation = await systemPrisma.licenseAllocation.create({
+        data: {
+          licenseId: testLicenseId,
+          userId: userAAdminId,
+          allocatedBy: userAAdminId,
+          allocatedAt: recentAllocationAt,
+          status: 'ACTIVE',
+          notes: 'recent allocation inactivity regression test',
+        },
+      });
+
+      try {
+        const report = await costOptimizationService.getUnusedSeatsReport(tenantAId);
+        expect(report.reclaimCandidates.some((candidate) => candidate.allocationId === allocation.id)).toBe(false);
+      } finally {
+        await systemPrisma.licenseAllocation.delete({ where: { id: allocation.id } });
+      }
     });
   });
 });
