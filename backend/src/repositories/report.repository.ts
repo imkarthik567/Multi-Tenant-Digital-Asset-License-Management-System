@@ -186,9 +186,17 @@ export class ReportRepository {
    * 8. Monthly Access Trends (mv_monthly_access_stats)
    */
   public async getAccessTrend(prismaClient: PrismaClient, tenantId: string) {
-    return prismaClient.$queryRaw<any[]>(
-      Prisma.sql`
-        SELECT 
+    // Raw SQL operations do not pass through the model-level Prisma extension,
+    // so explicitly bind the trusted tenant context in the same transaction.
+    return prismaClient.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+
+      return tx.$queryRaw<any[]>(
+        Prisma.sql`SELECT
           month_year,
           download_count,
           checkout_count,
@@ -197,11 +205,11 @@ export class ReportRepository {
           total_access_events,
           active_accessing_users,
           distinct_assets_accessed
-        FROM mv_monthly_access_stats
+        FROM v_monthly_access_stats_tenant
         WHERE tenant_id = ${tenantId}::uuid
-        ORDER BY month_year ASC;
-      `
-    );
+        ORDER BY month_year ASC;`
+      );
+    });
   }
 
   /**
