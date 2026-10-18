@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { queryAccessLogSchema } from '../validators/access.validator';
 import { queryAssetSchema } from '../validators/asset.validator';
 import { queryLicenseSchema } from '../validators/license.validator';
+import { queryTenantSchema } from '../validators/tenant.validator';
 import {
   exportAuditLogQuerySchema,
   queryAuditLogSchema,
@@ -52,5 +53,18 @@ describe('license numeric filters', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+});
+
+
+describe('tenant numeric filters', () => {
+  it('rejects malformed, nonpositive, and out-of-range plan IDs', () => {
+    expect(queryTenantSchema.safeParse({ planId: '2x' }).success).toBe(false);
+    expect(queryTenantSchema.safeParse({ planId: '0' }).success).toBe(false);
+    expect(queryTenantSchema.safeParse({ planId: '2147483648' }).success).toBe(false);
+  });
+
+  it('accepts valid positive plan IDs', () => {
+    expect(queryTenantSchema.safeParse({ planId: '12' }).success).toBe(true);
   });
 });
