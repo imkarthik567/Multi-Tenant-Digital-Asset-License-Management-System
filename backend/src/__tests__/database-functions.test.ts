@@ -765,6 +765,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
           roleId: role!.id,
           email: `quota-owner-${unique}@example.test`,
           fullName: 'Quota Race Owner',
+          passwordHash: 'quota-race-test-hash',
         },
       });
 
@@ -793,6 +794,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
             roleId: role!.id,
             email: `quota-user-one-${unique}@example.test`,
             fullName: 'Quota Race User One',
+          passwordHash: 'quota-race-test-hash',
           },
         }),
         systemPrisma.user.create({
@@ -801,6 +803,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
             roleId: role!.id,
             email: `quota-user-two-${unique}@example.test`,
             fullName: 'Quota Race User Two',
+          passwordHash: 'quota-race-test-hash',
           },
         }),
       ]);
