@@ -1,5 +1,5 @@
 # ==============================================================================
-# AssetVault: Production Web Frontend Dockerfile (Vite Build + Nginx Alpine)
+# AssetVault: Production Web Frontend Dockerfile (Vite Build + Nginx)
 # ==============================================================================
 
 # Stage 1: Build Frontend Assets
@@ -23,11 +23,14 @@ WORKDIR /app/frontend
 ENV VITE_API_URL=/api
 RUN node ../node_modules/vite/bin/vite.js build
 
-# Stage 2: Ultra-Slim Production Nginx Runtime
-FROM nginx:alpine AS runner
+# Stage 2: Production Nginx Runtime
+FROM nginx:stable-trixie AS runner
 
-# Apply security updates to packages in the Nginx base image.
-RUN apk upgrade --no-cache
+# Apply security updates and install wget for the container health check.
+RUN apt-get update \
+  && apt-get upgrade -y \
+  && apt-get install -y --no-install-recommends wget \
+  && rm -rf /var/lib/apt/lists/*
 
 # Remove default nginx HTML templates
 RUN rm -rf /usr/share/nginx/html/*
