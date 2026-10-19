@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma, prismaForRequest } from '../config/prisma';
 import { Prisma } from '@prisma/client';
 import { costOptimizationService } from '../services/costOptimization.service';
+import { tenantService } from '../services/tenant.service';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
@@ -732,4 +733,85 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       await systemPrisma.license.delete({ where: { id: license.id } });
     }
   });
+
+  it('serializes concurrent asset and user inserts against tenant plan quotas', async () => {
+    const unique = Date.now();
+    const plan = await systemPrisma.plan.create({
+      data: {
+        name: `Quota Race Plan ${unique}`,
+        maxUsers: 2,
+        maxAssets: 1,
+      },
+    });
+    let tenantId: string | undefined;
+
+    try {
+      const tenant = await systemPrisma.tenant.create({
+        data: {
+          name: `Quota Race Tenant ${unique}`,
+          slug: `quota-race-${unique}`,
+          contactEmail: `quota-race-${unique}@example.test`,
+          planId: plan.id,
+          status: 'ACTIVE',
+        },
+      });
+      tenantId = tenant.id;
+
+      const role = await systemPrisma.role.findUnique({ where: { name: 'TENANT_ADMIN' } });
+      expect(role).not.toBeNull();
+      const owner = await systemPrisma.user.create({
+        data: {
+          tenantId,
+          roleId: role!.id,
+          email: `quota-owner-${unique}@example.test`,
+          fullName: 'Quota Race Owner',
+        },
+      });
+
+      const attempts = await Promise.allSettled([
+        systemPrisma.asset.create({
+          data: {
+            tenantId,
+            ownerId: owner.id,
+            name: 'Quota Race Asset One',
+            assetCode: `QUOTA-RACE-${unique}-1`,
+            assetType: 'DOCUMENT',
+          },
+        }),
+        systemPrisma.asset.create({
+          data: {
+            tenantId,
+            ownerId: owner.id,
+            name: 'Quota Race Asset Two',
+            assetCode: `QUOTA-RACE-${unique}-2`,
+            assetType: 'DOCUMENT',
+          },
+        }),
+        systemPrisma.user.create({
+          data: {
+            tenantId,
+            roleId: role!.id,
+            email: `quota-user-one-${unique}@example.test`,
+            fullName: 'Quota Race User One',
+          },
+        }),
+        systemPrisma.user.create({
+          data: {
+            tenantId,
+            roleId: role!.id,
+            email: `quota-user-two-${unique}@example.test`,
+            fullName: 'Quota Race User Two',
+          },
+        }),
+      ]);
+
+      expect(attempts.filter((result) => result.status === 'fulfilled')).toHaveLength(2);
+      expect(attempts.slice(0, 2).filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(attempts.slice(2).filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    } finally {
+      if (tenantId) await tenantService.deleteTenant(tenantId);
+      await systemPrisma.plan.delete({ where: { id: plan.id } });
+    }
+  });
+
 });
