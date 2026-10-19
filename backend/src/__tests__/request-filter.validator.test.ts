@@ -36,6 +36,10 @@ describe('request date and cursor filters', () => {
   });
 
   it('rejects malformed cursor values and limits', () => {
+    expect(queryAccessLogSchema.safeParse({ cursor: '9223372036854775808' }).success).toBe(false);
+    expect(queryAuditLogSchema.safeParse({ cursor: '9223372036854775808' }).success).toBe(false);
+    expect(queryAccessLogSchema.safeParse({ cursor: '9223372036854775807' }).success).toBe(true);
+    expect(queryAuditLogSchema.safeParse({ cursor: '0009223372036854775807' }).success).toBe(true);
     expect(queryAccessLogSchema.safeParse({ limit: 'abc' }).success).toBe(false);
     expect(queryAuditLogSchema.safeParse({ limit: 'abc' }).success).toBe(false);
     expect(queryAccessLogSchema.safeParse({ cursor: 'abc' }).success).toBe(false);

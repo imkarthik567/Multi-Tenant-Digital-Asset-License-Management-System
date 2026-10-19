@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import { dateStringSchema } from './date.validator';
 import { AccessAction } from '@prisma/client';
+import { cursorIdSchema } from './pagination.validator';
 
 const queryDateSchema = dateStringSchema;
 
