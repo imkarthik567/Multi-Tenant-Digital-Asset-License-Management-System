@@ -11,7 +11,7 @@ describe('Frontend inFlightRefreshPromise Deduplication', () => {
   it('dedupes multiple concurrent calls into a single HTTP POST /auth/refresh', async () => {
     let networkCallCount = 0;
 
-    vi.spyOn(axios, 'post').mockImplementation(async (url) => {
+    vi.spyOn(axios, 'post').mockImplementation(async (url: any) => {
       if (String(url).includes('/auth/refresh')) {
         networkCallCount++;
         // Simulate small network delay
@@ -48,7 +48,7 @@ describe('Frontend inFlightRefreshPromise Deduplication', () => {
   it('allows subsequent calls after previous refresh finishes to initiate a new request', async () => {
     let networkCallCount = 0;
 
-    vi.spyOn(axios, 'post').mockImplementation(async (url) => {
+    vi.spyOn(axios, 'post').mockImplementation(async (url: any) => {
       if (String(url).includes('/auth/refresh')) {
         networkCallCount++;
         return {

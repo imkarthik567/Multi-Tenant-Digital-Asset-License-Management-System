@@ -40,9 +40,9 @@ RUN apk upgrade --no-cache && apk add --no-cache openssl curl wget libc6-compat 
 
 # Create node workspace layout
 COPY package*.json /app/
-COPY backend/package*.json ./
+COPY backend/package*.json /app/backend/
 COPY frontend/package*.json /app/frontend/
-COPY backend/prisma ./prisma
+COPY backend/prisma /app/backend/prisma/
 COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Install production-only dependencies
