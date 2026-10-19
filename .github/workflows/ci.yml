@@ -57,6 +57,9 @@ jobs:
           bash -n backend/docker-entrypoint.sh
           find database/backup -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
 
+      - name: Test backup environment variable precedence
+        run: bash database/backup/tests/environment-loader.sh
+
       - name: Validate PowerShell Script Syntax
         shell: pwsh
         run: |

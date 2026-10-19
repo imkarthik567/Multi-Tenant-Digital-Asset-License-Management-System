@@ -35,29 +35,12 @@ done
 
 mkdir -p "${BACKUP_DIR}"
 
-# 1. Load environment variables from .env if not present.
+# Load unset variables from project .env files while preserving exported values.
 # Backups must use a privileged direct URL, not the tenant-scoped application URL,
 # otherwise RLS can silently produce incomplete archives.
-load_env() {
-  local env_file="$1"
-  if [[ -f "${env_file}" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-      if [[ -n "${line}" && ! "${line}" =~ ^# && "${line}" =~ = ]]; then
-        local key="${line%%=*}"
-        local val="${line#*=}"
-        val="${val%\"}"; val="${val#\"}"
-        val="${val%\\'}"; val="${val#\\'}"
-        if [[ -z "${!key:-}" ]]; then export "${key}=${val}"; fi
-      fi
-    done < "${env_file}"
-  fi
-}
-
-if [[ -z "${DATABASE_DIRECT_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}" ]]; then
-  load_env "${PROJECT_ROOT}/.env"
-  load_env "${PROJECT_ROOT}/backend/.env"
-fi
+# shellcheck source=environment.sh
+source "${SCRIPT_DIR}/environment.sh"
+load_project_env "${PROJECT_ROOT}"
 
 # Use Docker-specific direct credentials when backing up the local Compose database.
 source_url="${DATABASE_DIRECT_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}"

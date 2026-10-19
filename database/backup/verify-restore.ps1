@@ -31,11 +31,9 @@ function Load-EnvFile([string]$Path) {
     }
 }
 
-# Use the same environment files and connection precedence as verify-restore.sh.
-if (-not $env:DATABASE_DIRECT_URL -and -not $env:DIRECT_URL -and -not $env:DATABASE_URL) {
-    Load-EnvFile (Join-Path $ProjectRoot ".env")
-    Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
-}
+# Load missing values even when DATABASE_URL is exported so the preferred direct URL can be selected.
+Load-EnvFile (Join-Path $ProjectRoot ".env")
+Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
 . (Join-Path $ScriptDir "connection.ps1")
 $ConnectionUrl = Get-PreferredPgConnectionUrl -Docker:$Docker
 $ConnectionDetails = Get-PgConnectionDetails -Url $ConnectionUrl

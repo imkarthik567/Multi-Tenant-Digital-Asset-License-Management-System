@@ -95,26 +95,9 @@ fi
 
 # 3. Load a privileged connection URL. Restore must not use the tenant-scoped
 # runtime account because RLS can prevent complete restoration.
-load_env() {
-  local env_file="$1"
-  if [[ -f "${env_file}" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-      if [[ -n "${line}" && ! "${line}" =~ ^# && "${line}" =~ = ]]; then
-        local key="${line%%=*}"
-        local val="${line#*=}"
-        val="${val%\"}"; val="${val#\"}"
-        val="${val%\\'}"; val="${val#\\'}"
-        if [[ -z "${!key:-}" ]]; then export "${key}=${val}"; fi
-      fi
-    done < "${env_file}"
-  fi
-}
-
-if [[ -z "${DATABASE_DIRECT_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}" ]]; then
-  load_env "${PROJECT_ROOT}/.env"
-  load_env "${PROJECT_ROOT}/backend/.env"
-fi
+# shellcheck source=environment.sh
+source "${SCRIPT_DIR}/environment.sh"
+load_project_env "${PROJECT_ROOT}"
 
 source_url="${DATABASE_DIRECT_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}"
 if [[ "${DOCKER_MODE}" == "true" && -n "${DOCKER_DIRECT_URL:-}" ]]; then
