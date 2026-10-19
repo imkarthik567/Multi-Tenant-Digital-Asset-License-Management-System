@@ -61,3 +61,14 @@ export const queryAssetSchema = z
     createdTo: queryDateSchema.optional(),
   })
   .strip();
+
+export const assetIdParamsSchema = z
+  .object({ id: z.string().uuid('Asset ID must be a valid UUID') })
+  .strip();
+
+export const assetTagParamsSchema = z
+  .object({
+    id: z.string().uuid('Asset ID must be a valid UUID'),
+    tagId: z.string().uuid('Tag ID must be a valid UUID'),
+  })
+  .strip();

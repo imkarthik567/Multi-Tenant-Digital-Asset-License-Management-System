@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Request } from 'express';
 import { getPaginationParams } from '../utils/pagination.util';
 import { queryAccessLogSchema } from '../validators/access.validator';
-import { createAssetSchema, queryAssetSchema } from '../validators/asset.validator';
+import { assetIdParamsSchema, assetTagParamsSchema, createAssetSchema, queryAssetSchema } from '../validators/asset.validator';
 import { queryLicenseSchema } from '../validators/license.validator';
 import { queryTenantSchema, tenantIdQuerySchema } from '../validators/tenant.validator';
 import { planIdParamsSchema } from '../validators/plan.validator';
@@ -13,6 +13,22 @@ import {
   exportAuditLogQuerySchema,
   queryAuditLogSchema,
 } from '../validators/audit.validator';
+
+describe('asset path parameters', () => {
+  it('rejects malformed asset and tag UUIDs before database queries', () => {
+    expect(assetIdParamsSchema.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
+    expect(assetTagParamsSchema.safeParse({
+      id: '00000000-0000-4000-8000-000000000001',
+      tagId: 'not-a-uuid',
+    }).success).toBe(false);
+  });
+
+  it('accepts valid UUIDs for asset and tag routes', () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    expect(assetIdParamsSchema.safeParse({ id }).success).toBe(true);
+    expect(assetTagParamsSchema.safeParse({ id, tagId: id }).success).toBe(true);
+  });
+});
 
 describe('audit log ID path parameter', () => {
   it('rejects malformed and out-of-range IDs before BigInt conversion', () => {
