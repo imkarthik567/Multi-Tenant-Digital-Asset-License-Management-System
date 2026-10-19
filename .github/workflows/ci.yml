@@ -79,6 +79,8 @@ jobs:
           NODE_ENV: test
           PORT: 5000
           DATABASE_URL: postgresql://assetvault_app:app_test_password_123@localhost:5432/assetvault_test_db?schema=public
+          TEST_DATABASE_URL: postgresql://assetvault_app:app_test_password_123@localhost:5432/assetvault_test_db?schema=public
+          APP_DATABASE_URL: postgresql://assetvault_app:app_test_password_123@localhost:5432/assetvault_test_db?schema=public
           DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
           MIGRATE_DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
           JWT_SECRET: test_jwt_access_secret_32_characters_minimum_entropy_1234

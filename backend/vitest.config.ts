@@ -11,6 +11,7 @@ export default defineConfig({
       DATABASE_URL:
         process.env.TEST_DATABASE_URL ||
         process.env.APP_DATABASE_URL ||
+        process.env.DATABASE_URL ||
         'postgresql://assetvault_app:app_password@localhost:5432/assetvault_db?schema=public',
     },
     include: [
