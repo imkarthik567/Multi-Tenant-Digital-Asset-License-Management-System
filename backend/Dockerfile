@@ -35,8 +35,8 @@ WORKDIR /app/backend
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# Install runtime utilities (curl/wget for healthcheck) and refresh npm's bundled dependency tree.
-RUN apk upgrade --no-cache && apk add --no-cache openssl curl wget libc6-compat && npm install --global npm@11 && npm cache clean --force
+# Install runtime utilities (curl/wget for healthcheck)
+RUN apk upgrade --no-cache && apk add --no-cache openssl curl wget libc6-compat && npm cache clean --force
 
 # Create node workspace layout
 COPY package*.json /app/
@@ -47,7 +47,7 @@ COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Install production-only dependencies
 WORKDIR /app
-RUN npm ci --workspace=@assetvault/api --omit=dev && npm cache clean --force
+RUN npm ci --workspace=@assetvault/api --omit=dev --ignore-scripts && npm cache clean --force
 
 WORKDIR /app/backend
 # Copy built artifacts from builder

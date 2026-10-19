@@ -31,7 +31,10 @@ END $$;
 ALTER ROLE assetvault_app WITH LOGIN PASSWORD :APP_PASSWORD;
 
 -- 3. Grant connection privileges on the current database
-GRANT CONNECT ON DATABASE current_database() TO assetvault_app;
+DO $$
+BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO assetvault_app', current_database());
+END $$;
 
 -- 4. Grant schema usage (prevents schema tampering)
 GRANT USAGE ON SCHEMA public TO assetvault_app;
