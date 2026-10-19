@@ -90,10 +90,7 @@ jobs:
           CLIENT_URL: http://localhost:5173
           CORS_ORIGIN: http://localhost:5173
         run: |
-          mkdir -p node_modules/@vitest
-          if [ -d "backend/node_modules/@vitest/coverage-v8" ] && [ ! -d "node_modules/@vitest/coverage-v8" ]; then
-            cp -r backend/node_modules/@vitest/coverage-v8 node_modules/@vitest/
-          fi
+          node -e "const fs=require('fs'),path=require('path');function copyDir(s,d){if(!fs.existsSync(s))return;fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){const sp=path.join(s,e.name),dp=path.join(d,e.name);if(e.isDirectory()){copyDir(sp,dp);}else if(!fs.existsSync(dp)){fs.copyFileSync(sp,dp);}}}copyDir('backend/node_modules','node_modules');"
           npm run test -- --coverage
 
       - name: Upload Test Coverage Artifact
