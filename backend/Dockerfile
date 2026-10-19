@@ -35,8 +35,8 @@ WORKDIR /app/backend
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# Install runtime utilities (curl/wget for healthcheck)
-RUN apk upgrade --no-cache && apk add --no-cache openssl curl wget libc6-compat && npm cache clean --force
+# Install runtime utilities (curl/wget for healthcheck) and refresh npm bundled tree for Trivy
+RUN apk upgrade --no-cache && apk add --no-cache openssl curl wget libc6-compat && npm install --global npm@11 && npm cache clean --force
 
 # Create node workspace layout
 COPY package*.json /app/
