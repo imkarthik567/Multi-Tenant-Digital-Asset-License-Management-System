@@ -63,6 +63,9 @@ GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA public TO assetvault_app;
 
+-- 8b. Grant ownership of materialized views so application/scheduler can refresh them
+ALTER MATERIALIZED VIEW IF EXISTS mv_monthly_access_stats OWNER TO assetvault_app;
+
 -- 9. Configure default privileges for future objects created by migrations/admin
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO assetvault_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO assetvault_app;
