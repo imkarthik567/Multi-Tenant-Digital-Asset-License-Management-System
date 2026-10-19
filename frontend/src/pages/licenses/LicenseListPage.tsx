@@ -69,10 +69,15 @@ export const LicenseListPage: React.FC = () => {
     queryFn: () => api.get('/users', { params: { limit: 100 } }),
   });
 
+  const roleName =
+    typeof user?.role === 'object' && user?.role !== null
+      ? (user.role as any).name
+      : user?.role;
+
   const canManage =
-    user?.role === 'TENANT_ADMIN' ||
-    user?.role === 'ASSET_MANAGER' ||
-    user?.role === 'SUPER_ADMIN' ||
+    roleName === 'TENANT_ADMIN' ||
+    roleName === 'ASSET_MANAGER' ||
+    roleName === 'SUPER_ADMIN' ||
     user?.isSuperAdmin;
 
   // Allocate Seat mutation

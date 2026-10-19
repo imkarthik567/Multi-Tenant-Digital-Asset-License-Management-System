@@ -10,7 +10,11 @@
 import { PrismaClient, AssetType, AssetStatus, LicenseStatus, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const seedDatabaseUrl =
+  process.env.MIGRATE_DATABASE_URL || process.env.DIRECT_URL || process.env.DATABASE_URL;
+const prisma = new PrismaClient({
+  datasources: seedDatabaseUrl ? { db: { url: seedDatabaseUrl } } : undefined,
+});
 
 async function main() {
   console.log('🌱 Starting comprehensive AssetVault database seed...');

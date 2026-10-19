@@ -5,7 +5,7 @@
 // Supports both toast({ title, message, type }) and toast.success/error methods
 // ==============================================================================
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -71,8 +71,13 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   toastFn.info = useCallback((message: string, title?: string) => addToast('info', message, title), [addToast]);
   toastFn.toast = toastFn;
 
+  const contextValue = useMemo(
+    () => ({ toast: toastFn, removeToast }),
+    [toastFn, removeToast]
+  );
+
   return (
-    <ToastContext.Provider value={{ toast: toastFn, removeToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       {/* Toast Notification Container */}
       <div

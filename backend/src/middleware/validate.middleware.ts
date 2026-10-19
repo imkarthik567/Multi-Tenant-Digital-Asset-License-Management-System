@@ -1,7 +1,7 @@
 // ==============================================================================
 // AssetVault: Request Payload Validation & Mass-Assignment Defense Middleware
 // Course: BCSE307L Database Systems (Fall 2026-27)
-// Parses with Zod, strips unknown fields (blocks role_id/tenant_id injection), and returns 422
+// Parses with Zod, strips unknown fields (blocks role_id/tenant_id injection), and delegates to errorHandler returning 400 (VALIDATION_ERROR)
 // ==============================================================================
 
 import { Request, Response, NextFunction } from 'express';

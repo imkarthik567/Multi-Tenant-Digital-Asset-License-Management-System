@@ -49,11 +49,13 @@ export const TagInput: React.FC<TagInputProps> = ({
     onChange(tags.filter((_, idx) => idx !== indexToRemove));
   };
 
+  const safeTags = tags || [];
+
   return (
     <div
       className={`flex flex-wrap items-center gap-1.5 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus-within:ring-2 focus-within:ring-primary-500/30 focus-within:border-primary-500 transition-all ${className}`}
     >
-      {tags.map((tag, idx) => (
+      {safeTags.map((tag, idx) => (
         <span
           key={idx}
           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800/60 animate-fade-in"
@@ -70,7 +72,7 @@ export const TagInput: React.FC<TagInputProps> = ({
         </span>
       ))}
 
-      {tags.length < maxTags && (
+      {safeTags.length < maxTags && (
         <div className="flex-1 min-w-[120px] flex items-center">
           <input
             type="text"

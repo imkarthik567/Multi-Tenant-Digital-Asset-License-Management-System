@@ -17,12 +17,13 @@ import {
   attachTagsSchema,
 } from '../validators/asset.validator';
 import { createVersionSchema, compareVersionsQuerySchema } from '../validators/version.validator';
+import { queryAccessLogSchema } from '../validators/access.validator';
 
 import { accessController } from '../controllers/access.controller';
 
 const router = Router();
 
-router.use(authenticate, loadUser);
+router.use(authenticate, tenantContext, loadUser);
 
 // 1. Bulk CSV operations (must precede /:id)
 router.get('/export', authorize('assets:read'), tenantContext, assetController.exportCsv);
@@ -57,7 +58,7 @@ router.patch('/:id/restore', authorize('assets:delete'), tenantContext, assetCon
 router.post('/:id/checkout', authorize('assets:download'), tenantContext, accessController.checkout);
 router.post('/:id/checkin', authorize('assets:download'), tenantContext, accessController.checkin);
 router.get('/:id/download', authorize('assets:download'), tenantContext, accessController.download);
-router.get('/:id/access-logs', authorize('assets:read'), tenantContext, accessController.listLogsForAsset);
+router.get('/:id/access-logs', authorize('assets:read'), tenantContext, validate({ query: queryAccessLogSchema }), accessController.listLogsForAsset);
 
 // 4. Asset Tag Operations
 router.post('/:id/tags', authorize('assets:update'), tenantContext, validate(attachTagsSchema), assetController.attachTags);

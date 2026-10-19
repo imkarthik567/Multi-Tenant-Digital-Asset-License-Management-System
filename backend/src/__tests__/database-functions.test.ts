@@ -97,7 +97,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
 
     it('sp_allocate_license_seat creates an active seat and exactly ONE audit log entry', async () => {
       // 1. Call stored procedure sp_allocate_license_seat
-      const result: any = await prisma.$queryRaw(
+      const result: any = await systemPrisma.$queryRaw(
         Prisma.sql`CALL sp_allocate_license_seat(
           ${testLicenseId}::UUID,
           ${userAMemberId}::UUID,
@@ -136,7 +136,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       const revocationReason = 'Employee department transfer to Infrastructure Unit';
 
       // 1. Call stored procedure sp_release_license_seat with custom reason
-      await prisma.$executeRaw(
+      await systemPrisma.$executeRaw(
         Prisma.sql`CALL sp_release_license_seat(
           ${createdAllocationId}::UUID,
           ${userAAdminId}::UUID,
@@ -153,7 +153,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       expect(allocation!.releasedAt).not.toBeNull();
 
       // Verify reason appended to notes
-      const notesRaw: any = await prisma.$queryRaw(
+      const notesRaw: any = await systemPrisma.$queryRaw(
         Prisma.sql`SELECT notes FROM license_allocations WHERE id = ${createdAllocationId}::UUID;`
       );
       expect(notesRaw[0]?.notes).toContain(`Revoked: ${revocationReason}`);
@@ -177,7 +177,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
     it('sp_allocate_license_seat rejects allocation when seats are exhausted', async () => {
       // License has 2 seats total.
       // Allocate seat 1 to userAAdminId
-      await prisma.$executeRaw(
+      await systemPrisma.$executeRaw(
         Prisma.sql`CALL sp_allocate_license_seat(
           ${testLicenseId}::UUID,
           ${userAAdminId}::UUID,
@@ -187,7 +187,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       );
 
       // Allocate seat 2 to userAMemberId
-      await prisma.$executeRaw(
+      await systemPrisma.$executeRaw(
         Prisma.sql`CALL sp_allocate_license_seat(
           ${testLicenseId}::UUID,
           ${userAMemberId}::UUID,
@@ -198,7 +198,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
 
       // Attempt 3rd seat allocation should fail with check_violation
       await expect(
-        prisma.$executeRaw(
+        systemPrisma.$executeRaw(
           Prisma.sql`CALL sp_allocate_license_seat(
             ${testLicenseId}::UUID,
             ${userAAdminId}::UUID,
@@ -213,7 +213,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       const newEndDate = '2028-06-30';
       const renewalCost = 300.0;
 
-      const result: any = await prisma.$queryRaw(
+      const result: any = await systemPrisma.$queryRaw(
         Prisma.sql`CALL sp_renew_license(
           ${testLicenseId}::UUID,
           ${newEndDate}::DATE,
@@ -263,12 +263,12 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
 
       // Attempting to UPDATE an audit log row must fail
       await expect(
-        prisma.$executeRaw`UPDATE audit_logs SET action = 'DELETE' WHERE id = ${log!.id}::BIGINT;`
+        systemPrisma.$executeRaw`UPDATE audit_logs SET action = 'DELETE' WHERE id = ${log!.id}::BIGINT;`
       ).rejects.toThrow();
 
       // Attempting to DELETE an audit log row must fail
       await expect(
-        prisma.$executeRaw`DELETE FROM audit_logs WHERE id = ${log!.id}::BIGINT;`
+        systemPrisma.$executeRaw`DELETE FROM audit_logs WHERE id = ${log!.id}::BIGINT;`
       ).rejects.toThrow();
     });
 
@@ -441,7 +441,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
     });
 
     it('fn_tenant_dashboard_stats returns all KPIs including new user_count, unlicensed_assets_count, and asset_type_breakdown', async () => {
-      const result: any = await prisma.$queryRaw`
+      const result: any = await systemPrisma.$queryRaw`
         SELECT fn_tenant_dashboard_stats(${tenantAId}::UUID) AS stats;
       `;
       const stats = result[0]?.stats;

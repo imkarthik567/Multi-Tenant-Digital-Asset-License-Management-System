@@ -81,7 +81,7 @@ export class AccessRepository {
         where,
         skip: params.skip,
         take: params.limit,
-        orderBy: { accessedAt: 'desc' },
+        orderBy: { [params.sort]: params.order },
         include: {
           asset: { select: { id: true, name: true, assetCode: true, assetType: true } },
           user: { select: { id: true, fullName: true, email: true } },

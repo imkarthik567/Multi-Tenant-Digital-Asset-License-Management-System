@@ -54,26 +54,57 @@ AssetVault is designed for zero-cost, high-reliability deployment on modern free
    - `pg_trgm` (for trigram global search)
    - `btree_gist` (for temporal exclusion constraints)
 
-### B. Connection String Architecture
-Supabase provides two distinct connection strings in **Project Settings** -> **Database**:
-1. **Transaction Pooler (Port 6543)**: Used for application runtime (`DATABASE_URL`). Add `?pgbouncer=true` to the connection string so Prisma disables prepared statement caching:
-   ```
-   postgresql://postgres.[project-ref]:[DB_PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&schema=public
-   ```
-2. **Direct Connection (Port 5432)**: Used for running schema migrations and DDL operations (`DIRECT_URL`):
-   ```
-   postgresql://postgres.[project-ref]:[DB_PASSWORD]@aws-0-[region].pooler.supabase.com:5432/postgres?schema=public
-   ```
+### B. Connection String Architecture (`DATABASE_URL` vs `DIRECT_URL`)
+Prisma's datasource configuration in `backend/prisma/schema.prisma` defines both `url = env("DATABASE_URL")` and `directUrl = env("DIRECT_URL")`:
 
-### C. Create Restricted Runtime Role (`assetvault_app`)
-To adhere strictly to the principle of least privilege, run the production bootstrap script using the Supabase SQL Editor or `psql`:
+1. **Transaction Pooler (Port 6543 - `DATABASE_URL`)**:
+   - Used for Express API runtime traffic and client queries.
+   - Cloud providers (Supabase / Neon) route runtime queries through a transaction pooler (PgBouncer / Supavisor) to prevent PostgreSQL connection starvation under high concurrency.
+   - Must include `?pgbouncer=true` so Prisma knows not to create cached prepared statements across pooled sessions:
+     ```
+     postgresql://postgres.[project-ref]:[DB_PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&schema=public
+     ```
+
+2. **Direct Connection (Port 5432 - `DIRECT_URL`)**:
+   - Used by Prisma CLI and migrations (`prisma migrate deploy`, `prisma db push`, `prisma db seed`).
+   - Transaction poolers do **not** support session-level locks, advisory locks, or DDL schema migrations. Attempting to run migrations through a transaction pooler will fail with errors such as `P3009` or `prepared statement already exists`.
+   - Bypasses the pooler and connects directly to the PostgreSQL instance:
+     ```
+     postgresql://postgres.[project-ref]:[DB_PASSWORD]@aws-0-[region].pooler.supabase.com:5432/postgres?schema=public
+     ```
+
+3. **Local Development & Docker Compose Parity**:
+   - In local environments and local Docker Compose orchestration, no transaction pooler is active.
+   - In `.env.example` and `.env`, `DIRECT_URL` and `DATABASE_URL` point to the same direct connection string (`localhost:5432`).
+   - In `docker-compose.yml`, both `DATABASE_URL` and `DIRECT_URL` are explicitly injected into the `api` and `worker` container environments pointing to `db:5432`. This guarantees that container initialization (`docker-entrypoint.sh` executing `npx prisma migrate deploy`) succeeds seamlessly without missing variable errors (`P1012`) or localhost fallback misroutes.
+
+### C. Create Restricted Runtime Role (`assetvault_app`) & Enforce RLS
+In PostgreSQL, **Row-Level Security (RLS) policies do not apply to superusers or table owners** (`postgres`). Connecting as `postgres` completely bypasses RLS policies at the engine level. 
+
+To enforce Layer 1 database tenant isolation, the application must connect as a non-superuser, non-owner role: `assetvault_app`.
+Because the initial migration creates `assetvault_app WITH NOLOGIN`, you must explicitly grant `LOGIN` and assign a secure password:
+
+```sql
+-- Direct SQL command (or executed via 08_production_bootstrap.sql):
+ALTER ROLE assetvault_app WITH LOGIN PASSWORD '<STRONG_APP_PASSWORD_HERE>';
+```
+
+Run the production bootstrap script using the Supabase SQL Editor or `psql`:
 
 ```bash
 # Execute 08_production_bootstrap.sql against your Supabase Direct URL
 psql "$DIRECT_URL" -v APP_PASSWORD="'<STRONG_APP_PASSWORD_HERE>'" -f database/sql/08_production_bootstrap.sql
 ```
 
-This creates the `assetvault_app` role with standard CRUD permissions and revokes `CREATE/DROP` DDL capabilities.
+This ensures:
+1. `assetvault_app` has `LOGIN` enabled with a dedicated password.
+2. Standard DML rights (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) are granted on all application tables.
+3. DDL privileges (`CREATE`, `DROP`, `ALTER TABLE`) are completely revoked.
+4. RLS policies actively filter all queries executed under `assetvault_app`.
+
+#### Dual-Role Connection Architecture:
+- **Application Runtime (`DATABASE_URL`)**: Connects as `assetvault_app` (`postgresql://assetvault_app:<APP_PASSWORD>@...`). RLS is strictly enforced by PostgreSQL.
+- **Migrations & Seeding (`DIRECT_URL` / `MIGRATE_DATABASE_URL`)**: Connects as the schema owner (`postgres`). Runs DDL and cross-tenant seed operations that bypass RLS.
 
 ### D. Apply Migrations & Reference Data
 From your local terminal or CI/CD runner:
@@ -109,8 +140,12 @@ npm run db:seed
 4. Set **Dockerfile Path**: `backend/Dockerfile`.
 5. Set **Docker Context**: `.` (root directory).
 6. Set **Health Check Path**: `/api/health`.
-7. Select the **Free** instance type.
 8. Add the environment variables listed in Section 5 below.
+
+### Background Worker Architecture (`ENABLE_IN_PROCESS_WORKER`)
+AssetVault provides background jobs (license expiry notifications, MV refresh, contract auto-renewal) that can execute in two modes governed by `ENABLE_IN_PROCESS_WORKER`:
+- **Single-Container Deployments (Render Web Service Free Tier)**: Set `ENABLE_IN_PROCESS_WORKER=true` on the web service so cron tasks run directly inside the API process.
+- **Multi-Container Deployments (`docker-compose.yml`, Kubernetes)**: Set `ENABLE_IN_PROCESS_WORKER=false` on the `api` container and `true` on the `worker` container to ensure jobs run only in the dedicated worker process without duplication.
 
 ---
 
@@ -131,33 +166,55 @@ npm run db:seed
 
 ## 5. Complete Environment Variable Reference Table
 
-| Variable Name | Service | Required? | Example Placeholder | Purpose & Security Note |
+### A. Backend Application Configuration (`backend/src/config/env.ts`)
+
+| Variable Name | Type / Allowed Values | Default Value | Required? | Purpose & Security Note |
 |---|---|---|---|---|
-| `NODE_ENV` | Render | Yes | `production` | Enables HSTS, secure cookies, suppresses stack traces. |
-| `PORT` | Render | Yes | `5000` | Port for Express HTTP listener. |
-| `DATABASE_URL` | Render | Yes | `postgresql://...@pooler.supabase.com:6543/postgres?pgbouncer=true` | Supabase pooled connection string. Never commit. |
-| `DIRECT_URL` | Render / CI | Yes | `postgresql://...@aws-0.supabase.com:5432/postgres` | Supabase direct connection for migrations. |
-| `CLIENT_URL` | Render | Yes | `https://assetvault.vercel.app,https://yourdomain.duckdns.org` | Comma-separated list of allowed frontend origins for CORS. |
-| `CORS_ORIGIN` | Render | Yes | `https://assetvault.vercel.app` | Primary CORS origin matching frontend domain. |
-| `JWT_ACCESS_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Signs short-lived access JWTs (15m expiry). |
-| `JWT_REFRESH_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Validates refresh tokens (7d expiry). |
-| `COOKIE_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Signs httpOnly cookies. |
-| `COOKIE_SAMESITE` | Render | No | `lax` | Set to `lax` (default) or `none` if cross-site. |
-| `ENABLE_IN_PROCESS_WORKER` | Render | Yes | `true` | Runs cron jobs inside the API process with advisory locks. |
-| `METRICS_BEARER_TOKEN` | Render | Yes | `assetvault-metrics-secret-token` | Protects `/metrics` Prometheus telemetry endpoint. |
-| `GOOGLE_CLIENT_ID` | Render | Optional | `12345.apps.googleusercontent.com` | Google OAuth Client ID for enterprise SSO. |
-| `GOOGLE_CLIENT_SECRET` | Render | Optional | `GOCSPX-abc123secret` | Google OAuth Client Secret. Never commit. |
-| `GOOGLE_CALLBACK_URL` | Render | Optional | `https://assetvault-api.onrender.com/api/v1/auth/google/callback` | Callback URL registered in Google Cloud Console. |
-| `SMTP_HOST` | Render | Optional | `smtp.ethereal.email` | Transactional email provider host. |
-| `SMTP_PORT` | Render | Optional | `587` | SMTP port (587 TLS or 465 SSL). |
-| `SMTP_USER` | Render | Optional | `your_smtp_user` | SMTP authentication user. |
-| `SMTP_PASS` | Render | Optional | `your_smtp_password` | SMTP authentication password. |
-| `SMTP_FROM` | Render | Optional | `AssetVault <notifications@assetvault.io>` | Outgoing sender identity. |
-| `SUPER_ADMIN_EMAIL` | Render / Local | Yes | `superadmin@assetvault.io` | Initial global administrator login email. |
-| `SUPER_ADMIN_PASSWORD` | Render / Local | Yes | `ChangeMe123!` | Initial administrator password. Rotate upon first login. |
-| `SEED_DEMO` | Render | Optional | `false` | Set to `false` for production, `true` for demo tenants. |
-| `RENDER_DEPLOY_HOOK_URL`| GitHub Secret| Optional | `https://api.render.com/deploy/srv-xxx?key=yyy` | Triggered by CI/CD upon successful main builds. |
-| `RENDER_API_URL` | GitHub Secret| Optional | `https://assetvault-api.onrender.com` | Target URL polled by health verification & keepalive. |
+| `PORT` | Number | `5000` | No | Port for the Express HTTP server listener. |
+| `NODE_ENV` | `development` \| `production` \| `test` | `development` | No | Sets Node runtime environment. In `production`, enables HSTS, secure cookies, suppresses stack traces. |
+| `DATABASE_URL` | String (PostgreSQL URL) | *(None)* | **Yes** | Primary database connection string. In production, points to the Supabase pooled connection (port 6543 with `?pgbouncer=true`). |
+| `DIRECT_URL` | String (PostgreSQL URL) | *(Optional)* | No (Prod Yes) | Direct database connection string (port 5432) bypassing connection poolers. Required for schema migrations & DDL. |
+| `MIGRATE_DATABASE_URL` | String (PostgreSQL URL) | *(Optional)* | No | Fallback direct URL used during CI migrations if `DIRECT_URL` is unset. |
+| `JWT_ACCESS_SECRET` | String (min 32 chars) | *(None)* | **Yes** | Cryptographic HMAC secret for signing short-lived access JWTs. |
+| `JWT_REFRESH_SECRET` | String (min 32 chars) | *(None)* | **Yes** | Cryptographic HMAC secret for signing and validating rotating refresh tokens. |
+| `JWT_ACCESS_EXPIRES_IN`| String (zeit/ms format)| `15m` | No | Expiration duration for access tokens. |
+| `JWT_REFRESH_EXPIRES_IN`| String (zeit/ms format)| `7d` | No | Expiration duration for refresh tokens. |
+| `COOKIE_SECRET` | String (min 32 chars) | *(None)* | **Yes** | Secret used to sign and verify httpOnly session cookies. |
+| `COOKIE_SAMESITE` | `lax` \| `strict` \| `none` | `lax` (default) | No | `SameSite` attribute for the refresh token cookie. Set to `none` if frontend and backend reside on different domains with HTTPS. |
+| `COOKIE_DOMAIN` | String | *(Optional)* | No | Explicit domain scope for cookies (e.g., `.yourdomain.com`). |
+| `CLIENT_URL` | String (URL list) | `http://localhost:5173` | No | Comma-separated allowed frontend origins for CORS and redirect validations. |
+| `CORS_ORIGIN` | String (URL) | `http://localhost:5173` | No | Primary frontend origin matching Vite client. |
+| `RATE_LIMIT_WINDOW_MS` | Number (milliseconds) | `900000` (15m) | No | Sliding window duration for Express API rate limiting. |
+| `RATE_LIMIT_MAX` | Number | `100` | No | Maximum requests per IP address within the rate-limiting window. |
+| `GOOGLE_CLIENT_ID` | String | `mock_google_client_id...` | No | Google OAuth 2.0 Web Client ID for enterprise SSO. |
+| `GOOGLE_CLIENT_SECRET` | String | `mock_google_client_secret`| No | Google OAuth 2.0 Client Secret. Never commit. |
+| `GOOGLE_CALLBACK_URL` | String (URL) | `http://localhost:5000/api/v1/auth/google/callback` | No | OAuth redirect callback URI registered with Google Cloud Console. |
+| `SMTP_HOST` | String | `smtp.ethereal.email` | No | SMTP relay server hostname for transactional notification emails. |
+| `SMTP_PORT` | Number | `587` | No | SMTP port (typically `587` for STARTTLS, `465` for SSL). |
+| `SMTP_USER` | String | *(Optional)* | No | SMTP authentication username. |
+| `SMTP_PASS` | String | *(Optional)* | No | SMTP authentication password. Never commit. |
+| `SMTP_FROM` | String | `AssetVault <notifications@assetvault.io>` | No | Default `From` email header address. |
+| `SMTP_SECURE` | Boolean | `false` | No | If `true`, connects via SSL/TLS on port 465; if `false`, upgrades via STARTTLS. |
+| `METRICS_BEARER_TOKEN` | String | `assetvault-metrics-token-2026` | No (Prod Yes) | Bearer authentication token required to access protected `/metrics` Prometheus endpoint. |
+| `ENABLE_IN_PROCESS_WORKER`| Boolean | `false` | No | Authoritative flag for in-process background cron jobs (defaults to `false`). Set `true` on single-container deployments (Render); set `false` on multi-container deployments where a dedicated worker exists. |
+| `RUN_WORKER_IN_API` | Boolean | *(Optional)* | No | Backwards-compatible fallback alias for `ENABLE_IN_PROCESS_WORKER`. |
+
+### B. Database Seeding Configuration (`backend/prisma/seed.ts`)
+
+| Variable Name | Default Value | Required? | Purpose |
+|---|---|---|---|
+| `SUPER_ADMIN_EMAIL` | `superadmin@assetvault.io` | No | Initial Super Admin login email created during first seed run. |
+| `SUPER_ADMIN_PASSWORD`| `Password123!` | No | Initial password for the Super Admin user. Must be rotated immediately. |
+| `SUPER_ADMIN_NAME` | `Global Super Administrator` | No | Display full name of the initial Super Admin account. |
+| `SEED_DEMO` | `true` | No | Set to `false` in production to omit demo tenants and sample data. |
+
+### C. CI/CD & Automation GitHub Secrets
+
+| Secret Name | Workflow | Required? | Purpose |
+|---|---|---|---|
+| `RENDER_DEPLOY_HOOK_URL` | `deploy.yml` | Optional | Webhook URL triggered to initiate Render web service re-deployment. |
+| `RENDER_API_URL` | `deploy.yml`, `keepalive.yml` | Optional | Base URL for post-deployment health verification and keepalive pings. |
+| `BACKUP_ENCRYPTION_PASSPHRASE` | `db-backup.yml` | Optional | Passphrase used with OpenSSL AES-256-CBC to encrypt nightly cloud database dumps before artifact upload. |
 
 ---
 

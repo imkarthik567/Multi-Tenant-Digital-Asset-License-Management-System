@@ -16,8 +16,10 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import { Prisma } from '@prisma/client';
 import app from '../app';
 import { prismaForRequest } from '../config/prisma';
+import { hashToken } from '../utils/hash.util';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
@@ -30,6 +32,13 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
   let innovatelabsAssetId: string;
 
   beforeAll(async () => {
+    // Clear failed login attempts before test suite runs
+    try {
+      await systemPrisma.$executeRaw(Prisma.sql`DELETE FROM failed_login_attempts;`);
+    } catch (e) {
+      // ignore
+    }
+
     // 1. Retrieve TechCorp and InnovateLabs tenant IDs
     const techcorp = await systemPrisma.tenant.findUnique({
       where: { slug: 'techcorp' },
@@ -203,6 +212,77 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
   });
 
   // ----------------------------------------------------------------------------
+  // Test 4b: Concurrent refresh requests within grace window
+  // ----------------------------------------------------------------------------
+  it('4b. Concurrent refresh requests within grace window both succeed and do not nuke sessions', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'techcorp.dev1@techcorp.io',
+        password: 'Password123!',
+      });
+
+    expect(loginRes.status).toBe(200);
+    const cookies = loginRes.headers['set-cookie'];
+    const cookie = Array.isArray(cookies) ? cookies[0] : cookies;
+    const token = cookie.match(/refreshToken=([^;]+)/)![1];
+
+    // Fire two concurrent refresh requests simultaneously with the same refresh token
+    const [res1, res2] = await Promise.all([
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+    ]);
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect(res1.body.data.accessToken).toBeDefined();
+    expect(res2.body.data.accessToken).toBeDefined();
+
+    // Verify session family was NOT nuked: a subsequent request with the newly issued token succeeds
+    const newCookies = res1.headers['set-cookie'] || res2.headers['set-cookie'];
+    const newCookie = Array.isArray(newCookies) ? newCookies[0] : newCookies;
+    const newToken = newCookie.match(/refreshToken=([^;]+)/)![1];
+
+    const subsequentRes = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${newToken}`]);
+
+    expect(subsequentRes.status).toBe(200);
+    expect(subsequentRes.body.data.accessToken).toBeDefined();
+  });
+
+  // ----------------------------------------------------------------------------
+  // Test 4c: Multiple (5) concurrent refresh requests within grace window
+  // ----------------------------------------------------------------------------
+  it('4c. Multiple (5) concurrent refresh requests within grace window all succeed', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'techcorp.dev2@techcorp.io',
+        password: 'Password123!',
+      });
+
+    expect(loginRes.status).toBe(200);
+    const cookies = loginRes.headers['set-cookie'];
+    const cookie = Array.isArray(cookies) ? cookies[0] : cookies;
+    const token = cookie.match(/refreshToken=([^;]+)/)![1];
+
+    // Fire 5 concurrent refresh requests simultaneously
+    const responses = await Promise.all([
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+    ]);
+
+    for (const res of responses) {
+      expect(res.status).toBe(200);
+      expect(res.body.data.accessToken).toBeDefined();
+    }
+  });
+
+  // ----------------------------------------------------------------------------
   // Test 5: Refresh token reuse detection revokes all user sessions
   // ----------------------------------------------------------------------------
   it('5. Refresh token reuse detection revokes all sessions upon replay of revoked token', async () => {
@@ -227,6 +307,12 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
     const cookies2 = rotateRes.headers['set-cookie'];
     const cookie2 = Array.isArray(cookies2) ? cookies2[0] : cookies2;
     const token2 = cookie2.match(/refreshToken=([^;]+)/)![1];
+
+    // Age token1 past the grace window to simulate a replay attack outside benign concurrency
+    await systemPrisma.refreshToken.update({
+      where: { tokenHash: hashToken(token1) },
+      data: { revokedAt: new Date(Date.now() - 10000) },
+    });
 
     // Step 3: Malicious replay of old token1 (should trigger reuse detection)
     const replayRes = await request(app)
@@ -380,6 +466,25 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
     expect(res.body.status).toBe('success');
     // Result must be safely parameterized; returns 0 or only assets literally matching "' OR '1'='1"
     expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  // ----------------------------------------------------------------------------
+  // Test 11: GET /api/auth/me returns profile containing both fullName and name
+  // ----------------------------------------------------------------------------
+  it('11. GET /api/auth/me returns profile containing both fullName and name matching domain types', async () => {
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${techcorpAdminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('success');
+    expect(res.body.data.id).toBeDefined();
+    expect(res.body.data.email).toBe('techcorp.admin@techcorp.io');
+    expect(res.body.data.name).toBe('TechCorp Dynamics Lead Admin');
+    expect(res.body.data.fullName).toBe('TechCorp Dynamics Lead Admin');
+    expect(res.body.data.tenant).toBeDefined();
+    expect(res.body.data.tenant.slug).toBe('techcorp');
+    expect(Array.isArray(res.body.data.permissions)).toBe(true);
   });
 
   afterAll(async () => {

@@ -82,7 +82,7 @@ export const setRefreshTokenCookie = (res: Response, rawToken: string): void => 
     sameSite,
     ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
-    path: '/api/auth',
+    path: '/api',
   });
 };
 
@@ -97,6 +97,6 @@ export const clearRefreshTokenCookie = (res: Response): void => {
     secure: env.NODE_ENV === 'production',
     sameSite,
     ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
-    path: '/api/auth',
+    path: '/api',
   });
 };

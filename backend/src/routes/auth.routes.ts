@@ -9,7 +9,7 @@ import { authController } from '../controllers/auth.controller';
 import { validate } from '../middleware/validate.middleware';
 import { authenticate } from '../middleware/auth.middleware';
 import { loadUser } from '../middleware/loadUser.middleware';
-import { authRateLimiter } from '../middleware/rateLimiter.middleware';
+import { authRateLimiter, refreshRateLimiter } from '../middleware/rateLimiter.middleware';
 import { loginSchema, registerTenantSchema, refreshTokenSchema } from '../validators/auth.validator';
 import { env } from '../config/env';
 
@@ -21,8 +21,8 @@ router.post('/login', authRateLimiter, validate(loginSchema), authController.log
 // 2. Tenant Self-Registration
 router.post('/register-tenant', authRateLimiter, validate(registerTenantSchema), authController.registerTenant);
 
-// 3. Token Refresh with Rotation & Reuse Detection
-router.post('/refresh', authRateLimiter, validate(refreshTokenSchema), authController.refresh);
+// 3. Token Refresh with Rotation & Reuse Detection (uses looser limiter)
+router.post('/refresh', refreshRateLimiter, validate(refreshTokenSchema), authController.refresh);
 
 // 4. Logout (current session)
 router.post('/logout', authController.logout);

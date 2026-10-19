@@ -5,6 +5,7 @@
 // ==============================================================================
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
@@ -80,7 +81,7 @@ export const NotificationListPage: React.FC = () => {
     onSuccess: (data: any) => {
       toast({
         title: 'Expiry Check Completed',
-        message: data.message || 'Scanned for licenses expiring within 30 days',
+        message: data?.data?.message || data?.message || 'Scanned for licenses expiring within 30 days',
         type: 'success',
       });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -272,13 +273,13 @@ export const NotificationListPage: React.FC = () => {
                   </button>
                 )}
                 {n.licenseId && (
-                  <a
-                    href={`/licenses/${n.licenseId}`}
+                  <Link
+                    to={`/licenses/${n.licenseId}`}
                     className="p-1.5 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 rounded transition-colors"
                     title="View Related License"
                   >
                     <ExternalLink className="w-4 h-4" />
-                  </a>
+                  </Link>
                 )}
               </div>
             </div>

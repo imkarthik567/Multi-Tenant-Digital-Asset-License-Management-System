@@ -113,7 +113,7 @@ export const FileUrlField: React.FC<FileUrlFieldProps> = ({
         <input
           id={inputId}
           type="url"
-          value={value}
+          value={value ?? ''}
           required={required}
           disabled={disabled}
           placeholder={placeholder}

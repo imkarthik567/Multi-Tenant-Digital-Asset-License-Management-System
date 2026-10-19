@@ -9,11 +9,14 @@ import { Prisma } from '@prisma/client';
 import { hashPassword, comparePassword, hashToken } from '../utils/hash.util';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
+// Pre-computed BCrypt cost factor 12 hash for constant-time comparison when user or passwordHash is missing
+const DUMMY_BCRYPT_HASH = '$2a$12$e8fT5/jGz18N.f0V.1P0O.oTj8U1yE4/Q0/J1J1J1J1J1J1J1J1J1';
+
 import {
   generateAccessToken,
   generateRefreshTokenData,
 } from '../utils/token.util';
-import { checkEmailLockout, recordFailedLogin, resetFailedLogins } from './accountProtection.service';
+import { checkAccountLockout, recordFailedLogin, resetFailedLogins } from './accountProtection.service';
 import {
   UnauthorizedError,
   ForbiddenError,
@@ -54,17 +57,19 @@ export class AuthService {
   /**
    * 1. Email + Password Login
    * - Strict generic error message (no account enumeration)
+   * - Constant-time execution via dummy bcrypt comparison when user is missing
    * - Rejects inactive accounts and suspended tenants
-   * - Account lockout after 5 failed attempts in 15m
+   * - Account lockout per (email + IP) with exponential backoff surviving restarts
    */
   public async login(
     input: LoginInput,
     metadata: { userAgent?: string; ipAddress?: string } = {}
   ): Promise<AuthSuccessResult> {
     const normalizedEmail = input.email.toLowerCase().trim();
+    const clientIp = metadata.ipAddress || '127.0.0.1';
 
-    // 1. Check account lockout state
-    checkEmailLockout(normalizedEmail);
+    // 1. Check account lockout state for (email + IP)
+    await checkAccountLockout(normalizedEmail, clientIp);
 
     // 2. Query user from database
     const user = await systemPrisma.user.findUnique({
@@ -79,16 +84,18 @@ export class AuthService {
 
     // 3. Generic failure if user not found or no password set (OAuth-only account)
     if (!user || !user.passwordHash) {
-      recordFailedLogin(normalizedEmail);
-      logger.warn({ email: normalizedEmail }, 'Authentication failed: User not found or no password hash');
+      // Always run dummy bcrypt compare so timing is constant regardless of user existence
+      await comparePassword(input.password, DUMMY_BCRYPT_HASH);
+      await recordFailedLogin(normalizedEmail, clientIp);
+      logger.warn({ email: normalizedEmail, ip: clientIp }, 'Authentication failed: User not found or no password hash');
       throw new UnauthorizedError('Invalid email or password');
     }
 
     // 4. Verify password with BCrypt
     const isPasswordValid = await comparePassword(input.password, user.passwordHash);
     if (!isPasswordValid) {
-      recordFailedLogin(normalizedEmail);
-      logger.warn({ email: normalizedEmail }, 'Authentication failed: Password mismatch');
+      await recordFailedLogin(normalizedEmail, clientIp);
+      logger.warn({ email: normalizedEmail, ip: clientIp }, 'Authentication failed: Password mismatch');
       throw new UnauthorizedError('Invalid email or password');
     }
 
@@ -103,8 +110,8 @@ export class AuthService {
       throw new ForbiddenError('Organization account is suspended. Please contact platform support.');
     }
 
-    // 6. Reset failed attempts upon successful login
-    resetFailedLogins(normalizedEmail);
+    // 6. Reset failed attempts upon successful login for this (email + IP)
+    await resetFailedLogins(normalizedEmail, clientIp);
 
     // 7. Generate tokens and session records
     const roleName = user.role.name as RoleName;
@@ -274,12 +281,14 @@ export class AuthService {
   public async refresh(
     rawRefreshToken: string,
     metadata: { userAgent?: string; ipAddress?: string } = {}
-  ): Promise<{ accessToken: string; newRawRefreshToken: string }> {
+  ): Promise<{ accessToken: string; newRawRefreshToken?: string }> {
     if (!rawRefreshToken) {
       throw new UnauthorizedError('Refresh token must be provided');
     }
 
     const tokenHash = hashToken(rawRefreshToken);
+    const now = new Date();
+    const GRACE_PERIOD_MS = parseInt(process.env.REFRESH_TOKEN_GRACE_WINDOW_MS || '3000', 10);
 
     const storedToken = await systemPrisma.refreshToken.findUnique({
       where: { tokenHash },
@@ -297,29 +306,6 @@ export class AuthService {
       throw new UnauthorizedError('Invalid refresh token');
     }
 
-    // Reuse Detection: If the token was already revoked, revoke ALL sessions for this user!
-    if (storedToken.revokedAt !== null) {
-      logger.warn(
-        { userId: storedToken.userId, tokenId: storedToken.id },
-        'SECURITY ALERT: Revoked refresh token reuse detected! Invalidating all user sessions.'
-      );
-
-      await systemPrisma.refreshToken.updateMany({
-        where: { userId: storedToken.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-
-      throw new UnauthorizedError(
-        'Compromised refresh token reuse detected. All active sessions have been revoked. Please log in again.'
-      );
-    }
-
-    // Expiry check
-    if (new Date() > storedToken.expiresAt) {
-      throw new UnauthorizedError('Refresh token has expired. Please log in again.');
-    }
-
-    // User status checks
     const user = storedToken.user;
     if (!user.isActive) {
       throw new UnauthorizedError('User account has been deactivated.');
@@ -329,23 +315,84 @@ export class AuthService {
       throw new ForbiddenError('Organization account is suspended.');
     }
 
-    // Revoke old token (Token Rotation)
-    await systemPrisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: { revokedAt: new Date() },
-    });
+    // 1. Reuse Detection with Grace Window for the immediately previous token
+    if (storedToken.revokedAt !== null) {
+      const elapsedSinceRevocation = now.getTime() - storedToken.revokedAt.getTime();
 
-    // Issue new refresh token & access token
+      // Check if this token was recently rotated and replaced by an active successor token
+      const successorToken = await systemPrisma.refreshToken.findFirst({
+        where: {
+          userId: storedToken.userId,
+          id: { not: storedToken.id },
+          createdAt: { gte: new Date(storedToken.revokedAt.getTime() - 1000) },
+          revokedAt: null,
+        },
+      });
+
+      if (elapsedSinceRevocation <= GRACE_PERIOD_MS && successorToken) {
+        logger.info(
+          { userId: storedToken.userId, tokenId: storedToken.id, elapsedMs: elapsedSinceRevocation },
+          'Benign concurrent refresh token reuse detected within grace window. Returning access token.'
+        );
+        const roleName = user.role.name as RoleName;
+        const accessToken = generateAccessToken({
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          tenantId: user.tenantId,
+          roleId: user.roleId,
+          role: roleName,
+          isSuperAdmin: roleName === 'SUPER_ADMIN',
+        });
+        return { accessToken };
+      }
+
+      // Beyond grace window OR no active successor token (e.g. logged out or security cascade):
+      // Malicious reuse / replay detected! Invalidate all sessions!
+      logger.warn(
+        { userId: storedToken.userId, tokenId: storedToken.id, elapsedMs: elapsedSinceRevocation },
+        'SECURITY ALERT: Revoked refresh token reuse detected! Invalidating all user sessions.'
+      );
+
+      await systemPrisma.refreshToken.updateMany({
+        where: { userId: storedToken.userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+
+      throw new UnauthorizedError(
+        'Compromised refresh token reuse detected. All active sessions have been revoked. Please log in again.'
+      );
+    }
+
+    // 2. Expiry check
+    if (now > storedToken.expiresAt) {
+      throw new UnauthorizedError('Refresh token has expired. Please log in again.');
+    }
+
+    // 3. Atomic Token Rotation: update revokedAt only where currently null and create new token
     const newRefreshData = generateRefreshTokenData();
 
-    await systemPrisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: newRefreshData.tokenHash,
-        expiresAt: newRefreshData.expiresAt,
-        userAgent: metadata.userAgent,
-        ipAddress: metadata.ipAddress,
-      },
+    const rotationResult = await systemPrisma.$transaction(async (tx: any) => {
+      const updateResult = await tx.refreshToken.updateMany({
+        where: { tokenHash, revokedAt: null },
+        data: { revokedAt: now },
+      });
+
+      if (updateResult.count !== 1) {
+        return null;
+      }
+
+      await tx.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: newRefreshData.tokenHash,
+          expiresAt: newRefreshData.expiresAt,
+          userAgent: metadata.userAgent,
+          ipAddress: metadata.ipAddress,
+        },
+      });
+
+      return newRefreshData.rawToken;
     });
 
     const roleName = user.role.name as RoleName;
@@ -359,9 +406,17 @@ export class AuthService {
       isSuperAdmin: roleName === 'SUPER_ADMIN',
     });
 
+    if (!rotationResult) {
+      logger.info(
+        { userId: user.id, tokenId: storedToken.id },
+        'Concurrent refresh race resolved: token was already rotated by concurrent thread. Returning access token.'
+      );
+      return { accessToken };
+    }
+
     return {
       accessToken,
-      newRawRefreshToken: newRefreshData.rawToken,
+      newRawRefreshToken: rotationResult,
     };
   }
 
@@ -411,6 +466,7 @@ export class AuthService {
     return {
       id: user.id,
       name: user.fullName,
+      fullName: user.fullName,
       email: user.email,
       avatarUrl: user.avatarUrl,
       role: roleName,

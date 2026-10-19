@@ -191,20 +191,25 @@ export const VendorListPage: React.FC = () => {
                       <span>{v.supportPhone}</span>
                     </div>
                   )}
-                  {v.website && (
-                    <div className="flex items-center space-x-2">
-                      <Globe className="w-3.5 h-3.5 text-slate-400" />
-                      <a
-                        href={v.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline flex items-center text-primary-600 dark:text-primary-400 truncate"
-                      >
-                        {v.website.replace(/^https?:\/\//, '')}
-                        <ExternalLink className="w-3 h-3 ml-1" />
-                      </a>
-                    </div>
-                  )}
+                  {v.website && (() => {
+                    const cleanUrl = v.website.trim();
+                    const isHttp = /^https?:\/\//i.test(cleanUrl);
+                    const safeHref = isHttp ? cleanUrl : /^javascript:/i.test(cleanUrl) ? '#' : `https://${cleanUrl}`;
+                    return (
+                      <div className="flex items-center space-x-2">
+                        <Globe className="w-3.5 h-3.5 text-slate-400" />
+                        <a
+                          href={safeHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline flex items-center text-primary-600 dark:text-primary-400 truncate"
+                        >
+                          {v.website.replace(/^https?:\/\//, '')}
+                          <ExternalLink className="w-3 h-3 ml-1" />
+                        </a>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

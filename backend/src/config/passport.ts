@@ -7,7 +7,7 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { env } from './env';
-import { prisma } from './prisma';
+import { systemPrisma } from './prisma';
 import { logger } from './logger';
 import { getPermissionsForRole, RoleName } from './permissions';
 
@@ -33,7 +33,7 @@ export const configurePassport = (): void => {
           }
 
           // 1. Look up existing pre-invited user by email or existing googleId
-          let user = await prisma.user.findFirst({
+          let user = await systemPrisma.user.findFirst({
             where: {
               OR: [{ googleId: profile.id }, { email }],
             },
@@ -63,7 +63,7 @@ export const configurePassport = (): void => {
 
           // 5. Link Google ID and avatar on first Google OAuth login
           if (!user.googleId) {
-            user = await prisma.user.update({
+            user = await systemPrisma.user.update({
               where: { id: user.id },
               data: {
                 googleId: profile.id,
@@ -78,7 +78,7 @@ export const configurePassport = (): void => {
               },
             });
           } else {
-            await prisma.user.update({
+            await systemPrisma.user.update({
               where: { id: user.id },
               data: { lastLoginAt: new Date() },
             });

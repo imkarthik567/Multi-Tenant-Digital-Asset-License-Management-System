@@ -4,7 +4,7 @@
 // Provides instant multi-entity search across Assets, Licenses, Vendors, and Tags
 // ==============================================================================
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -85,9 +85,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     setLoading(true);
     const handler = setTimeout(async () => {
       try {
-        const res = await api.get<SearchResponse>(`/search?q=${encodeURIComponent(term)}`);
-        setResults(res.results);
-        setTotal(res.total);
+        const res = await api.get<any>(`/search?q=${encodeURIComponent(term)}`);
+        const searchData = res?.data || res;
+        setResults(searchData?.results || { assets: [], licenses: [], vendors: [], tags: [] });
+        setTotal(searchData?.total ?? 0);
         setSelectedIndex(0);
       } catch {
         setResults({ assets: [], licenses: [], vendors: [], tags: [] });
@@ -101,12 +102,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   }, [searchTerm, isOpen]);
 
   // Flattened array for keyboard navigation
-  const flatItems: SearchResultItem[] = [
-    ...results.assets,
-    ...results.licenses,
-    ...results.vendors,
-    ...results.tags,
-  ];
+  const flatItems = useMemo<SearchResultItem[]>(
+    () => [
+      ...(results?.assets || []),
+      ...(results?.licenses || []),
+      ...(results?.vendors || []),
+      ...(results?.tags || []),
+    ],
+    [results]
+  );
 
   // Keyboard navigation (ArrowUp, ArrowDown, Enter, Escape)
   useEffect(() => {

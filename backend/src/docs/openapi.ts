@@ -356,7 +356,26 @@ export const openApiSpec = {
       get: { tags: ['Asset Access'], summary: 'Seat-gated asset download', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }], responses: { 200: { description: 'Download metadata and URL' }, 403: { description: 'Forbidden' } } },
     },
     '/assets/{id}/access-logs': {
-      get: { tags: ['Asset Access'], summary: 'List access and audit logs for asset', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }], responses: { 200: { description: 'Asset access logs' } } },
+      get: {
+        tags: ['Asset Access'],
+        summary: 'List access and audit logs for asset',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'page', in: 'query', required: false, schema: { type: 'integer', minimum: 1 } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'cursor', in: 'query', required: false, schema: { type: 'string', pattern: '^\\d+$' } },
+          { name: 'action', in: 'query', required: false, schema: { type: 'string', enum: ['VIEW', 'DOWNLOAD', 'CHECKOUT', 'CHECKIN'] } },
+          { name: 'userId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+          { name: 'dateFrom', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+          { name: 'dateTo', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+          { name: 'sort', in: 'query', required: false, schema: { type: 'string', enum: ['accessedAt', 'action', 'id'] } },
+          { name: 'order', in: 'query', required: false, schema: { type: 'string', enum: ['asc', 'desc'] } },
+        ],
+        responses: {
+          200: { description: 'Asset access logs' },
+          400: { description: 'Validation failed (VALIDATION_ERROR)' },
+        },
+      },
     },
     '/licenses': {
       get: { tags: ['Licenses'], summary: 'List licenses with masked license keys', responses: { 200: { description: 'License list' } } },
@@ -393,7 +412,25 @@ export const openApiSpec = {
       get: { tags: ['Allocations'], summary: 'List seats allocated for license', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }], responses: { 200: { description: 'Active allocations' } } },
     },
     '/notifications': {
-      get: { tags: ['Notifications'], summary: 'List user notifications', responses: { 200: { description: 'Notifications' } } },
+      get: {
+        tags: ['Notifications'],
+        summary: 'List user notifications',
+        parameters: [
+          { name: 'page', in: 'query', required: false, schema: { type: 'integer', minimum: 1 } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'cursor', in: 'query', required: false, schema: { type: 'string', pattern: '^\\d+$' } },
+          { name: 'isRead', in: 'query', required: false, schema: { type: 'string', enum: ['true', 'false'] } },
+          { name: 'type', in: 'query', required: false, schema: { type: 'string', enum: ['EXPIRY_30', 'EXPIRY_15', 'EXPIRY_7', 'EXPIRED', 'OVER_ALLOCATION', 'SYSTEM'] } },
+          { name: 'dateFrom', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+          { name: 'dateTo', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+          { name: 'sort', in: 'query', required: false, schema: { type: 'string', enum: ['createdAt', 'isRead', 'type', 'id'] } },
+          { name: 'order', in: 'query', required: false, schema: { type: 'string', enum: ['asc', 'desc'] } },
+        ],
+        responses: {
+          200: { description: 'Notifications' },
+          400: { description: 'Validation failed (VALIDATION_ERROR)' },
+        },
+      },
     },
     '/notifications/{id}/read': {
       patch: { tags: ['Notifications'], summary: 'Mark notification as read', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }], responses: { 200: { description: 'Marked read' } } },
@@ -442,6 +479,18 @@ export const openApiSpec = {
     },
     '/search': {
       get: { tags: ['Search'], summary: 'Global trigram multi-entity search across assets, licenses, vendors, and tags', parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Search results grouped by entity' } } },
+    },
+    '/search/assets': {
+      get: { tags: ['Search'], summary: 'Search digital assets with assets:read permission', parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Matching assets' }, 403: { description: 'Forbidden' } } },
+    },
+    '/search/licenses': {
+      get: { tags: ['Search'], summary: 'Search licenses with licenses:read permission (masks license keys for non-admin roles)', parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Matching licenses' }, 403: { description: 'Forbidden' } } },
+    },
+    '/search/vendors': {
+      get: { tags: ['Search'], summary: 'Search vendors with vendors:read permission', parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Matching vendors' }, 403: { description: 'Forbidden' } } },
+    },
+    '/search/tags': {
+      get: { tags: ['Search'], summary: 'Search metadata tags with tags:read permission', parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Matching tags' }, 403: { description: 'Forbidden' } } },
     },
     '/licenses/{id}/pdf': {
       get: { tags: ['Licenses'], summary: 'Download branded PDF dossier for a software license', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }], responses: { 200: { description: 'PDF binary stream' } } },

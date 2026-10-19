@@ -32,7 +32,8 @@ RUN rm -rf /usr/share/nginx/html/*
 # Copy compiled static assets from builder
 COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
-# Copy optimized Nginx configuration
+# Copy optimized Nginx configuration and security headers snippet
+COPY frontend/security-headers.conf /etc/nginx/security-headers.conf
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

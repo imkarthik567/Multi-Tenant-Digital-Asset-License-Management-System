@@ -26,3 +26,19 @@ export const authRateLimiter = rateLimit({
     },
   },
 });
+
+/**
+ * Looser rate limiter specifically for /auth/refresh to prevent silent token refresh from being choked
+ */
+export const refreshRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: env.NODE_ENV === 'test' || env.NODE_ENV === 'development' ? 5000 : 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Too many token refresh attempts. Please try again after 15 minutes.',
+    },
+  },
+});
