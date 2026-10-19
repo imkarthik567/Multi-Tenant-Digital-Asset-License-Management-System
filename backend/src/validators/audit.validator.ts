@@ -10,6 +10,10 @@ import { cursorIdSchema } from './pagination.validator';
 
 const queryDateSchema = dateStringSchema;
 
+export const auditLogIdParamsSchema = z
+  .object({ id: cursorIdSchema })
+  .strip();
+
 export const queryAuditLogSchema = z
   .object({
     page: z.string().optional(),

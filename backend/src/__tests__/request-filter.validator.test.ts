@@ -9,9 +9,19 @@ import { planIdParamsSchema } from '../validators/plan.validator';
 import { compareVersionsQuerySchema, createVersionSchema, versionNoParamsSchema } from '../validators/version.validator';
 import { runExpiryCheckSchema } from '../validators/notification.validator';
 import {
+  auditLogIdParamsSchema,
   exportAuditLogQuerySchema,
   queryAuditLogSchema,
 } from '../validators/audit.validator';
+
+describe('audit log ID path parameter', () => {
+  it('rejects malformed and out-of-range IDs before BigInt conversion', () => {
+    expect(auditLogIdParamsSchema.safeParse({ id: 'abc' }).success).toBe(false);
+    expect(auditLogIdParamsSchema.safeParse({ id: '9223372036854775808' }).success).toBe(false);
+    expect(auditLogIdParamsSchema.safeParse({ id: '9223372036854775807' }).success).toBe(true);
+  });
+});
+
 
 describe('request date and cursor filters', () => {
   it('rejects malformed dates before they reach database queries', () => {

@@ -10,7 +10,7 @@ import { loadUser } from '../middleware/loadUser.middleware';
 import { authorize } from '../middleware/authorize.middleware';
 import { tenantContext } from '../middleware/tenantScope.middleware';
 import { validate } from '../middleware/validate.middleware';
-import { exportAuditLogQuerySchema, queryAuditLogSchema } from '../validators/audit.validator';
+import { auditLogIdParamsSchema, exportAuditLogQuerySchema, queryAuditLogSchema } from '../validators/audit.validator';
 
 const router = Router();
 
@@ -23,6 +23,6 @@ router.get('/', authorize('audit:read'), validate({ query: queryAuditLogSchema }
 router.get('/export', authorize('audit:read'), validate({ query: exportAuditLogQuerySchema }), auditController.exportCsv);
 
 // 2. Retrieve JSON diff comparing oldData and newData for a specific audit log entry
-router.get('/:id/diff', authorize('audit:read'), auditController.getDiff);
+router.get('/:id/diff', authorize('audit:read'), validate({ params: auditLogIdParamsSchema }), auditController.getDiff);
 
 export default router;
