@@ -89,7 +89,12 @@ jobs:
           COOKIE_SECRET: test_cookie_secret_32_characters_minimum_entropy_9012
           CLIENT_URL: http://localhost:5173
           CORS_ORIGIN: http://localhost:5173
-        run: npm run test -- --coverage
+        run: |
+          mkdir -p node_modules/@vitest
+          if [ -d "backend/node_modules/@vitest/coverage-v8" ] && [ ! -d "node_modules/@vitest/coverage-v8" ]; then
+            cp -r backend/node_modules/@vitest/coverage-v8 node_modules/@vitest/
+          fi
+          npm run test -- --coverage
 
       - name: Upload Test Coverage Artifact
         uses: actions/upload-artifact@v4
