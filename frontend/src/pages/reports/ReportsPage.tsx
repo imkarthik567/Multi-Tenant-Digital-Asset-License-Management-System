@@ -19,6 +19,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   ResponsiveContainer,
   BarChart,
@@ -59,6 +60,8 @@ const toNum = (val: any): number => {
 
 export const ReportsPage: React.FC = () => {
   const { toast } = useToast();
+  const { hasPermission } = useAuth();
+  const canManageAllocations = hasPermission('allocations:manage_all');
   const [activeTab, setActiveTab] = useState<
     'utilization' | 'vendor_spend' | 'monthly_spend' | 'top_assets' | 'unlicensed' | 'trends' | 'cost_optimization'
   >('utilization');
@@ -186,7 +189,7 @@ export const ReportsPage: React.FC = () => {
       const res = await api.get<any>('/reports/unused-seats');
       return (res as any)?.data || res;
     },
-    enabled: activeTab === 'cost_optimization',
+    enabled: activeTab === 'cost_optimization' && canManageAllocations,
   });
 
   // 1-Click Release Seat Mutation (uses sp_release_license_seat)
@@ -351,17 +354,19 @@ export const ReportsPage: React.FC = () => {
             <Activity className="w-3.5 h-3.5 mr-1.5" />
             Access Trend (MV)
           </button>
-          <button
-            onClick={() => setActiveTab('cost_optimization')}
-            className={`py-3 px-1 border-b-2 text-xs font-medium whitespace-nowrap transition-colors flex items-center ${
-              activeTab === 'cost_optimization'
-                ? 'border-primary-500 text-primary-600 dark:text-primary-400 font-semibold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
-            }`}
-          >
-            <Coins className="w-3.5 h-3.5 mr-1.5" />
-            Cost Optimisation & Unused Seats
-          </button>
+          {canManageAllocations && (
+            <button
+              onClick={() => setActiveTab('cost_optimization')}
+              className={`py-3 px-1 border-b-2 text-xs font-medium whitespace-nowrap transition-colors flex items-center ${
+                activeTab === 'cost_optimization'
+                  ? 'border-primary-500 text-primary-600 dark:text-primary-400 font-semibold'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
+              }`}
+            >
+              <Coins className="w-3.5 h-3.5 mr-1.5" />
+              Cost Optimisation & Unused Seats
+            </button>
+          )}
         </nav>
       </div>
 
@@ -729,7 +734,7 @@ export const ReportsPage: React.FC = () => {
       )}
 
       {/* 7. COST OPTIMIZATION & UNUSED SEATS TAB */}
-      {activeTab === 'cost_optimization' && (
+      {activeTab === 'cost_optimization' && canManageAllocations && (
         <div className="space-y-6">
           {isCostOptLoading ? (
             <LoadingSkeleton variant="card" count={2} />

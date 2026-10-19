@@ -77,3 +77,6 @@ uploads/
 # E2E Test Reports & Artifacts
 test-results/
 playwright-report/
+
+# Temporary update dumps
+updated_*.txt

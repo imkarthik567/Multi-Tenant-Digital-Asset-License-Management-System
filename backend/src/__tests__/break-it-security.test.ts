@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 import app from '../app';
 import { prismaForRequest } from '../config/prisma';
 import { env } from '../config/env';
+import { hashToken } from '../utils/hash.util';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
@@ -237,6 +238,14 @@ describe('AssetVault Examiner Break-It Security Suite', () => {
       expect(refresh1.status).toBe(200);
       const newCookieHeader = String(refresh1.headers['set-cookie'] || '');
 
+      // Age old token past grace window
+      const match = cookieHeader.match(/refreshToken=([^;]+)/);
+      const oldToken: string = match && match[1] ? match[1] : '';
+      await systemPrisma.refreshToken.update({
+        where: { tokenHash: hashToken(oldToken) },
+        data: { revokedAt: new Date(Date.now() - 10000) },
+      });
+
       // 3. Attacker replays OLD compromised refresh token -> detects reuse and fails with 401
       const replayed = await request(app)
         .post('/api/auth/refresh')
@@ -393,7 +402,8 @@ describe('AssetVault Examiner Break-It Security Suite', () => {
           endDate: '2026-11-01', // Before start date
         });
 
-      expect([400, 422]).toContain(res.status);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('blocks license with negative or zero seat capacity -> 400 Bad Request', async () => {
@@ -411,7 +421,8 @@ describe('AssetVault Examiner Break-It Security Suite', () => {
           cost: 100,
         });
 
-      expect([400, 422]).toContain(res.status);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('blocks duplicate asset_code creation within the same tenant -> 409 Conflict', async () => {

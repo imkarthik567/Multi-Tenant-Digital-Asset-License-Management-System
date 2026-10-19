@@ -74,14 +74,16 @@ jobs:
           psql -h localhost -p 5432 -U postgres -d assetvault_test_db -f database/sql/02_functions_procedures.sql
           psql -h localhost -p 5432 -U postgres -d assetvault_test_db -f database/sql/03_triggers.sql
           psql -h localhost -p 5432 -U postgres -d assetvault_test_db -f database/sql/04_rls.sql
+          psql -h localhost -p 5432 -U postgres -d assetvault_test_db -v APP_PASSWORD="'app_test_password_123'" -f database/sql/08_production_bootstrap.sql
           npx prisma db seed --schema backend/prisma/schema.prisma || npm run db:seed
 
-      - name: Execute Vitest Suite with Code Coverage
+      - name: Execute Vitest Suite with Code Coverage (Enforcing RLS via Non-Superuser Role)
         env:
           NODE_ENV: test
           PORT: 5000
-          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
+          DATABASE_URL: postgresql://assetvault_app:app_test_password_123@localhost:5432/assetvault_test_db?schema=public
           DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
+          MIGRATE_DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
           JWT_SECRET: test_jwt_access_secret_32_characters_minimum_entropy_1234
           JWT_ACCESS_SECRET: test_jwt_access_secret_32_characters_minimum_entropy_1234
           JWT_REFRESH_SECRET: test_jwt_refresh_secret_32_characters_minimum_entropy_5678

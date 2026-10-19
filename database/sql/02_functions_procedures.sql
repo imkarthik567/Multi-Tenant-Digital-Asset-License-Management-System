@@ -274,7 +274,8 @@ BEGIN
 
     -- 5. Update license record
     UPDATE licenses
-    SET end_date = p_new_end_date,
+    SET start_date = COALESCE(v_old_end_date, start_date),
+        end_date = p_new_end_date,
         status = 'ACTIVE',
         updated_at = NOW()
     WHERE id = p_license_id;
@@ -300,7 +301,17 @@ DECLARE
     v_days_left INT;
     v_notif_type notification_type;
     v_already_notified BOOLEAN;
+    v_tenant_status tenant_status;
 BEGIN
+    -- Only generate notifications for eligible tenants (ACTIVE or TRIAL; exclude SUSPENDED/CANCELLED)
+    SELECT status INTO v_tenant_status
+    FROM tenants
+    WHERE id = p_tenant_id;
+
+    IF v_tenant_status IS NULL OR v_tenant_status NOT IN ('ACTIVE', 'TRIAL') THEN
+        RETURN 0;
+    END IF;
+
     FOR v_lic IN
         SELECT id, name, end_date
         FROM licenses

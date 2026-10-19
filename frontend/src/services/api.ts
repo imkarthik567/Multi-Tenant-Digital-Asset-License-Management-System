@@ -8,7 +8,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiResponse } from '../types';
 
 const rawBase = (import.meta as any).env?.VITE_API_URL;
-const API_BASE_URL = rawBase
+export const API_BASE_URL = rawBase
   ? rawBase.endsWith('/api')
     ? rawBase
     : `${rawBase.replace(/\/+$/, '')}/api`
@@ -34,22 +34,33 @@ export const apiClient = axios.create({
   },
 });
 
-// Flag and queue to prevent multiple simultaneous refresh calls
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (value?: unknown) => void;
-  reject: (reason?: unknown) => void;
-}> = [];
+// In-Flight Refresh Token Promise (dedupes concurrent refresh calls across client)
+let inFlightRefreshPromise: Promise<string> | null = null;
 
-const processQueue = (error: Error | null) => {
-  failedQueue.forEach((promise) => {
-    if (error) {
-      promise.reject(error);
-    } else {
-      promise.resolve();
+export const refreshAccessToken = async (): Promise<string> => {
+  if (inFlightRefreshPromise) {
+    return inFlightRefreshPromise;
+  }
+
+  inFlightRefreshPromise = (async () => {
+    try {
+      const res = await axios.post<ApiResponse<{ accessToken: string }>>(
+        `${API_BASE_URL}/auth/refresh`,
+        {},
+        { withCredentials: true }
+      );
+      const newAccessToken = res.data.data.accessToken;
+      setAccessToken(newAccessToken);
+      return newAccessToken;
+    } catch (err) {
+      setAccessToken(null);
+      throw err;
+    } finally {
+      inFlightRefreshPromise = null;
     }
-  });
-  failedQueue = [];
+  })();
+
+  return inFlightRefreshPromise;
 };
 
 // Request Interceptor: Attach Access Token
@@ -77,44 +88,15 @@ apiClient.interceptors.response.use(
       !originalRequest.url?.includes('/auth/login') &&
       !originalRequest.url?.includes('/auth/refresh')
     ) {
-      if (isRefreshing) {
-        // Queue the request until the current refresh finishes
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then(() => {
-            if (inMemoryAccessToken) {
-              originalRequest.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
-            }
-            return apiClient(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
       originalRequest._retry = true;
-      isRefreshing = true;
 
       try {
-        // Attempt silent refresh via httpOnly cookie
-        const res = await axios.post<ApiResponse<{ accessToken: string }>>(
-          `${API_BASE_URL}/auth/refresh`,
-          {},
-          { withCredentials: true }
-        );
-
-        const newAccessToken = res.data.data.accessToken;
-        setAccessToken(newAccessToken);
-        processQueue(null);
-
+        const newAccessToken = await refreshAccessToken();
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshErr) {
-        processQueue(refreshErr as Error);
-        setAccessToken(null);
         window.dispatchEvent(new CustomEvent('auth:session_expired'));
         return Promise.reject(refreshErr);
-      } finally {
-        isRefreshing = false;
       }
     }
 

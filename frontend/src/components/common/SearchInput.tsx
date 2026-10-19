@@ -22,11 +22,11 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   debounceMs = 300,
   className = '',
 }) => {
-  const [internalValue, setInternalValue] = useState(externalValue);
+  const [internalValue, setInternalValue] = useState(externalValue ?? '');
 
   // Sync internal value when external changes
   useEffect(() => {
-    setInternalValue(externalValue);
+    setInternalValue(externalValue ?? '');
   }, [externalValue]);
 
   // Debounced callback
@@ -50,7 +50,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       <Search className="absolute left-3 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
       <input
         type="text"
-        value={internalValue}
+        value={internalValue ?? ''}
         onChange={(e) => setInternalValue(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}

@@ -4,6 +4,7 @@
 // ==============================================================================
 
 import { Request, Response } from 'express';
+import { NotificationType } from '@prisma/client';
 import { notificationService } from '../services/notification.service';
 import { notificationStreamService } from '../services/notificationStream.service';
 import { getPaginationParams } from '../utils/pagination.util';
@@ -12,9 +13,12 @@ import { asyncHandler } from '../utils/asyncHandler';
 
 export class NotificationController {
   public listNotifications = asyncHandler(async (req: Request, res: Response) => {
-    const params = getPaginationParams(req, 'created_at', ['created_at', 'is_read']);
+    const params = getPaginationParams(req, 'createdAt', ['createdAt', 'isRead', 'type', 'id']);
     const filter = {
       isRead: req.query.isRead !== undefined ? req.query.isRead === 'true' : undefined,
+      type: req.query.type as NotificationType | undefined,
+      dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
+      dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
     };
 
     const result = await notificationService.listUserNotifications(

@@ -4,12 +4,25 @@
 // ==============================================================================
 
 import { z } from 'zod';
+import { NotificationType } from '@prisma/client';
+import {
+  isoDateStringSchema,
+  limitQuerySchema,
+  numericCursorSchema,
+  pageQuerySchema,
+} from './access.validator';
 
 export const queryNotificationSchema = z
   .object({
-    page: z.string().optional(),
-    limit: z.string().optional(),
+    page: pageQuerySchema.optional(),
+    limit: limitQuerySchema.optional(),
+    cursor: numericCursorSchema.optional(),
     isRead: z.enum(['true', 'false']).optional(),
+    type: z.nativeEnum(NotificationType).optional(),
+    dateFrom: isoDateStringSchema.optional(),
+    dateTo: isoDateStringSchema.optional(),
+    sort: z.enum(['createdAt', 'isRead', 'type', 'id']).optional(),
+    order: z.enum(['asc', 'desc']).optional(),
   })
   .strip();
 

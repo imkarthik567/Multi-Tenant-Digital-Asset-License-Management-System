@@ -71,13 +71,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'assets', label: 'Digital Assets', path: '/assets', icon: <FolderLock className="w-5 h-5" />, permission: 'assets:read' },
     ];
 
+    const roleName =
+      typeof user?.role === 'object' && user?.role !== null
+        ? (user.role as any).name
+        : user?.role;
+
     // For standard members: My Licenses
-    if (user?.role === 'MEMBER') {
+    if (roleName === 'MEMBER') {
       items.push({ id: 'my_licenses', label: 'My Licenses', path: '/my-licenses', icon: <Compass className="w-5 h-5" /> });
     }
 
     // For Asset Managers & Tenant Admins
-    if (user?.role === 'TENANT_ADMIN' || user?.role === 'ASSET_MANAGER') {
+    if (roleName === 'TENANT_ADMIN' || roleName === 'ASSET_MANAGER') {
       items.push(
         { id: 'licenses', label: 'Licenses', path: '/licenses', icon: <KeyRound className="w-5 h-5" />, permission: 'licenses:read' },
         { id: 'allocations', label: 'Seat Allocations', path: '/allocations', icon: <Layers className="w-5 h-5" />, permission: 'allocations:read' },
@@ -89,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     // For Tenant Admins strictly: Users and Audit Ledger
-    if (user?.role === 'TENANT_ADMIN') {
+    if (roleName === 'TENANT_ADMIN') {
       items.push(
         { id: 'users', label: 'Users & Roles', path: '/users', icon: <Users className="w-5 h-5" />, permission: 'users:read' },
         { id: 'audit_logs', label: 'Audit Trail', path: '/audit-logs', icon: <History className="w-5 h-5" />, permission: 'audit:read' }

@@ -728,7 +728,13 @@ export const AssetDetailPage: React.FC = () => {
 
                   <div className="flex items-center space-x-2">
                     <a
-                      href={v.fileUrl}
+                      href={v.fileUrl && /^(https?:\/\/|\/)/i.test(v.fileUrl) ? v.fileUrl : '#'}
+                      onClick={(e) => {
+                        if (!v.fileUrl || !/^(https?:\/\/|\/)/i.test(v.fileUrl)) {
+                          e.preventDefault();
+                          toast.error('Invalid or untrusted file URL scheme');
+                        }
+                      }}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"

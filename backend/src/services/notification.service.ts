@@ -14,7 +14,7 @@ export class NotificationService {
     prismaClient: any,
     userId: string,
     params: PaginationParams,
-    filter: { isRead?: boolean } = {}
+    filter: { isRead?: boolean; type?: any; dateFrom?: Date; dateTo?: Date } = {}
   ) {
     const { data, total } = await notificationRepository.findUserNotifications(
       prismaClient,

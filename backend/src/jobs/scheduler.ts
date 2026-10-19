@@ -20,31 +20,43 @@ export class JobScheduler {
   private cronTasks: any[] = [];
 
   /**
-   * Safe wrapper that executes a routine only if PostgreSQL advisory lock is granted
+   * Safe wrapper that executes a routine only if PostgreSQL advisory transaction lock is granted.
+   * Runs the entire routine within an interactive prisma.$transaction with extended timeout,
+   * acquiring a transaction-level lock (pg_try_advisory_xact_lock) and setting super_admin RLS context.
+   * Lock automatically releases at commit or rollback, preventing connection pool leaks.
    */
-  private async withAdvisoryLock<T>(
+  public async withAdvisoryLock<T>(
     lockId: number,
     jobName: string,
-    action: () => Promise<T>
+    action: (tx: Prisma.TransactionClient) => Promise<T>
   ): Promise<T | null> {
     try {
-      const lockResult: any = await prisma.$queryRaw(
-        Prisma.sql`SELECT pg_try_advisory_lock(${lockId}) AS locked;`
+      return await prisma.$transaction(
+        async (tx) => {
+          const lockResult: any = await tx.$queryRaw(
+            Prisma.sql`SELECT pg_try_advisory_xact_lock(${lockId}) AS locked;`
+          );
+          const isLocked = Boolean(lockResult?.[0]?.locked);
+
+          if (!isLocked) {
+            logger.info({ jobName, lockId }, 'Advisory lock held by another worker instance. Skipping execution.');
+            return null;
+          }
+
+          logger.info({ jobName, lockId }, `Acquired transaction advisory lock ${lockId}. Executing job...`);
+
+          // Enforce super_admin RLS context for cross-tenant background worker jobs
+          await tx.$executeRaw(
+            Prisma.sql`SELECT set_config('app.is_super_admin', 'true', true);`
+          );
+
+          return await action(tx);
+        },
+        {
+          maxWait: 10000,
+          timeout: 60000,
+        }
       );
-      const isLocked = Boolean(lockResult?.[0]?.locked);
-
-      if (!isLocked) {
-        logger.info({ jobName, lockId }, 'Advisory lock held by another worker instance. Skipping execution.');
-        return null;
-      }
-
-      logger.info({ jobName, lockId }, `Acquired advisory lock ${lockId}. Executing job...`);
-      try {
-        return await action();
-      } finally {
-        await prisma.$queryRaw(Prisma.sql`SELECT pg_advisory_unlock(${lockId});`);
-        logger.debug({ jobName, lockId }, `Released advisory lock ${lockId}.`);
-      }
     } catch (err: any) {
       logger.error({ err, jobName, lockId }, `Error in job execution with advisory lock ${lockId}`);
       return null;
@@ -58,19 +70,19 @@ export class JobScheduler {
    */
   public async runExpiryNotificationsJob(): Promise<{ totalNotifications: number; emailsSent: number }> {
     return (
-      (await this.withAdvisoryLock(LOCK_EXPIRY_NOTIFICATIONS, 'ExpiryNotifications', async () => {
+      (await this.withAdvisoryLock(LOCK_EXPIRY_NOTIFICATIONS, 'ExpiryNotifications', async (tx) => {
         logger.info('Starting scheduled license expiry notification routine...');
 
-        // 1. Get all active tenants
-        const tenants: any = await prisma.$queryRaw(
-          Prisma.sql`SELECT id, name FROM tenants WHERE status = 'ACTIVE';`
+        // 1. Get all active and trial tenants (excluding SUSPENDED/CANCELLED per TenantStatus enum)
+        const tenants: any = await tx.$queryRaw(
+          Prisma.sql`SELECT id, name FROM tenants WHERE status IN ('ACTIVE', 'TRIAL');`
         );
 
         let totalNotifications = 0;
 
         for (const tenant of tenants) {
           try {
-            const res: any = await prisma.$queryRaw(
+            const res: any = await tx.$queryRaw(
               Prisma.sql`SELECT fn_generate_expiry_notifications(${tenant.id}::uuid, 30) AS created_count;`
             );
             const count = parseInt(res?.[0]?.created_count || '0', 10);
@@ -86,7 +98,7 @@ export class JobScheduler {
         // 2. Fetch freshly generated notifications from the last hour to dispatch emails
         let emailsSent = 0;
         try {
-          const freshAlerts: any = await prisma.$queryRaw(Prisma.sql`
+          const freshAlerts: any = await tx.$queryRaw(Prisma.sql`
             SELECT 
               n.id, n.type, n.message, n.created_at,
               u.email, u.full_name,
@@ -145,9 +157,9 @@ export class JobScheduler {
    * Executes REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats
    */
   public async runRefreshMaterializedViewJob(): Promise<boolean> {
-    const result = await this.withAdvisoryLock(LOCK_REFRESH_MV, 'RefreshMaterializedView', async () => {
+    const result = await this.withAdvisoryLock(LOCK_REFRESH_MV, 'RefreshMaterializedView', async (tx) => {
       logger.info('Refreshing materialized view mv_monthly_access_stats...');
-      await prisma.$executeRaw(Prisma.sql`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;`);
+      await tx.$executeRaw(Prisma.sql`SELECT fn_refresh_monthly_access_stats();`);
       logger.info('Successfully refreshed materialized view mv_monthly_access_stats');
       return true;
     });
@@ -159,42 +171,73 @@ export class JobScheduler {
    * Auto-renews licenses where auto_renew = true and end_date is within 3 days,
    * extending by previous period length via sp_renew_license.
    */
-  public async runAutoRenewLicensesJob(): Promise<{ renewedCount: number }> {
+  public async runAutoRenewLicensesJob(referenceDate?: Date): Promise<{ renewedCount: number }> {
     return (
-      (await this.withAdvisoryLock(LOCK_AUTO_RENEW, 'AutoRenewLicenses', async () => {
+      (await this.withAdvisoryLock(LOCK_AUTO_RENEW, 'AutoRenewLicenses', async (tx) => {
         logger.info('Checking licenses eligible for automated contract renewal...');
 
+        const currentDate = referenceDate ?? new Date();
+        const refDateStr = currentDate.toISOString().split('T')[0];
+
         // Find active un-deleted licenses due for renewal within 3 days
-        const eligibleLicenses: any = await prisma.$queryRaw(Prisma.sql`
+        const eligibleLicenses: any = await tx.$queryRaw(Prisma.sql`
           SELECT 
             l.id, l.tenant_id, l.name, l.start_date, l.end_date, l.cost,
-            u.id AS admin_user_id
+            u.id AS admin_user_id,
+            lr.old_end_date AS last_old_end_date,
+            lr.new_end_date AS last_new_end_date
           FROM licenses l
           LEFT JOIN LATERAL (
-            SELECT id FROM users
-            WHERE tenant_id = l.tenant_id AND is_active = TRUE
-            ORDER BY role_id ASC
+            SELECT u.id FROM users u
+            JOIN roles r ON r.id = u.role_id
+            WHERE u.tenant_id = l.tenant_id 
+              AND u.is_active = TRUE
+              AND r.name = 'TENANT_ADMIN'
+            ORDER BY u.created_at ASC
             LIMIT 1
           ) u ON true
+          LEFT JOIN LATERAL (
+            SELECT old_end_date, new_end_date
+            FROM license_renewals
+            WHERE license_id = l.id
+            ORDER BY renewed_at DESC, id DESC
+            LIMIT 1
+          ) lr ON true
           WHERE l.auto_renew = TRUE
             AND l.status = 'ACTIVE'
             AND l.deleted_at IS NULL
             AND l.end_date IS NOT NULL
-            AND l.end_date >= CURRENT_DATE
-            AND l.end_date <= (CURRENT_DATE + INTERVAL '3 days');
+            AND l.end_date >= ${refDateStr}::date
+            AND l.end_date <= (${refDateStr}::date + INTERVAL '3 days');
         `);
 
         let renewedCount = 0;
 
         for (const lic of eligibleLicenses) {
+          if (!lic.admin_user_id) {
+            logger.warn(
+              { licenseId: lic.id, name: lic.name, tenantId: lic.tenant_id },
+              'Skipping auto-renewal: No active TENANT_ADMIN found for tenant'
+            );
+            continue;
+          }
+
           try {
             const startDate = new Date(lic.start_date);
             const endDate = new Date(lic.end_date);
-            let diffDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            let diffDays: number;
+
+            if (lic.last_old_end_date && lic.last_new_end_date) {
+              const lastOld = new Date(lic.last_old_end_date);
+              const lastNew = new Date(lic.last_new_end_date);
+              diffDays = Math.round((lastNew.getTime() - lastOld.getTime()) / (1000 * 60 * 60 * 24));
+            } else {
+              diffDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            }
+
             if (diffDays <= 0) diffDays = 365;
 
-            const newEndDate = new Date(endDate);
-            newEndDate.setDate(newEndDate.getDate() + diffDays);
+            const newEndDate = new Date(endDate.getTime() + diffDays * (1000 * 60 * 60 * 24));
             const formattedNewEndDate = newEndDate.toISOString().split('T')[0];
 
             logger.info(
@@ -204,7 +247,7 @@ export class JobScheduler {
 
             const renewalNote = `Automated period renewal (+${diffDays} days) by AssetVault Background Worker`;
 
-            await prisma.$executeRaw(
+            await tx.$executeRaw(
               Prisma.sql`CALL sp_renew_license(${lic.id}::uuid, ${formattedNewEndDate}::date, ${lic.cost}::numeric, ${lic.admin_user_id}::uuid, ${renewalNote}::text, null);`
             );
 

@@ -28,6 +28,7 @@ import { CommandPalette } from '../common/CommandPalette';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { Notification } from '../../types';
+import { NotificationStreamClient } from '../../services/notificationStream';
 
 interface NavbarProps {
   onMobileMenuToggle: () => void;
@@ -57,32 +58,26 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Real-time Server-Sent Events (SSE) notification stream listener
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+
+  // Real-time Server-Sent Events (SSE) notification stream listener via fetch streaming
   useEffect(() => {
     if (!user) return;
-    let eventSource: EventSource | null = null;
-    try {
-      eventSource = new EventSource('/api/notifications/stream', { withCredentials: true });
-      eventSource.addEventListener('notification', (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-          toast.info(payload.message || 'New notification alert');
-        } catch {
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        }
-      });
-      eventSource.onerror = () => {
-        // EventSource will automatically retry in the background
-      };
-    } catch {
-      // Fallback cleanly to polling
-    }
+
+    const streamClient = new NotificationStreamClient({
+      onNotification: (payload) => {
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        toastRef.current.info(payload.message || 'New notification alert');
+      },
+    });
+
+    streamClient.start();
 
     return () => {
-      if (eventSource) eventSource.close();
+      streamClient.stop();
     };
-  }, [user, queryClient, toast]);
+  }, [user?.id, queryClient]);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifMenuRef = useRef<HTMLDivElement>(null);

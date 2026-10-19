@@ -6,7 +6,18 @@ export default defineConfig({
     environment: 'node',
     testTimeout: 30000,
     hookTimeout: 30000,
-    include: ['backend/src/__tests__/**/*.test.ts', 'src/__tests__/**/*.test.ts'],
+    env: {
+      // Connect as non-bypass application role by default to verify strict RLS enforcement
+      DATABASE_URL:
+        process.env.TEST_DATABASE_URL ||
+        process.env.APP_DATABASE_URL ||
+        'postgresql://assetvault_app:app_password@localhost:5432/assetvault_db?schema=public',
+    },
+    include: [
+      'backend/src/__tests__/**/*.test.ts',
+      'src/__tests__/**/*.test.ts',
+      'frontend/src/__tests__/**/*.test.ts',
+    ],
     fileParallelism: false, // Run integration tests sequentially to avoid DB race conditions
     coverage: {
       provider: 'v8',

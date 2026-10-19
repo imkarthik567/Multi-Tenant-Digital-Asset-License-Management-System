@@ -50,7 +50,12 @@ export const DashboardPage: React.FC = () => {
   const isSuperAdmin = user?.isSuperAdmin;
   const [isRemediationModalOpen, setIsRemediationModalOpen] = useState(false);
 
-  if (user?.role === 'MEMBER') {
+  const roleName =
+    typeof user?.role === 'object' && user?.role !== null
+      ? (user.role as any).name
+      : user?.role;
+
+  if (roleName === 'MEMBER') {
     return <Navigate to="/my-licenses" replace />;
   }
 

@@ -10,6 +10,7 @@ import { getPaginationParams } from '../utils/pagination.util';
 import { sendResponse } from '../utils/response.util';
 import { asyncHandler } from '../utils/asyncHandler';
 import { TenantStatus } from '@prisma/client';
+import { NotFoundError } from '../errors/AppError';
 
 export class TenantController {
   public listTenants = asyncHandler(async (req: Request, res: Response) => {
@@ -22,7 +23,11 @@ export class TenantController {
   });
 
   public getTenantById = asyncHandler(async (req: Request, res: Response) => {
-    const tenantId = req.params.id === 'current' ? req.user?.tenantId : req.params.id;
+    const rawId = req.params.id;
+    const tenantId = rawId === 'current' ? req.user?.tenantId : rawId;
+    if (!req.user?.isSuperAdmin && tenantId !== req.user?.tenantId) {
+      throw new NotFoundError('Tenant organization not found');
+    }
     const tenant = await tenantService.getTenantById(req.prisma, tenantId!);
     sendResponse(res, 200, tenant);
   });

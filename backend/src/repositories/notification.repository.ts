@@ -3,7 +3,7 @@
 // Course: BCSE307L Database Systems (Fall 2026-27)
 // ==============================================================================
 
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient, NotificationType } from '@prisma/client';
 import { PaginationParams } from '../utils/pagination.util';
 
 export class NotificationRepository {
@@ -11,19 +11,26 @@ export class NotificationRepository {
     prismaClient: PrismaClient,
     userId: string,
     params: PaginationParams,
-    filter: { isRead?: boolean } = {}
+    filter: { isRead?: boolean; type?: NotificationType; dateFrom?: Date; dateTo?: Date } = {}
   ) {
     const where: Prisma.NotificationWhereInput = {
       userId,
       ...(filter.isRead !== undefined ? { isRead: filter.isRead } : {}),
+      ...(filter.type ? { type: filter.type } : {}),
     };
+
+    if (filter.dateFrom || filter.dateTo) {
+      where.createdAt = {};
+      if (filter.dateFrom) where.createdAt.gte = filter.dateFrom;
+      if (filter.dateTo) where.createdAt.lte = filter.dateTo;
+    }
 
     const [data, total] = await Promise.all([
       prismaClient.notification.findMany({
         where,
         skip: params.skip,
         take: params.limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [params.sort]: params.order },
         include: {
           license: {
             select: {

@@ -3,7 +3,6 @@ name: Continuous Deployment & Smoke Health Verification
 on:
   workflow_run:
     workflows: [ "Docker Build, Scan & Publish" ]
-    branches: [ main ]
     types: [ completed ]
   workflow_dispatch:
 
@@ -21,8 +20,12 @@ jobs:
       - name: Trigger Render Deployment via Deploy Hook
         if: "${{ env.RENDER_DEPLOY_HOOK_URL != '' }}"
         run: |
+          set +x
           echo "🚀 Triggering Render Web Service deployment..."
-          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          curl -s -S -f -X POST "$RENDER_DEPLOY_HOOK_URL" -o /dev/null || {
+            echo "❌ Deployment trigger failed: Render deploy hook returned an error."
+            exit 1
+          }
           echo "✅ Deployment trigger accepted by Render."
 
       - name: Poll Health & Readiness Endpoints (3-minute Timeout)

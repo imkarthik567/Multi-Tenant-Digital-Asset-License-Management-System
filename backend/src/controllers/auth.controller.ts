@@ -12,7 +12,7 @@ import {
   generateAccessToken,
   generateRefreshTokenData,
 } from '../utils/token.util';
-import { prisma } from '../config/prisma';
+import { systemPrisma } from '../config/prisma';
 import { env } from '../config/env';
 
 export class AuthController {
@@ -76,7 +76,9 @@ export class AuthController {
         ipAddress: req.ip,
       });
 
-      setRefreshTokenCookie(res, result.newRawRefreshToken);
+      if (result.newRawRefreshToken) {
+        setRefreshTokenCookie(res, result.newRawRefreshToken);
+      }
 
       res.status(200).json({
         status: 'success',
@@ -187,7 +189,7 @@ export class AuthController {
 
       const refreshData = generateRefreshTokenData();
 
-      await prisma.refreshToken.create({
+      await systemPrisma.refreshToken.create({
         data: {
           userId: user.id,
           tokenHash: refreshData.tokenHash,

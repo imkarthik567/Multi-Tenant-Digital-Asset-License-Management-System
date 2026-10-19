@@ -631,6 +631,42 @@ describe('AssetVault REST API & Advanced Database Business Logic Suite', () => {
       expect(res.body.data.success).toBe(true);
       expect(res.body.data).toHaveProperty('notificationsGenerated');
     });
+
+    it('GET /api/notifications/stream rejects unauthenticated requests with 401 and accepts Bearer token with 200 text/event-stream', async () => {
+      // 1. Unauthenticated request must return 401 Unauthorized
+      const unauthRes = await request(app).get('/api/notifications/stream');
+      expect(unauthRes.status).toBe(401);
+
+      // 2. Authenticated request with Bearer token must establish text/event-stream connection
+      await new Promise<void>((resolve, reject) => {
+        request(app)
+          .get('/api/notifications/stream')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200)
+          .expect('Content-Type', /^text\/event-stream/)
+          .buffer(false)
+          .parse((res, callback) => {
+            res.on('data', (chunk: Buffer) => {
+              const text = chunk.toString();
+              if (text.includes('event: connected')) {
+                (res as any).destroy();
+                callback(null, text);
+                resolve();
+              }
+            });
+            res.on('error', () => {
+              resolve();
+            });
+          })
+          .end((err) => {
+            if (err && !err.message?.includes('socket') && !err.message?.includes('aborted')) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+      });
+    });
   });
 
   afterAll(async () => {

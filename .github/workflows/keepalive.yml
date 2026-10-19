@@ -15,9 +15,11 @@ jobs:
         env:
           API_URL: ${{ secrets.RENDER_API_URL || 'https://assetvault-api.onrender.com' }}
         run: |
+          set +x
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "[$TIMESTAMP] Sending keepalive ping to $API_URL/api/health..."
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health" || echo "000")
+          SAFE_URL=$(echo "$API_URL" | sed -E 's#://[^@]+@#://***@#')
+          echo "[$TIMESTAMP] Sending keepalive ping to $SAFE_URL/api/health..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$API_URL/api/health" || echo "000")
           echo "[$TIMESTAMP] Response status code: $HTTP_STATUS"
           if [ "$HTTP_STATUS" -eq 200 ]; then
             echo "✅ AssetVault API is warm and healthy."

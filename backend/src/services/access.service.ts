@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import { accessRepository, AccessLogFilterOptions } from '../repositories/access.repository';
-import { NotFoundError, ForbiddenError, BadRequestError } from '../errors/AppError';
+import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../errors/AppError';
 import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.util';
 import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
@@ -13,7 +13,7 @@ import { Prisma } from '@prisma/client';
 export class AccessService {
   /**
    * Atomic Asset Checkout
-   * Transaction 3: Verifies active seat allocation, logs access, and updates asset status
+   * Transaction 3: Verifies asset status, open checkout state, active seat allocation, and logs access
    */
   public async checkoutAsset(
     tenantId: string,
@@ -36,6 +36,29 @@ export class AccessService {
         throw new NotFoundError('Asset not found');
       }
 
+      // Reject non-ACTIVE assets (e.g. ARCHIVED or DRAFT)
+      if (asset.status !== 'ACTIVE') {
+        throw new ConflictError(
+          `Cannot checkout asset with status '${asset.status}'. Only ACTIVE assets can be checked out.`
+        );
+      }
+
+      // Verify no open checkout exists for this user/asset (prevent double checkout)
+      const lastCheckoutAction = await tx.assetAccessLog.findFirst({
+        where: {
+          assetId,
+          userId,
+          action: { in: ['CHECKOUT', 'CHECKIN'] },
+        },
+        orderBy: { id: 'desc' },
+      });
+
+      if (lastCheckoutAction?.action === 'CHECKOUT') {
+        throw new ConflictError(
+          'Asset is already checked out by this user. Please check in the asset before checking out again.'
+        );
+      }
+
       // Check seat coverage
       const hasSeat = await accessRepository.verifyUserSeatCoverage(tx, assetId, userId);
       if (!hasSeat) {
@@ -54,7 +77,7 @@ export class AccessService {
         },
       });
 
-      // Update asset status
+      // Update asset timestamp while preserving valid ACTIVE status
       const updatedAsset = await tx.asset.update({
         where: { id: assetId },
         data: { status: 'ACTIVE', updatedAt: new Date() },
@@ -70,6 +93,7 @@ export class AccessService {
 
   /**
    * Atomic Asset Checkin
+   * Verifies asset status, ensures an open CHECKOUT log exists for this user/asset, and logs checkin
    */
   public async checkinAsset(
     tenantId: string,
@@ -90,6 +114,29 @@ export class AccessService {
       });
       if (!asset) {
         throw new NotFoundError('Asset not found');
+      }
+
+      // Reject non-ACTIVE assets (e.g. ARCHIVED or DRAFT)
+      if (asset.status !== 'ACTIVE') {
+        throw new ConflictError(
+          `Cannot check in asset with status '${asset.status}'. Only ACTIVE assets can be checked in.`
+        );
+      }
+
+      // Verify an open checkout exists for this user/asset (prevent checkin without prior checkout)
+      const lastCheckoutAction = await tx.assetAccessLog.findFirst({
+        where: {
+          assetId,
+          userId,
+          action: { in: ['CHECKOUT', 'CHECKIN'] },
+        },
+        orderBy: { id: 'desc' },
+      });
+
+      if (!lastCheckoutAction || lastCheckoutAction.action !== 'CHECKOUT') {
+        throw new ConflictError(
+          'Cannot check in asset: No active checkout found for this user.'
+        );
       }
 
       await tx.assetAccessLog.create({

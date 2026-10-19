@@ -84,7 +84,7 @@ export class AccessController {
       return;
     }
 
-    const params = getPaginationParams(req, 'created_at', ['created_at', 'action']);
+    const params = getPaginationParams(req, 'accessedAt', ['accessedAt', 'action', 'id']);
     const result = await accessService.listAccessLogs(req.prisma, params, filter);
     sendResponse(res, 200, result.data, result.meta);
   });
@@ -110,7 +110,7 @@ export class AccessController {
       return;
     }
 
-    const params = getPaginationParams(req, 'created_at', ['created_at', 'action']);
+    const params = getPaginationParams(req, 'accessedAt', ['accessedAt', 'action', 'id']);
     const result = await accessService.listAccessLogs(req.prisma, params, filter);
     sendResponse(res, 200, result.data, result.meta);
   });

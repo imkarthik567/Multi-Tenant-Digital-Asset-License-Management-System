@@ -67,7 +67,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         <input
           id={inputId}
           type="date"
-          value={value}
+          value={value ?? ''}
           min={minDate}
           max={maxDate}
           required={required}

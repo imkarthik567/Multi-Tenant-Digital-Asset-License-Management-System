@@ -5,8 +5,9 @@
 // ==============================================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { api, setAccessToken, getAccessToken } from '../services/api';
+import { api, setAccessToken, getAccessToken, refreshAccessToken } from '../services/api';
 import { User, Tenant, RoleName } from '../types';
+import { parseAuthProfile } from '../utils/auth.util';
 
 interface AuthContextType {
   user: User | null;
@@ -45,9 +46,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // If no token in memory, attempt silent refresh via httpOnly cookie
       if (!token) {
         try {
-          const refreshRes = await api.post<{ data: { accessToken: string } }>('/auth/refresh');
-          token = refreshRes.data.accessToken;
-          setAccessToken(token);
+          token = await refreshAccessToken();
         } catch {
           // No active session in cookies
           setAccessToken(null);
@@ -61,12 +60,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (token) {
         // Fetch current authenticated user & permissions
         const meRes = await api.get<{ data: any }>('/auth/me');
-        const currentUser = (meRes as any).data?.user || (meRes as any).data || meRes;
-        setUser(currentUser);
-        setTenant((meRes as any).data?.tenant || currentUser?.tenant || null);
-        setPermissions(currentUser?.permissions || []);
+        const session = parseAuthProfile(meRes);
+        setUser(session.user);
+        setTenant(session.tenant);
+        setPermissions(session.permissions);
       }
-    } catch {
+    } catch (err) {
+      console.error('[AuthContext] initAuth failed to restore session:', err);
       setAccessToken(null);
       setUser(null);
       setTenant(null);
@@ -100,12 +100,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
     }>('/auth/login', { email, password });
 
-    const { accessToken, user: loggedInUser, tenant: userTenant } = res.data;
+    const { accessToken } = res.data;
     setAccessToken(accessToken);
-    setUser(loggedInUser);
-    setTenant(userTenant || loggedInUser.tenant || null);
-    setPermissions(loggedInUser.permissions || []);
-    return loggedInUser;
+    const session = parseAuthProfile(res);
+    setUser(session.user);
+    setTenant(session.tenant);
+    setPermissions(session.permissions);
+    return session.user;
   };
 
   const register = async (payload: {
@@ -138,12 +139,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       password: payload.password,
     });
 
-    const { accessToken, user: registeredUser, tenant: registeredTenant } = res.data;
+    const { accessToken } = res.data;
     setAccessToken(accessToken);
-    setUser(registeredUser);
-    setTenant(registeredTenant);
-    setPermissions(registeredUser.permissions || []);
-    return registeredUser;
+    const session = parseAuthProfile(res);
+    setUser(session.user);
+    setTenant(session.tenant);
+    setPermissions(session.permissions);
+    return session.user;
   };
 
   const logout = async () => {
@@ -161,13 +163,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshProfile = async () => {
     try {
-      const meRes = await api.get<{ data: { user: User; tenant?: Tenant | null } }>('/auth/me');
-      const currentUser = meRes.data.user;
-      setUser(currentUser);
-      setTenant(meRes.data.tenant || currentUser.tenant || null);
-      setPermissions(currentUser.permissions || []);
-    } catch {
-      // Keep existing profile if re-fetch fails
+      const meRes = await api.get<{ data: any }>('/auth/me');
+      const session = parseAuthProfile(meRes);
+      setUser(session.user);
+      setTenant(session.tenant);
+      setPermissions(session.permissions);
+    } catch (err: any) {
+      console.error('[AuthContext] refreshProfile failed to refresh profile:', err);
+      throw err;
     }
   };
 

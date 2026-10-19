@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { AuditLog } from '../../types';
 import { ScrollText, Eye, X, Download } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { Pagination } from '../../components/common/Pagination';
 
 export const AuditLogPage: React.FC = () => {
   const { toast } = useToast();
@@ -193,6 +194,16 @@ export const AuditLogPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {logsData?.meta && logsData.meta.totalPages > 1 && (
+          <div className="pt-2">
+            <Pagination
+              currentPage={page}
+              totalPages={logsData.meta.totalPages}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </div>

@@ -39,7 +39,11 @@ export const LicenseDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, hasPermission } = useAuth();
-  const isMember = user?.role === 'MEMBER';
+  const roleName =
+    typeof user?.role === 'object' && user?.role !== null
+      ? (user.role as any).name
+      : user?.role;
+  const isMember = roleName === 'MEMBER';
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'allocations' | 'renewals'>('overview');
@@ -80,7 +84,8 @@ export const LicenseDetailPage: React.FC = () => {
 
   React.useEffect(() => {
     if (license) {
-      const currentEnd = license.endDate ? new Date(license.endDate) : new Date();
+      const parsedEnd = license.endDate ? new Date(license.endDate) : new Date();
+      const currentEnd = isNaN(parsedEnd.getTime()) ? new Date() : parsedEnd;
       currentEnd.setFullYear(currentEnd.getFullYear() + 1);
       setRenewForm({
         newEndDate: currentEnd.toISOString().split('T')[0],

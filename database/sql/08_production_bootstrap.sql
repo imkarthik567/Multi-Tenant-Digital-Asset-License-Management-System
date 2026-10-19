@@ -27,8 +27,8 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Set password for application runtime role from variable
-ALTER ROLE assetvault_app WITH PASSWORD :APP_PASSWORD;
+-- 2. Enable login and set password for application runtime role from variable
+ALTER ROLE assetvault_app WITH LOGIN PASSWORD :APP_PASSWORD;
 
 -- 3. Grant connection privileges on the current database
 GRANT CONNECT ON DATABASE current_database() TO assetvault_app;
@@ -38,6 +38,17 @@ GRANT USAGE ON SCHEMA public TO assetvault_app;
 
 -- 5. Revoke DDL creation rights on schema public (Least Privilege: No table creations or drops at runtime)
 REVOKE CREATE ON SCHEMA public FROM assetvault_app;
+
+-- 5b. Create failed_login_attempts table for persistent brute-force defense
+CREATE TABLE IF NOT EXISTS failed_login_attempts (
+  key VARCHAR(255) PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  ip_address VARCHAR(45) NOT NULL,
+  count INT NOT NULL DEFAULT 1,
+  first_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  locked_until TIMESTAMPTZ
+);
 
 -- 6. Grant standard DML rights across all existing tables
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO assetvault_app;

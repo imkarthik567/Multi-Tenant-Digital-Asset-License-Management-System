@@ -12,6 +12,8 @@
 // ==============================================================================
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import request from 'supertest';
 import { Prisma } from '@prisma/client';
 import app from '../app';
@@ -330,4 +332,51 @@ describe('AssetVault Advanced Enterprise Features Suite', () => {
       expect(result).toBe(true);
     });
   });
+
+  // --------------------------------------------------------------------------
+  // 9. Deployment & Container Configuration Contracts
+  // --------------------------------------------------------------------------
+  describe('9. Deployment & Container Configuration Contracts', () => {
+    it('ensures docker-compose.yml and .env.example provide DIRECT_URL required by schema.prisma', () => {
+      const composePath = path.resolve(__dirname, '../../../docker-compose.yml');
+      const envExamplePath = path.resolve(__dirname, '../../../.env.example');
+
+      const composeContent = fs.readFileSync(composePath, 'utf-8');
+      const envExampleContent = fs.readFileSync(envExamplePath, 'utf-8');
+
+      // Verify .env.example defines DIRECT_URL
+      expect(envExampleContent).toMatch(/^DIRECT_URL=/m);
+
+      // Verify docker-compose.yml configures DIRECT_URL for both api and worker services
+      expect(composeContent).toMatch(/api:[\s\S]*?DIRECT_URL:\s*postgresql:/);
+      expect(composeContent).toMatch(/worker:[\s\S]*?DIRECT_URL:\s*postgresql:/);
+    });
+
+    it('ensures prisma CLI is in production dependencies pinned to @prisma/client version', () => {
+      const backendPkgPath = path.resolve(__dirname, '../../package.json');
+      const backendPkg = JSON.parse(fs.readFileSync(backendPkgPath, 'utf-8'));
+
+      // prisma CLI must be in dependencies (not devDependencies) so runner stage with --omit=dev installs it
+      expect(backendPkg.dependencies.prisma).toBeDefined();
+      expect(backendPkg.dependencies.prisma).toBe(backendPkg.dependencies['@prisma/client']);
+      expect(backendPkg.devDependencies?.prisma).toBeUndefined();
+    });
+
+    it('ensures database bootstrap SQL enables LOGIN when setting assetvault_app password', () => {
+      const bootstrapSqlPath = path.resolve(__dirname, '../../../database/sql/08_production_bootstrap.sql');
+      const bootstrapSql = fs.readFileSync(bootstrapSqlPath, 'utf-8');
+
+      // The role is created WITH NOLOGIN in migrations, so bootstrap MUST include WITH LOGIN when altering password
+      expect(bootstrapSql).toMatch(/ALTER ROLE assetvault_app WITH[^;]*LOGIN[^;]*PASSWORD/i);
+    });
+
+    it('ensures seed script supports MIGRATE_DATABASE_URL or DIRECT_URL for owner execution', () => {
+      const seedScriptPath = path.resolve(__dirname, '../../prisma/seed.ts');
+      const seedScript = fs.readFileSync(seedScriptPath, 'utf-8');
+
+      // Seed script must read MIGRATE_DATABASE_URL or DIRECT_URL to connect as owner during cross-tenant seed
+      expect(seedScript).toMatch(/MIGRATE_DATABASE_URL|DIRECT_URL/);
+    });
+  });
 });
+

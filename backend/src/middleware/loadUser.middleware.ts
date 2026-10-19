@@ -17,11 +17,13 @@ export const loadUser = async (req: Request, _res: Response, next: NextFunction)
 
     // Always fetch fresh user state from PostgreSQL with tenant context
     const isSuperAdmin = Boolean(req.jwtUser.isSuperAdmin || req.jwtUser.role === 'SUPER_ADMIN');
-    const userPrisma = prismaForRequest({
-      tenantId: req.jwtUser.tenantId,
-      userId: req.jwtUser.sub,
-      isSuperAdmin,
-    });
+    const userPrisma =
+      req.prisma ||
+      prismaForRequest({
+        tenantId: req.jwtUser.tenantId,
+        userId: req.jwtUser.sub,
+        isSuperAdmin,
+      });
 
     const user = await userPrisma.user.findUnique({
       where: { id: req.jwtUser.sub },
@@ -58,6 +60,14 @@ export const loadUser = async (req: Request, _res: Response, next: NextFunction)
       permissions: getPermissionsForRole(roleName),
       tenant: user.tenant,
     };
+
+    if (user.tenant) {
+      req.tenant = {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        slug: user.tenant.slug,
+      };
+    }
 
     next();
   } catch (error) {

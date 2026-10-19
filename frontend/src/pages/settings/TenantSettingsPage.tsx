@@ -22,7 +22,8 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 
 export const TenantSettingsPage: React.FC = () => {
-  const { user, tenant, logout } = useAuth();
+  const { user, tenant, logout, hasPermission } = useAuth();
+  const canExportTenant = hasPermission('tenants:update_own');
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'security'>('profile');
@@ -204,25 +205,27 @@ export const TenantSettingsPage: React.FC = () => {
           </div>
 
           {/* Data Lifecycle / GDPR Archive Section */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-primary-500" />
-                Data Lifecycle & Compliance Archive
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Download an export archive of all organization assets, versions, licenses, seat allocations, categories, and tags.
-              </p>
+          {canExportTenant && (
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-primary-500" />
+                  Data Lifecycle & Compliance Archive
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Download an export archive of all organization assets, versions, licenses, seat allocations, categories, and tags.
+                </p>
+              </div>
+              <button
+                onClick={handleExportTenantData}
+                disabled={isExportingTenant}
+                className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors shadow-sm disabled:opacity-50 shrink-0"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5 text-primary-500" />
+                {isExportingTenant ? 'Archiving...' : 'Export Tenant Data (JSON)'}
+              </button>
             </div>
-            <button
-              onClick={handleExportTenantData}
-              disabled={isExportingTenant}
-              className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors shadow-sm disabled:opacity-50 shrink-0"
-            >
-              <Download className="w-3.5 h-3.5 mr-1.5 text-primary-500" />
-              {isExportingTenant ? 'Archiving...' : 'Export Tenant Data (JSON)'}
-            </button>
-          </div>
+          )}
         </div>
       )}
 
