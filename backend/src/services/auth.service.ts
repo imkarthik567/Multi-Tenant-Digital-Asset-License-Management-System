@@ -228,6 +228,8 @@ export class AuthService {
           fullName: input.adminFullName.trim(),
           passwordHash,
           isActive: true,
+          // Registration issues a session immediately, so record the initial login too.
+          lastLoginAt: new Date(),
         },
         include: { role: true },
       });

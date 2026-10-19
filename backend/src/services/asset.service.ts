@@ -28,7 +28,21 @@ export class AssetService {
     if (!asset) {
       throw new NotFoundError('Asset not found');
     }
-    return asset;
+
+    // Asset detail records come from the Prisma model, while list records come
+    // from v_asset_catalog. Include the canonical computed compliance fields in
+    // the detail response too, rather than letting the UI default to UNLICENSED.
+    const catalogCompliance = await assetRepository.findCatalogCompliance(
+      prismaClient,
+      id,
+      asset.tenantId
+    );
+
+    return {
+      ...asset,
+      complianceStatus: catalogCompliance?.compliance_status ?? 'UNLICENSED',
+      coveringLicensesCount: Number(catalogCompliance?.covering_licenses_count ?? 0),
+    };
   }
 
   public async createAsset(prismaClient: any, tenantId: string, ownerId: string, data: any) {

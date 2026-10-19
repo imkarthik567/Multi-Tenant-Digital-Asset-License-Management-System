@@ -118,6 +118,23 @@ export class AssetRepository {
     return { data: data as AssetCatalogViewRow[], total };
   }
 
+  public async findCatalogCompliance(
+    prisma: PrismaClient | any,
+    id: string,
+    tenantId: string
+  ): Promise<{ compliance_status: string; covering_licenses_count: number } | null> {
+    // Use the same database view as the asset list so detail pages get the
+    // canonical compliance calculation, scoped to the owning tenant.
+    const rows = (await prisma.$queryRaw(
+      Prisma.sql`SELECT compliance_status, covering_licenses_count
+                  FROM v_asset_catalog
+                  WHERE asset_id = ${id}::uuid
+                    AND tenant_id = ${tenantId}::uuid
+                  LIMIT 1`
+    )) as Array<{ compliance_status: string; covering_licenses_count: number }>;
+    return rows[0] ?? null;
+  }
+
   public async findById(prisma: PrismaClient | any, id: string, includeDeleted = false): Promise<any | null> {
     const where: Prisma.AssetWhereInput = { id };
     if (!includeDeleted) {

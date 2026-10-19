@@ -18,8 +18,8 @@ const envSchema = z.object({
   COOKIE_SECRET: z.string().min(32, 'COOKIE_SECRET must be at least 32 characters long'),
 
   // Google OAuth Credentials
-  GOOGLE_CLIENT_ID: z.string().default('mock_google_client_id.apps.googleusercontent.com'),
-  GOOGLE_CLIENT_SECRET: z.string().default('mock_google_client_secret'),
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().default(''),
   GOOGLE_CALLBACK_URL: z.string().default('http://localhost:5000/api/v1/auth/google/callback'),
 
   // CORS and Security Limits
@@ -61,6 +61,26 @@ const parseEnv = () => {
     console.error(JSON.stringify(result.error.format(), null, 2));
     process.exit(1);
   }
+
+  if (
+    result.data.NODE_ENV === 'production' &&
+    (!process.env.METRICS_BEARER_TOKEN ||
+      result.data.METRICS_BEARER_TOKEN === 'assetvault-metrics-token-2026')
+  ) {
+    console.error('❌ FATAL: Set a unique METRICS_BEARER_TOKEN in production; the development default is not allowed.');
+    process.exit(1);
+  }
+
+  if (
+    result.data.NODE_ENV === 'production' &&
+    result.data.GOOGLE_CLIENT_ID &&
+    result.data.GOOGLE_CLIENT_SECRET &&
+    new URL(result.data.GOOGLE_CALLBACK_URL).hostname === 'localhost'
+  ) {
+    console.error('❌ FATAL: Configure GOOGLE_CALLBACK_URL for the deployed HTTPS callback when Google OAuth is enabled in production.');
+    process.exit(1);
+  }
+
   return result.data;
 };
 

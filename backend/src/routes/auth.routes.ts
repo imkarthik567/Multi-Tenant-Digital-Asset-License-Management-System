@@ -14,6 +14,9 @@ import { loginSchema, registerTenantSchema, refreshTokenSchema } from '../valida
 import { env } from '../config/env';
 
 const router = Router();
+const primaryClientUrl = (env.CLIENT_URL.split(',')[0] || 'http://localhost:5173')
+  .trim()
+  .replace(/\/$/, '');
 
 // 1. Password Login
 router.post('/login', authRateLimiter, validate(loginSchema), authController.login);
@@ -36,22 +39,24 @@ router.get('/me', authenticate, loadUser, authController.getMe);
 // 7. Role-Based Navigation Menu
 router.get('/menu', authenticate, loadUser, authController.getMenu);
 
-// 8. Google OAuth 2.0 Endpoints
-router.get(
-  '/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    session: false,
-  })
-);
+// 8. Google OAuth 2.0 Endpoints (optional; only register when credentials are configured)
+if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+  router.get(
+    '/google',
+    passport.authenticate('google', {
+      scope: ['profile', 'email'],
+      session: false,
+    })
+  );
 
-router.get(
-  '/google/callback',
-  passport.authenticate('google', {
-    session: false,
-    failureRedirect: `${env.CLIENT_URL}/login?error=not_invited`,
-  }),
-  authController.googleCallback
-);
+  router.get(
+    '/google/callback',
+    passport.authenticate('google', {
+      session: false,
+      failureRedirect: `${primaryClientUrl}/login?error=not_invited`,
+    }),
+    authController.googleCallback
+  );
+}
 
 export default router;

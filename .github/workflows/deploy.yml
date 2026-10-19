@@ -28,8 +28,12 @@ jobs:
           }
           echo "✅ Deployment trigger accepted by Render."
 
+      - name: Use Render auto-deploy when no deploy hook is configured
+        if: "${{ env.RENDER_DEPLOY_HOOK_URL == '' }}"
+        run: |
+          echo "::warning::RENDER_DEPLOY_HOOK_URL is not configured. Relying on the Render autoDeploy setting in render.yaml and verifying live health/readiness."
+
       - name: Poll Health & Readiness Endpoints (3-minute Timeout)
-        if: "${{ env.RENDER_DEPLOY_HOOK_URL != '' }}"
         run: |
           echo "⏳ Monitoring deployment startup on $API_URL..."
           TIMEOUT_SECONDS=180
@@ -49,5 +53,6 @@ jobs:
           echo "✅ /api/health responding with HTTP 200 OK!"
 
           echo "🔍 Verifying database readiness at /api/ready..."
-          curl -fsS "$API_URL/api/ready" || echo "Readiness probe verified."
-          echo "🎉 Deployment successfully verified!"
+          curl -fsS "$API_URL/api/ready" > /dev/null
+          echo "✅ /api/ready responding successfully!"
+          echo "🎉 Deployment health and readiness verified!"

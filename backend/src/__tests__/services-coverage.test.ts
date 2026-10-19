@@ -4,7 +4,7 @@
 // Comprehensive testing across all application domain services to ensure >=70% coverage
 // ==============================================================================
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { prismaForRequest } from '../config/prisma';
 import { tenantService } from '../services/tenant.service';
 import { userService } from '../services/user.service';
@@ -15,6 +15,7 @@ import { categoryService } from '../services/category.service';
 import { auditService } from '../services/audit.service';
 import { notificationService } from '../services/notification.service';
 import { assetService } from '../services/asset.service';
+import { assetRepository } from '../repositories/asset.repository';
 import { licenseService } from '../services/license.service';
 import { costOptimizationService } from '../services/costOptimization.service';
 import { complianceService } from '../services/compliance.service';
@@ -403,11 +404,37 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       expect(res.data).toBeDefined();
     });
 
-    it('retrieves asset details by ID', async () => {
+    it('retrieves asset details by ID with canonical compliance status', async () => {
       if (testAssetId) {
         const asset = await assetService.getAssetById(systemPrisma, testAssetId);
         expect(asset).toBeDefined();
         expect(asset.id).toBe(testAssetId);
+        expect(['COMPLIANT', 'EXPIRED_LICENSE', 'UNLICENSED']).toContain(asset.complianceStatus);
+        expect(typeof asset.coveringLicensesCount).toBe('number');
+      }
+    });
+
+    it('returns COMPLIANT for an asset covered by an active license', async () => {
+      const assetId = '00000000-0000-4000-8000-000000000001';
+      const tenantIdForTest = '00000000-0000-4000-8000-000000000002';
+      const findByIdSpy = vi.spyOn(assetRepository, 'findById').mockResolvedValue({
+        id: assetId,
+        tenantId: tenantIdForTest,
+        assetLicenses: [{ license: { status: 'ACTIVE', endDate: null, deletedAt: null } }],
+      } as any);
+      const catalogSpy = vi.spyOn(assetRepository, 'findCatalogCompliance').mockResolvedValue({
+        compliance_status: 'COMPLIANT',
+        covering_licenses_count: 1,
+      });
+
+      try {
+        const asset = await assetService.getAssetById(systemPrisma, assetId);
+        expect(asset.complianceStatus).toBe('COMPLIANT');
+        expect(asset.coveringLicensesCount).toBe(1);
+        expect(catalogSpy).toHaveBeenCalledWith(systemPrisma, assetId, tenantIdForTest);
+      } finally {
+        findByIdSpy.mockRestore();
+        catalogSpy.mockRestore();
       }
     });
 
