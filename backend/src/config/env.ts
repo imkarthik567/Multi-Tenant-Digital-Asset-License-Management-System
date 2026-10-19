@@ -45,7 +45,7 @@ const envSchema = z.object({
 
   // Background Worker Execution
   RUN_WORKER_IN_API: z.string().default('true').transform((val) => val === 'true'),
-  ENABLE_IN_PROCESS_WORKER: z.string().default('true').transform((val) => val === 'true'),
+  ENABLE_IN_PROCESS_WORKER: z.string().optional().transform((val) => val === undefined ? undefined : val === 'true'),
 });
 
 const parseEnv = () => {
