@@ -5,15 +5,16 @@
 --          with least-privilege access (DML only, no DDL/DROP capabilities).
 --
 -- Usage:
---   psql "$DIRECT_URL" -v APP_PASSWORD="'${APP_DB_PASSWORD}'" -f database/sql/08_production_bootstrap.sql
+--   psql "$DIRECT_URL" -v DBPASS="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
 -- ==============================================================================
 
 \set ON_ERROR_STOP on
 
--- Default fallback password if not supplied via -v APP_PASSWORD
-\if :{?APP_PASSWORD}
+-- Never fall back to a known/default password.
+\if :{?DBPASS}
 \else
-  \set APP_PASSWORD '\'ChangeMe_In_Production_Secret!\''
+  \echo 'FATAL: DBPASS must be supplied explicitly; refusing insecure default credentials.'
+  \quit 3
 \endif
 
 -- 1. Create restricted application runtime role if it doesn't exist
@@ -28,10 +29,10 @@ BEGIN
 END $$;
 
 -- 2. Set password for application runtime role from variable
-ALTER ROLE assetvault_app WITH PASSWORD :APP_PASSWORD;
+ALTER ROLE assetvault_app WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD :'DBPASS';
 
 -- 3. Grant connection privileges on the current database
-GRANT CONNECT ON DATABASE current_database() TO assetvault_app;
+SELECT format('GRANT CONNECT ON DATABASE %I TO assetvault_app', current_database()) \gexec
 
 -- 4. Grant schema usage (prevents schema tampering)
 GRANT USAGE ON SCHEMA public TO assetvault_app;
@@ -49,17 +50,28 @@ GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA public TO assetvault_app;
 
+-- The materialized view contains all tenants; expose only the filtered wrapper view.
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM assetvault_app;
+GRANT SELECT ON TABLE v_monthly_access_stats_tenant TO assetvault_app;
+
 -- 9. Configure default privileges for future objects created by migrations/admin
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO assetvault_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO assetvault_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON ROUTINES TO assetvault_app;
 
--- 10. Verification query: output granted privileges
-SELECT 
-  grantee, 
-  table_schema, 
-  privilege_type 
-FROM information_schema.schema_privileges 
-WHERE grantee = 'assetvault_app';
+-- 10. Verification queries (use PostgreSQL's supported information-schema views).
+SELECT
+  'public' AS schema_name,
+  has_schema_privilege('assetvault_app', 'public', 'USAGE') AS has_usage,
+  has_schema_privilege('assetvault_app', 'public', 'CREATE') AS has_create;
+
+SELECT
+  table_schema,
+  table_name,
+  privilege_type
+FROM information_schema.role_table_grants
+WHERE grantee = 'assetvault_app'
+ORDER BY table_schema, table_name, privilege_type;
 
 SELECT 'Production bootstrap role configuration completed successfully.' AS status;

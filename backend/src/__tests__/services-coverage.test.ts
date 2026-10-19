@@ -25,6 +25,11 @@ import { PaginationParams } from '../utils/pagination.util';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
+const testPassword = process.env.DEFAULT_SEED_PASSWORD;
+if (!testPassword) {
+  throw new Error('Set DEFAULT_SEED_PASSWORD before running seeded-user integration tests.');
+}
+
 describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
   let tenantId: string;
   let adminUserId: string;
@@ -173,7 +178,7 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
         {
           fullName: 'Coverage Test User',
           email: testEmail,
-          password: 'Password123!',
+          password: testPassword,
           roleName: 'MEMBER',
         },
         adminUserId
@@ -276,6 +281,73 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
     it('lists categories with pagination', async () => {
       const res = await categoryService.listCategories(systemPrisma, defaultPagination);
       expect(res.data).toBeDefined();
+    });
+
+    it('prevents concurrent reparenting from creating a category cycle', async () => {
+      const suffix = Date.now();
+      const first = await categoryService.createCategory(systemPrisma, tenantId, {
+        name: `Cycle-A-${suffix}`,
+      });
+      const second = await categoryService.createCategory(systemPrisma, tenantId, {
+        name: `Cycle-B-${suffix}`,
+      });
+
+      try {
+        const results = await Promise.allSettled([
+          categoryService.updateCategory(systemPrisma, first.id, { parentId: second.id }),
+          categoryService.updateCategory(systemPrisma, second.id, { parentId: first.id }),
+        ]);
+
+        expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+        expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+
+        const [updatedFirst, updatedSecond] = await Promise.all([
+          categoryService.getCategoryById(systemPrisma, first.id),
+          categoryService.getCategoryById(systemPrisma, second.id),
+        ]);
+        expect(updatedFirst.parentId === second.id && updatedSecond.parentId === first.id).toBe(false);
+      } finally {
+        await categoryService.updateCategory(systemPrisma, first.id, { parentId: null });
+        await categoryService.updateCategory(systemPrisma, second.id, { parentId: null });
+        await categoryService.deleteCategory(systemPrisma, first.id);
+        await categoryService.deleteCategory(systemPrisma, second.id);
+      }
+    });
+
+    it('keeps category deletion atomic with concurrent child creation', async () => {
+      const suffix = Date.now();
+      const parentName = `Delete-Race-Parent-${suffix}`;
+      const childName = `Delete-Race-Child-${suffix}`;
+      const parent = await categoryService.createCategory(systemPrisma, tenantId, {
+        name: parentName,
+      });
+
+      try {
+        const results = await Promise.allSettled([
+          categoryService.deleteCategory(systemPrisma, parent.id),
+          categoryService.createCategory(systemPrisma, tenantId, {
+            name: childName,
+            parentId: parent.id,
+          }),
+        ]);
+
+        expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+        expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      } finally {
+        const child = await systemPrisma.category.findFirst({
+          where: { tenantId, name: childName },
+        });
+        if (child) {
+          await categoryService.deleteCategory(systemPrisma, child.id);
+        }
+
+        const remainingParent = await systemPrisma.category.findFirst({
+          where: { tenantId, name: parentName },
+        });
+        if (remainingParent) {
+          await categoryService.deleteCategory(systemPrisma, remainingParent.id);
+        }
+      }
     });
 
     it('creates, retrieves, and updates a category', async () => {
@@ -414,6 +486,90 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       }
     });
 
+    it('rolls back all tag links when any requested tag is missing', async () => {
+      if (!testAssetId) {
+        throw new Error('Test precondition failed: TechCorp asset missing');
+      }
+
+      const tag = await systemPrisma.tag.create({
+        data: {
+          tenantId,
+          name: `atomic-attach-${Date.now()}`,
+        },
+      });
+
+      try {
+        await expect(
+          assetService.attachTags(tenantId, adminUserId, testAssetId, [
+            tag.id,
+            '00000000-0000-4000-8000-000000000099',
+          ])
+        ).rejects.toThrow('Tag not found');
+
+        const relation = await systemPrisma.assetTag.findUnique({
+          where: { assetId_tagId: { assetId: testAssetId, tagId: tag.id } },
+        });
+        expect(relation).toBeNull();
+      } finally {
+        await systemPrisma.assetTag.deleteMany({ where: { tagId: tag.id } });
+        await systemPrisma.tag.delete({ where: { id: tag.id } });
+      }
+    });
+
+    it('rejects an initial file version without a valid checksum', async () => {
+      const assetCode = `CHECKSUM-REQUIRED-${Date.now()}`;
+
+      await expect(
+        assetService.createAsset(systemPrisma, tenantId, adminUserId, {
+          name: 'Checksum Required Asset',
+          assetCode,
+          assetType: 'DOCUMENT',
+          fileUrl: 'https://storage.assetvault.io/checksum-required.bin',
+        })
+      ).rejects.toThrow('A valid SHA-256 checksum is required');
+
+      const persistedAsset = await systemPrisma.asset.findFirst({
+        where: { tenantId, assetCode },
+      });
+      expect(persistedAsset).toBeNull();
+    });
+
+    it('rejects an asset version without a valid checksum', async () => {
+      if (!testAssetId) {
+        throw new Error('Test precondition failed: TechCorp asset missing');
+      }
+
+      await expect(
+        assetService.createVersion(
+          tenantId,
+          testAssetId,
+          {
+            fileUrl: 'https://storage.assetvault.io/checksum-required-version.bin',
+            fileSizeBytes: 128,
+          },
+          adminUserId
+        )
+      ).rejects.toThrow('A valid SHA-256 checksum is required');
+    });
+
+    it('rolls back an asset if an initial tag cannot be created', async () => {
+      const assetCode = `ATOMIC-CREATE-${Date.now()}`;
+
+      await expect(
+        assetService.createAsset(systemPrisma, tenantId, adminUserId, {
+          name: 'Atomic Asset Creation Regression',
+          assetCode,
+          assetType: 'DOCUMENT',
+          tags: ['T'.repeat(51)],
+        })
+      ).rejects.toThrow();
+
+      const persistedAsset = await systemPrisma.asset.findFirst({
+        where: { tenantId, assetCode },
+      });
+      expect(persistedAsset).toBeNull();
+    });
+
     it('returns COMPLIANT for an asset covered by an active license', async () => {
       const assetId = '00000000-0000-4000-8000-000000000001';
       const tenantIdForTest = '00000000-0000-4000-8000-000000000002';
@@ -502,6 +658,28 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       const licenseCsv = await licenseService.exportCsv(systemPrisma, tenantId);
       expect(typeof licenseCsv).toBe('string');
       expect(licenseCsv).toContain('license_name');
+    });
+
+    it('rejects asset-license links when either record is soft-deleted', async () => {
+      const findAsset = vi.fn().mockResolvedValue(null);
+      const findLicense = vi.fn().mockResolvedValue(null);
+      const prismaMock = {
+        asset: { findFirst: findAsset },
+        license: { findFirst: findLicense },
+      };
+
+      await expect(licenseService.linkAsset(prismaMock, 'asset-id', 'license-id'))
+        .rejects.toThrow('Asset not found');
+      expect(findAsset).toHaveBeenCalledWith({
+        where: { id: 'asset-id', deletedAt: null },
+      });
+      expect(findLicense).toHaveBeenCalledWith({
+        where: { id: 'license-id', deletedAt: null },
+      });
+
+      findAsset.mockResolvedValue({ id: 'asset-id' });
+      await expect(licenseService.linkAsset(prismaMock, 'asset-id', 'license-id'))
+        .rejects.toThrow('License not found');
     });
 
     it('retrieves license renewals and covered assets', async () => {

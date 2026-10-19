@@ -26,6 +26,7 @@ const envSchema = z.object({
   CLIENT_URL: z.string().default('http://localhost:5173'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   DIRECT_URL: z.string().optional(),
+  APP_DB_PASSWORD: z.string().optional(),
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).optional(),
   COOKIE_DOMAIN: z.string().optional(),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform((val) => parseInt(val, 10)),
@@ -44,7 +45,7 @@ const envSchema = z.object({
 
   // Background Worker Execution
   RUN_WORKER_IN_API: z.string().default('true').transform((val) => val === 'true'),
-  ENABLE_IN_PROCESS_WORKER: z.string().default('true').transform((val) => val === 'true'),
+  ENABLE_IN_PROCESS_WORKER: z.string().optional().transform((val) => val === undefined ? undefined : val === 'true'),
 });
 
 const parseEnv = () => {
@@ -53,6 +54,50 @@ const parseEnv = () => {
     console.error('❌ FATAL: Invalid environment variable configuration:');
     console.error(JSON.stringify(result.error.format(), null, 2));
     process.exit(1);
+  }
+
+  if (result.data.NODE_ENV === 'production') {
+    if (!result.data.DIRECT_URL) {
+      console.error('❌ FATAL: DIRECT_URL is required in production for migrations and privileged maintenance tasks.');
+      process.exit(1);
+    }
+
+    if (!result.data.APP_DB_PASSWORD || result.data.APP_DB_PASSWORD.length < 32) {
+      console.error('❌ FATAL: APP_DB_PASSWORD must be configured with at least 32 characters in production.');
+      process.exit(1);
+    }
+
+    try {
+      const runtimeDbUser = decodeURIComponent(new URL(result.data.DATABASE_URL).username);
+      if (!runtimeDbUser.startsWith('assetvault_app')) {
+        console.error('❌ FATAL: DATABASE_URL must use the restricted assetvault_app runtime role in production; use DIRECT_URL for migrations/maintenance.');
+        process.exit(1);
+      }
+    } catch {
+      console.error('❌ FATAL: DATABASE_URL must be a valid PostgreSQL connection URL.');
+      process.exit(1);
+    }
+  }
+
+  if (result.data.NODE_ENV === 'production') {
+    const productionSecrets = [
+      result.data.JWT_ACCESS_SECRET,
+      result.data.JWT_REFRESH_SECRET,
+      result.data.COOKIE_SECRET,
+      result.data.APP_DB_PASSWORD || '',
+      result.data.METRICS_BEARER_TOKEN,
+    ];
+    const unsafePlaceholder = /placeholder|change.?me|example|your[_ -]?(secret|key)|postgrespassword|password123/i;
+
+    if (productionSecrets.some((secret) => unsafePlaceholder.test(secret))) {
+      console.error('❌ FATAL: Replace template/example values with real random secrets in production.');
+      process.exit(1);
+    }
+
+    if (new Set(productionSecrets).size !== productionSecrets.length) {
+      console.error('❌ FATAL: JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, COOKIE_SECRET, APP_DB_PASSWORD, and METRICS_BEARER_TOKEN must all be different.');
+      process.exit(1);
+    }
   }
 
   if (

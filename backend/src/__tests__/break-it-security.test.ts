@@ -13,6 +13,11 @@ import { env } from '../config/env';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
+const testPassword = process.env.DEFAULT_SEED_PASSWORD;
+if (!testPassword) {
+  throw new Error('Set DEFAULT_SEED_PASSWORD before running seeded-user integration tests.');
+}
+
 describe('AssetVault Examiner Break-It Security Suite', () => {
   let tenantAToken: string;
   let tenantBMemberToken: string;
@@ -27,7 +32,7 @@ describe('AssetVault Examiner Break-It Security Suite', () => {
     // 1. Authenticate TechCorp (Tenant A) Admin
     const loginA = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'techcorp.admin@techcorp.io', password: 'Password123!' });
+      .send({ email: 'techcorp.admin@techcorp.io', password: testPassword });
     expect(loginA.status).toBe(200);
     tenantAToken = loginA.body.data.accessToken;
     tenantAId = loginA.body.data.user.tenantId;
@@ -35,14 +40,14 @@ describe('AssetVault Examiner Break-It Security Suite', () => {
     // 2. Authenticate InnovateLabs (Tenant B) Admin & Member
     const loginBAdmin = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'innovatelabs.admin@innovatelabs.io', password: 'Password123!' });
+      .send({ email: 'innovatelabs.admin@innovatelabs.io', password: testPassword });
     expect(loginBAdmin.status).toBe(200);
     tenantBAdminToken = loginBAdmin.body.data.accessToken;
     tenantBId = loginBAdmin.body.data.user.tenantId;
 
     const loginBMember = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'innovatelabs.dev1@innovatelabs.io', password: 'Password123!' });
+      .send({ email: 'innovatelabs.dev1@innovatelabs.io', password: testPassword });
     expect(loginBMember.status).toBe(200);
     tenantBMemberToken = loginBMember.body.data.accessToken;
 
@@ -150,7 +155,7 @@ describe('AssetVault Examiner Break-It Security Suite', () => {
         .send({
           fullName: 'Unauthorized Admin',
           email: 'unauth@innovatelabs.io',
-          password: 'Password123!',
+          password: testPassword,
           roleName: 'TENANT_ADMIN',
         });
 
@@ -226,7 +231,7 @@ describe('AssetVault Examiner Break-It Security Suite', () => {
       // 1. Initial login to get fresh cookie
       const loginRes = await request(app)
         .post('/api/auth/login')
-        .send({ email: 'innovatelabs.dev2@innovatelabs.io', password: 'Password123!' });
+        .send({ email: 'innovatelabs.dev2@innovatelabs.io', password: testPassword });
       expect(loginRes.status).toBe(200);
       const cookieHeader = String(loginRes.headers['set-cookie'] || '');
 

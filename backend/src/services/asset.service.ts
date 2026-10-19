@@ -12,6 +12,10 @@ import { parseCsv, toCsv } from '../utils/csv.util';
 import { prisma } from '../config/prisma';
 import { AssetType, Prisma } from '@prisma/client';
 
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+}
+
 export class AssetService {
   public async listAssets(
     prismaClient: any,
@@ -45,51 +49,80 @@ export class AssetService {
     };
   }
 
-  public async createAsset(prismaClient: any, tenantId: string, ownerId: string, data: any) {
-    const existing = await assetRepository.findByCode(prismaClient, data.assetCode);
-    if (existing) {
-      throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
+  public async createAsset(_prismaClient: any, tenantId: string, ownerId: string, data: any) {
+    if (data.fileUrl && !/^[a-fA-F0-9]{64}$/.test(data.checksumSha256 || '')) {
+      throw new BadRequestError('A valid SHA-256 checksum is required when a file URL is provided.');
     }
 
-    const asset = await assetRepository.create(prismaClient, {
-      name: data.name,
-      assetCode: data.assetCode,
-      assetType: data.assetType,
-      description: data.description || null,
-      status: (data.status as any) || 'ACTIVE',
-      category: data.categoryId ? { connect: { id: data.categoryId } } : undefined,
-      owner: { connect: { id: ownerId } },
-      tenant: { connect: { id: tenantId } },
-    });
+    // Asset metadata, its initial file version, and tags form one logical
+    // create operation. Keep all writes in one transaction so a failed
+    // version or tag insert cannot leave a partially created asset.
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${ownerId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
 
-    if (data.fileUrl) {
-      await prismaClient.assetVersion.create({
-        data: {
-          assetId: asset.id,
-          versionNo: 1,
-          fileUrl: data.fileUrl,
-          fileSizeBytes: BigInt(data.fileSizeBytes || 1048576),
-          checksumSha256:
-            data.checksumSha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          uploadedBy: ownerId,
-        },
+      // Asset codes remain unique after soft deletion, matching the database's
+      // (tenant_id, asset_code) unique constraint.
+      const existing = await tx.asset.findFirst({
+        where: { assetCode: data.assetCode, tenantId },
       });
-    }
-
-    if (Array.isArray(data.tags) && data.tags.length > 0) {
-      for (const tagItem of data.tags) {
-        if (!tagItem || typeof tagItem !== 'string' || !tagItem.trim()) continue;
-        const tagName = tagItem.trim();
-        const tag = await prismaClient.tag.upsert({
-          where: { tenantId_name: { tenantId, name: tagName } },
-          create: { tenantId, name: tagName },
-          update: {},
-        });
-        await assetRepository.attachTag(prismaClient, asset.id, tag.id);
+      if (existing) {
+        throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
       }
-    }
 
-    return asset;
+      let asset;
+      try {
+        asset = await assetRepository.create(tx, {
+          name: data.name,
+          assetCode: data.assetCode,
+          assetType: data.assetType,
+          description: data.description || null,
+          status: (data.status as any) || 'ACTIVE',
+          category: data.categoryId ? { connect: { id: data.categoryId } } : undefined,
+          owner: { connect: { id: ownerId } },
+          tenant: { connect: { id: tenantId } },
+        });
+      } catch (error) {
+        // The pre-check above cannot prevent a concurrent create from winning
+        // between the check and insert. Preserve the API's conflict semantics.
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
+        }
+        throw error;
+      }
+
+      if (data.fileUrl) {
+        await tx.assetVersion.create({
+          data: {
+            assetId: asset.id,
+            versionNo: 1,
+            fileUrl: data.fileUrl,
+            fileSizeBytes: BigInt(data.fileSizeBytes || 1048576),
+            checksumSha256: data.checksumSha256,
+            uploadedBy: ownerId,
+          },
+        });
+      }
+
+      if (Array.isArray(data.tags) && data.tags.length > 0) {
+        for (const tagItem of data.tags) {
+          if (!tagItem || typeof tagItem !== 'string' || !tagItem.trim()) continue;
+          const tagName = tagItem.trim();
+          const tag = await tx.tag.upsert({
+            where: { tenantId_name: { tenantId, name: tagName } },
+            create: { tenantId, name: tagName },
+            update: {},
+          });
+          await assetRepository.attachTag(tx, asset.id, tag.id);
+        }
+      }
+
+      return asset;
+    });
   }
 
   public async updateAsset(prismaClient: any, id: string, data: any) {
@@ -121,14 +154,36 @@ export class AssetService {
     return assetRepository.restore(prismaClient, id);
   }
 
-  public async attachTags(prismaClient: any, assetId: string, tagIds: string[]) {
-    await this.getAssetById(prismaClient, assetId);
-    const results = [];
-    for (const tagId of tagIds) {
-      const res = await assetRepository.attachTag(prismaClient, assetId, tagId);
-      results.push(res);
-    }
-    return results;
+  public async attachTags(tenantId: string, userId: string, assetId: string, tagIds: string[]) {
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${userId}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+
+      const asset = await tx.asset.findFirst({
+        where: { id: assetId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!asset) {
+        throw new NotFoundError('Asset not found');
+      }
+
+      const results = [];
+      for (const tagId of tagIds) {
+        const tag = await tx.tag.findFirst({
+          where: { id: tagId, tenantId },
+          select: { id: true },
+        });
+        if (!tag) {
+          throw new NotFoundError('Tag not found');
+        }
+        results.push(await assetRepository.attachTag(tx, assetId, tag.id));
+      }
+      return results;
+    });
   }
 
   public async detachTag(prismaClient: any, assetId: string, tagId: string) {
@@ -141,6 +196,11 @@ export class AssetService {
    * Transaction 2: Safely computes next version number and inserts asset_version
    */
   public async createVersion(tenantId: string, assetId: string, data: any, userId: string) {
+    const checksumSha256 = data.checksumSha256 || data.checksum;
+    if (!/^[a-fA-F0-9]{64}$/.test(checksumSha256 || '')) {
+      throw new BadRequestError('A valid SHA-256 checksum is required for each file version.');
+    }
+
     return prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 
@@ -148,6 +208,10 @@ export class AssetService {
           set_config('app.current_user_id', ${userId}, true),
           set_config('app.is_super_admin', 'false', true);`
       );
+
+      // Serialize version allocation per asset. Without a parent-row lock,
+      // concurrent transactions can both observe the same latest version number.
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM assets WHERE id = ${assetId}::UUID FOR UPDATE;`);
 
       const asset = await tx.asset.findFirst({
         where: { id: assetId, deletedAt: null },
@@ -170,7 +234,7 @@ export class AssetService {
           versionNo: nextVersionNo,
           fileUrl: data.fileUrl,
           fileSizeBytes: BigInt(data.fileSizeBytes || data.fileSize || 1024),
-          checksumSha256: data.checksumSha256 || data.checksum || '0'.repeat(64),
+          checksumSha256,
           changeNotes: data.changeNotes || data.changelog || null,
           uploadedBy: userId,
         },
@@ -285,17 +349,27 @@ export class AssetService {
           throw new ConflictError(`Duplicate asset code '${rowData.assetCode}' encountered at database stage.`);
         }
 
-        const created = await tx.asset.create({
-          data: {
-            tenantId,
-            ownerId: userId,
-            name: rowData.name,
-            assetCode: rowData.assetCode,
-            assetType: rowData.assetType,
-            description: rowData.description,
-            status: 'ACTIVE',
-          },
-        });
+        let created;
+        try {
+          created = await tx.asset.create({
+            data: {
+              tenantId,
+              ownerId: userId,
+              name: rowData.name,
+              assetCode: rowData.assetCode,
+              assetType: rowData.assetType,
+              description: rowData.description,
+              status: 'ACTIVE',
+            },
+          });
+        } catch (error) {
+          // Concurrent imports can both pass findFirst; map the database
+          // uniqueness guard to the same client-facing conflict as the pre-check.
+          if (isUniqueConstraintViolation(error)) {
+            throw new ConflictError(`Duplicate asset code '${rowData.assetCode}' encountered at database stage.`);
+          }
+          throw error;
+        }
         createdRecords.push(created);
       }
 

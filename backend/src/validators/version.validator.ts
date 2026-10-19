@@ -33,22 +33,42 @@ export const createVersionSchema = z.preprocess(
   z
     .object({
       fileUrl: z.string().url('fileUrl must be a valid URL'),
-      fileSize: z.number().int().positive('fileSize must be a positive integer in bytes'),
+      fileSize: z
+        .number()
+        .int()
+        .positive('fileSize must be a positive integer in bytes')
+        .max(Number.MAX_SAFE_INTEGER, 'fileSize exceeds the safely representable byte range'),
       checksum: z
         .string()
-        .length(64, 'SHA-256 checksum must be exactly 64 hex characters')
-        .trim(),
+        .trim()
+        .regex(/^[a-fA-F0-9]{64}$/, 'SHA-256 checksum must be exactly 64 hexadecimal characters'),
       changelog: z.string().max(1000).optional().nullable(),
-      fileSizeBytes: z.number().int().positive().optional(),
+      fileSizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
       checksumSha256: z
         .string()
-        .length(64, 'SHA-256 checksum must be exactly 64 hex characters')
         .trim()
+        .regex(/^[a-fA-F0-9]{64}$/, 'SHA-256 checksum must be exactly 64 hexadecimal characters')
         .optional(),
       changeNotes: z.string().max(1000).optional().nullable(),
     })
     .passthrough()
 );
+
+const positiveVersionNumber = z.preprocess(
+  (value: unknown) =>
+    typeof value === 'string' && /^[1-9]\d*$/.test(value) ? Number(value) : value,
+  z.number().int().positive().max(2147483647)
+);
+
+export const versionNoParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+    versionNo: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'Version number must be a positive integer')
+      .refine((value) => Number(value) <= 2147483647, 'Version number exceeds the supported range'),
+  })
+  .strip();
 
 export const compareVersionsQuerySchema = z.preprocess(
   (val: any) => {
@@ -56,17 +76,14 @@ export const compareVersionsQuerySchema = z.preprocess(
       const rawFrom = val.from !== undefined ? val.from : val.v1;
       const rawTo = val.to !== undefined ? val.to : val.v2;
 
-      return {
-        from: typeof rawFrom === 'string' ? parseInt(rawFrom, 10) : rawFrom,
-        to: typeof rawTo === 'string' ? parseInt(rawTo, 10) : rawTo,
-      };
+      return { from: rawFrom, to: rawTo };
     }
     return val;
   },
   z
     .object({
-      from: z.number().int().positive('from must be a valid positive integer version number'),
-      to: z.number().int().positive('to must be a valid positive integer version number'),
+      from: positiveVersionNumber,
+      to: positiveVersionNumber,
     })
     .strip()
 );

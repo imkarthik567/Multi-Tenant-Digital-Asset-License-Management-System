@@ -24,6 +24,7 @@ async function startWorker() {
       logger.info({ signal }, 'Received termination signal. Gracefully shutting down worker...');
       jobScheduler.stopScheduler();
       await prisma.$disconnect();
+      await jobScheduler.disconnectDatabase();
       logger.info('Worker exited cleanly.');
       process.exit(0);
     };

@@ -142,9 +142,19 @@ export class TenantService {
         });
       }
 
-      // Delete tenant's assets and licenses first inside the transaction
+      // Remove audit-producing child records before purging their audit rows.
+      // These explicit deletes avoid tenant-owned audit entries being recreated
+      // by cascades after the audit ledger has been cleared for tenant erasure.
       await tx.asset.deleteMany({ where: { tenantId: id } });
       await tx.license.deleteMany({ where: { tenantId: id } });
+      await tx.vendor.deleteMany({ where: { tenantId: id } });
+
+      // Existing audit rows reference users, so clear them before user deletion.
+      // User-delete triggers may emit new tenant rows; clear those before erasing
+      // the tenant as well. Both passes require the transaction-local opt-in above.
+      await tx.auditLog.deleteMany({ where: { tenantId: id } });
+      await tx.user.deleteMany({ where: { tenantId: id } });
+      await tx.auditLog.deleteMany({ where: { tenantId: id } });
 
       // Delete tenant
       const deleted = await tx.tenant.delete({ where: { id } });

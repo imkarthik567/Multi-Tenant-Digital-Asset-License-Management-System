@@ -6,7 +6,7 @@
 [![Monitoring: Prometheus & Grafana](https://img.shields.io/badge/Monitoring-Prometheus%20%2B%20Grafana-F46800?logo=grafana&logoColor=white)](#)
 [![Database: PostgreSQL 16](https://img.shields.io/badge/Database-PostgreSQL%2016-336791?logo=postgresql)](https://www.postgresql.org/)
 [![ORM: Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748?logo=prisma)](https://www.prisma.io/)
-[![Backend: Express TypeScript](https://img.shields.io/badge/Backend-Node.js%2020%20+%20Express-68A063?logo=node.js)](https://nodejs.org/)
+[![Backend: Express TypeScript](https://img.shields.io/badge/Backend-Node.js%2022%20+%20Express-68A063?logo=node.js)](https://nodejs.org/)
 [![Frontend: React 18](https://img.shields.io/badge/Frontend-React%2018%20+%20Vite-61DAFB?logo=react)](https://react.dev/)
 [![Docker: Multi--Stage](https://img.shields.io/badge/Docker-Alpine%20Multi--Stage-2496ED?logo=docker)](https://www.docker.com/)
 [![License: Academic](https://img.shields.io/badge/License-Academic%20(VIT)-blue.svg)](#)
@@ -16,7 +16,7 @@
 ## Course Information
 * **Institution:** Vellore Institute of Technology (VIT), Vellore
 * **Course:** BCSE307L — Database Systems (Fall 2026-27)
-* **Author / Lead Architect:** Karthikeyan S (Registration No. 24MCA0000)
+* **Author / Lead Architect:** Karthikeyan S
 * **Project Repository:** `AssetVault`
 
 ---
@@ -102,6 +102,7 @@ AssetVault adopts a **Pooled Schema Multi-Tenant Model**:
 * **Data Dictionary:** [`database/data-dictionary.md`](database/data-dictionary.md)
 * **Relational Schema:** [`database/relational-schema.md`](database/relational-schema.md)
 * **Normalization Proofs:** [`database/normalization.md`](database/normalization.md)
+* **PDF Rubric Compliance:** [`docs/RUBRIC_COMPLIANCE.md`](docs/RUBRIC_COMPLIANCE.md)
 
 ### Database Object Inventory
 * **19 Relational Base Tables:** `tenants`, `plans`, `users`, `roles`, `refresh_tokens`, `categories`, `tags`, `vendors`, `assets`, `asset_versions`, `asset_tags`, `license_types`, `licenses`, `asset_licenses`, `license_allocations`, `license_renewals`, `asset_access_logs`, `audit_logs`, `notifications`.
@@ -114,7 +115,7 @@ AssetVault adopts a **Pooled Schema Multi-Tenant Model**:
 
 ## 6. Prerequisites
 
-* **Node.js:** v20.0.0 or higher
+* **Node.js:** v22.0.0 or higher
 * **npm:** v10.0.0 or higher
 * **PostgreSQL:** v16 or v18 (or Docker Desktop)
 * **Git:** v2.30.0 or higher
@@ -148,12 +149,14 @@ openssl rand -hex 32
 # On Windows PowerShell
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
-Paste these into `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET` inside `.env` and `backend/.env`.
+Paste these into `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET` inside `.env` and `backend/.env`. Use three different random values; production startup rejects placeholders and reused values.
+
+Before seeding, set `SUPER_ADMIN_EMAIL` and a strong `SUPER_ADMIN_PASSWORD` in your untracked `.env`. Local demo users require `DEFAULT_SEED_PASSWORD` as well. Set `APP_DB_PASSWORD` to a unique random value of at least 32 characters, and use the same password (URL-encoded) in `DATABASE_URL`; `DIRECT_URL` must have migration/admin privileges. These values have no default credentials in source control.
 
 ### Step 4: Configure Google OAuth 2.0 (Optional for Local Testing)
 1. Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
 2. Create a new OAuth 2.0 Client ID under **APIs & Services > Credentials**.
-3. Set **Authorized redirect URIs** to `http://localhost:5000/api/auth/google/callback`.
+3. Set **Authorized redirect URIs** to `http://localhost:5000/api/v1/auth/google/callback`.
 4. Copy the Client ID and Secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 
 ### Step 5: Database Schema Initialization & Seeding
@@ -161,10 +164,17 @@ Paste these into `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET` 
 # Install dependencies
 npm install
 
-# Push relational schema to PostgreSQL
-npx prisma db push --schema backend/prisma/schema.prisma
+# Apply versioned migrations (includes views, procedures, triggers and RLS SQL)
+# DIRECT_URL must use a database administrator/migration role with DDL privileges.
+npx prisma migrate deploy --schema backend/prisma/schema.prisma
 
-# Seed baseline plans, enterprise tenants, categories, assets, and licenses
+# Configure the restricted runtime role after migrations have created the base schema.
+# APP_DB_PASSWORD must match the password in DATABASE_URL; use a direct URL with no
+# Prisma-only query parameters when running psql.
+psql "$DIRECT_URL" -v DBPASS="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
+
+# Required before seed: SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD.
+# For local demo users, also set DEFAULT_SEED_PASSWORD. Seed uses DIRECT_URL by default.
 node node_modules/ts-node/dist/bin.js backend/prisma/seed.ts
 ```
 
@@ -184,6 +194,8 @@ npm run dev
 ### Option B: Production Full-Stack Docker Deployment
 ```bash
 # Build and launch all 5 containers (db, api, worker, web, pgadmin)
+# Configure DOCKER_DATABASE_URL, DOCKER_DIRECT_URL, and APP_DB_PASSWORD in .env first.
+# Both URLs must use the Docker hostname "db"; URL-encode special characters in passwords.
 docker compose up --build -d
 
 # Check container health status
@@ -201,7 +213,7 @@ npm run lint
 # 2. Secret Hygiene Pre-Scan
 npm run check:secrets
 
-# 3. Vitest Unit & Integration Tests (81 Tests, >=70% Service Coverage)
+# 3. Vitest unit and integration suite with coverage
 npm run test
 
 # 4. Playwright End-to-End User Journeys (3 Full E2E Flows)
@@ -224,15 +236,15 @@ npm run db:restore -- -y
 
 ## 9. Seeded Demo Accounts
 
-All demo accounts are initialized during `prisma/seed.ts`. Default password: `Password123!` (or value of `DEFAULT_SEED_PASSWORD` in `.env`).
+Demo tenant users are seeded by `prisma/seed.ts` in local development (and in production only when `SEED_DEMO=true`). Set `DEFAULT_SEED_PASSWORD` in the untracked `.env`; there is no shared password embedded in the application. The platform administrator address and password are configured via `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD`.
 
 | Email Address | Role | Tenant Organization | Capabilities |
 |---|---|---|---|
-| `superadmin@assetvault.internal` | `SUPER_ADMIN` | Global Platform | Cross-tenant metrics, manage subscription plans, suspend/activate tenants. |
+| Configured via `SUPER_ADMIN_EMAIL` | `SUPER_ADMIN` | Global Platform | Cross-tenant metrics, manage subscription plans, suspend/activate tenants. |
 | `techcorp.admin@techcorp.io` | `TENANT_ADMIN` | TechCorp Dynamics | Manage team members, review audit ledger, compliance score remediation, JSON export. |
 | `techcorp.mgr1@techcorp.io` | `ASSET_MANAGER` | TechCorp Dynamics | Create/edit assets, upload new versions, provision licenses, allocate seats. |
-| `techcorp.member1@techcorp.io` | `MEMBER` | TechCorp Dynamics | Browse asset catalog, download covered assets, view self-assigned license seats. |
-| `innovatelabs.admin@innovatelabs.com` | `TENANT_ADMIN` | InnovateLabs Inc | Isolated second tenant for cross-tenant boundary verification tests. |
+| `techcorp.dev1@techcorp.io` | `MEMBER` | TechCorp Dynamics | Browse asset catalog, download covered assets, view self-assigned license seats. |
+| `innovatelabs.admin@innovatelabs.io` | `TENANT_ADMIN` | InnovateLabs Inc | Isolated second tenant for cross-tenant boundary verification tests. |
 
 ---
 
@@ -242,9 +254,15 @@ All demo accounts are initialized during `prisma/seed.ts`. Default password: `Pa
 |---|---|---|
 | `PORT` | HTTP Port for Express REST API | `5000` |
 | `NODE_ENV` | Application environment mode | `development` / `production` |
-| `DATABASE_URL` | PostgreSQL connection string with public schema | `postgresql://user:pass@localhost:5432/assetvault_db?schema=public` |
+| `DATABASE_URL` | Restricted `assetvault_app` runtime connection in production; local URL for development | `postgresql://user:pass@localhost:5432/assetvault_db?schema=public` |
+| `DIRECT_URL` | Privileged direct connection for migrations, bootstrap, seed and trusted background maintenance | Set in deployment secret store |
+| `APP_DB_PASSWORD` | Password for restricted `assetvault_app` role; minimum 32 characters in production | Set in deployment secret store |
+| `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` | Initial platform administrator credentials | Set locally or in deployment secret store |
+| `DEFAULT_SEED_PASSWORD` | Password for local demo users; required only when demo data is seeded | Set locally; never reuse in production |
+| `DOCKER_DATABASE_URL` | Docker-network URL for the restricted runtime role (host `db`) | Required for Docker Compose |
+| `DOCKER_DIRECT_URL` | Docker-network direct/admin URL for migrations and maintenance (host `db`) | Required for Docker Compose |
 | `POSTGRES_USER` | PostgreSQL superuser username | `postgres` |
-| `POSTGRES_PASSWORD` | PostgreSQL superuser password | `postgrespassword` |
+| `POSTGRES_PASSWORD` | Local PostgreSQL administrator password | Set a local-only value in the untracked `.env` |
 | `POSTGRES_DB` | Target PostgreSQL database name | `assetvault_db` |
 | `JWT_ACCESS_SECRET` | 32+ byte cryptographic secret for access tokens | *(Random Hex String)* |
 | `JWT_REFRESH_SECRET` | 32+ byte cryptographic secret for refresh tokens | *(Random Hex String)* |
@@ -253,11 +271,11 @@ All demo accounts are initialized during `prisma/seed.ts`. Default password: `Pa
 | `COOKIE_SECRET` | Secret used for signing HTTP-only cookies | *(Random Hex String)* |
 | `GOOGLE_CLIENT_ID` | Google Cloud OAuth Client ID | `*.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Google Cloud OAuth Client Secret | *(Secret String)* |
-| `GOOGLE_CALLBACK_URL` | OAuth redirect endpoint | `http://localhost:5000/api/auth/google/callback` |
+| `GOOGLE_CALLBACK_URL` | OAuth redirect endpoint | `http://localhost:5000/api/v1/auth/google/callback` |
 | `CLIENT_URL` | Allowed client origin for CORS policies | `http://localhost:5173` |
 | `VITE_API_URL` | Backend URL for Vite frontend client proxy | `http://localhost:5000` |
 | `RUN_WORKER` | Enables background cron scheduler | `true` |
-| `METRICS_BEARER_TOKEN` | Bearer token protecting Prometheus `/metrics` (required to be explicitly set in production) | *(Unique random secret)* |
+| `METRICS_BEARER_TOKEN` | Bearer token protecting Prometheus `/metrics` (required to be explicitly set in production) | *(Unique random secret)*\n| `GRAFANA_PASSWORD` | Required Grafana administrator password for the local monitoring profile | Set in the untracked `.env`; no default is provided |
 
 ---
 
@@ -293,8 +311,10 @@ Comprehensive deployment guides:
 # Start API, Web, DB, Prometheus, and Grafana
 docker compose --profile monitoring up -d
 
-# Access Grafana Dashboard (admin / admin):
+# Open the Grafana dashboard:
 # http://localhost:3001
+# Username defaults to admin (or GRAFANA_USER); set GRAFANA_PASSWORD
+# in the untracked .env file. Compose does not provide a default password.
 # Pre-provisioned dashboard: "AssetVault Enterprise Operations & Telemetry"
 ```
 
@@ -339,7 +359,7 @@ docker compose --profile monitoring up -d
 │   ├── prometheus/                      # Scrape config with Bearer token authentication
 │   └── grafana/                         # Datasource and dashboard provisioning
 ├── docs/                                # Technical reports and verification evidence
-│   ├── FINAL_AUDIT.md                   # Strict requirement-by-requirement course brief audit (100% PASS)
+│   ├── FINAL_AUDIT.md                   # Requirement-by-requirement course brief audit (verification status tracked)
 │   ├── FINAL_REPORT.md                  # Comprehensive academic project report (15 sections, BCNF proofs)
 │   ├── DEMO_SCRIPT.md                   # 10-minute viva presentation and demo cue cards
 │   ├── VIVA_QA.md                       # 40 project-specific viva questions and detailed technical answers
@@ -378,6 +398,6 @@ Screenshots captured across Desktop ($1280\text{px}$), Tablet ($768\text{px}$), 
 
 ## 15. Academic Team & Acknowledgements
 
-* **Lead Architect & Developer:** Karthikeyan S (Department of Computer Applications, VIT Vellore).
+* **Lead Architect & Developer:** Karthikeyan S.
 * **Course Faculty:** Course Coordinator & Lab Faculty for BCSE307L (Database Systems).
 * **Academic License:** Vellore Institute of Technology (Fall 2026-27). Distributed for educational and academic assessment purposes.

@@ -11,7 +11,7 @@
 -- Includes vendor_id and license_type_id for backend filtering.
 -- ------------------------------------------------------------------------------
 DROP VIEW IF EXISTS v_license_utilization CASCADE;
-CREATE OR REPLACE VIEW v_license_utilization AS
+CREATE OR REPLACE VIEW v_license_utilization WITH (security_invoker = true) AS
 SELECT 
     l.id AS license_id,
     l.tenant_id,
@@ -48,7 +48,7 @@ GROUP BY l.id, l.tenant_id, l.vendor_id, l.license_type_id, l.name, v.name, lt.n
 -- Captures active licenses terminating within the next 30 days,
 -- categorizing urgency into CRITICAL (<=7d), WARNING (<=15d), and NOTICE (<=30d).
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW v_expiring_licenses AS
+CREATE OR REPLACE VIEW v_expiring_licenses WITH (security_invoker = true) AS
 SELECT 
     l.id AS license_id,
     l.tenant_id,
@@ -86,7 +86,7 @@ GROUP BY l.id, l.tenant_id, l.name, v.name, l.license_key, l.total_seats, l.star
 -- Includes category_id and owner_id for backend filtering.
 -- ------------------------------------------------------------------------------
 DROP VIEW IF EXISTS v_asset_catalog CASCADE;
-CREATE OR REPLACE VIEW v_asset_catalog AS
+CREATE OR REPLACE VIEW v_asset_catalog WITH (security_invoker = true) AS
 WITH latest_versions AS (
     SELECT 
         asset_id,
@@ -152,32 +152,116 @@ WHERE a.deleted_at IS NULL;
 -- 4. View: v_vendor_spend
 -- Aggregates procurement and renewal financial spend per vendor and tenant.
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW v_vendor_spend AS
-SELECT 
+CREATE OR REPLACE VIEW v_vendor_spend WITH (security_invoker = true) AS
+WITH license_totals AS (
+    SELECT
+        l.tenant_id,
+        l.vendor_id,
+        COUNT(l.id) AS license_count,
+        COALESCE(SUM(l.cost), 0)::NUMERIC(12,2) AS total_initial_cost,
+        COALESCE(SUM(l.total_seats), 0)::BIGINT AS total_seats_contracted
+    FROM licenses l
+    WHERE l.deleted_at IS NULL
+    GROUP BY l.tenant_id, l.vendor_id
+),
+renewal_totals AS (
+    SELECT
+        l.tenant_id,
+        l.vendor_id,
+        COALESCE(SUM(lr.cost), 0)::NUMERIC(12,2) AS total_renewal_cost
+    FROM licenses l
+    JOIN license_renewals lr ON lr.license_id = l.id
+    WHERE l.deleted_at IS NULL
+    GROUP BY l.tenant_id, l.vendor_id
+)
+SELECT
     v.tenant_id,
     v.id AS vendor_id,
     v.name AS vendor_name,
     v.contact_email,
-    COUNT(DISTINCT l.id) AS license_count,
-    COALESCE(SUM(l.cost), 0)::NUMERIC(12,2) AS total_initial_cost,
-    COALESCE(SUM(lr.cost), 0)::NUMERIC(12,2) AS total_renewal_cost,
-    (COALESCE(SUM(l.cost), 0) + COALESCE(SUM(lr.cost), 0))::NUMERIC(12,2) AS grand_total_spend,
-    COALESCE(SUM(l.total_seats), 0) AS total_seats_contracted,
+    COALESCE(lt.license_count, 0)::BIGINT AS license_count,
+    COALESCE(lt.total_initial_cost, 0)::NUMERIC(12,2) AS total_initial_cost,
+    COALESCE(rt.total_renewal_cost, 0)::NUMERIC(12,2) AS total_renewal_cost,
+    (
+      COALESCE(lt.total_initial_cost, 0) +
+      COALESCE(rt.total_renewal_cost, 0)
+    )::NUMERIC(12,2) AS grand_total_spend,
+    COALESCE(lt.total_seats_contracted, 0)::BIGINT AS total_seats_contracted,
     ROUND(
-        (COALESCE(SUM(l.cost), 0) + COALESCE(SUM(lr.cost), 0)) / NULLIF(SUM(l.total_seats), 0),
-        2
+      (
+        COALESCE(lt.total_initial_cost, 0) +
+        COALESCE(rt.total_renewal_cost, 0)
+      ) / NULLIF(lt.total_seats_contracted, 0),
+      2
     ) AS avg_cost_per_seat
 FROM vendors v
-LEFT JOIN licenses l ON l.vendor_id = v.id AND l.deleted_at IS NULL
-LEFT JOIN license_renewals lr ON lr.license_id = l.id
-GROUP BY v.tenant_id, v.id, v.name, v.contact_email;
+LEFT JOIN license_totals lt
+  ON lt.tenant_id = v.tenant_id AND lt.vendor_id = v.id
+LEFT JOIN renewal_totals rt
+  ON rt.tenant_id = v.tenant_id AND rt.vendor_id = v.id;
 
 -- ------------------------------------------------------------------------------
--- 5. View: v_tenant_summary
+-- 5. View: v_monthly_spend
+-- Monthly license spend and running tenant-local total using a window function.
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW v_monthly_spend WITH (security_invoker = true) AS
+WITH monthly_costs AS (
+    SELECT
+        l.tenant_id,
+        TO_CHAR(COALESCE(l.start_date, l.created_at), 'YYYY-MM') AS month_year,
+        SUM(l.cost)::NUMERIC(12,2) AS monthly_spend
+    FROM licenses l
+    WHERE l.deleted_at IS NULL
+    GROUP BY l.tenant_id, TO_CHAR(COALESCE(l.start_date, l.created_at), 'YYYY-MM')
+)
+SELECT
+    tenant_id,
+    month_year,
+    COALESCE(monthly_spend, 0)::NUMERIC(12,2) AS monthly_spend,
+    SUM(COALESCE(monthly_spend, 0)) OVER (
+        PARTITION BY tenant_id
+        ORDER BY month_year ASC
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    )::NUMERIC(12,2) AS running_total_spend
+FROM monthly_costs;
+
+-- ------------------------------------------------------------------------------
+-- 6. View: v_top_downloaded_assets
+-- Rank assets by download count within each tenant; callers still filter by tenant_id.
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW v_top_downloaded_assets WITH (security_invoker = true) AS
+WITH asset_downloads AS (
+    SELECT
+        a.tenant_id,
+        a.id AS asset_id,
+        a.name AS asset_name,
+        a.asset_code,
+        COUNT(aal.id)::BIGINT AS download_count
+    FROM assets a
+    LEFT JOIN asset_access_logs aal
+      ON aal.asset_id = a.id
+     AND aal.action = 'DOWNLOAD'
+    WHERE a.deleted_at IS NULL
+    GROUP BY a.tenant_id, a.id, a.name, a.asset_code
+)
+SELECT
+    tenant_id,
+    asset_id,
+    asset_name,
+    asset_code,
+    download_count,
+    RANK() OVER (
+        PARTITION BY tenant_id
+        ORDER BY download_count DESC
+    ) AS rank
+FROM asset_downloads;
+
+-- ------------------------------------------------------------------------------
+-- 7. View: v_tenant_summary
 -- Platform-wide overview for Super Administrators summarizing tenant scale,
 -- resource quotas, and financial expenditure.
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW v_tenant_summary AS
+CREATE OR REPLACE VIEW v_tenant_summary WITH (security_invoker = true) AS
 SELECT 
     t.id AS tenant_id,
     t.name AS tenant_name,
@@ -227,7 +311,7 @@ LEFT JOIN (
 ) lr ON lr.tenant_id = t.id;
 
 -- ------------------------------------------------------------------------------
--- 6. Materialized View: mv_monthly_access_stats & Refresh Routine
+-- 8. Materialized View: mv_monthly_access_stats & Refresh Routine
 -- Pre-aggregated monthly access metrics per tenant for fast reporting.
 -- ------------------------------------------------------------------------------
 DROP MATERIALIZED VIEW IF EXISTS mv_monthly_access_stats CASCADE;
@@ -248,6 +332,29 @@ JOIN assets a ON a.id = aal.asset_id
 GROUP BY a.tenant_id, TO_CHAR(aal.accessed_at, 'YYYY-MM');
 
 CREATE UNIQUE INDEX idx_mv_monthly_access_unique ON mv_monthly_access_stats (tenant_id, month_year);
+
+-- Do not expose the all-tenant materialized view directly to tenant-scoped users.
+-- The wrapper view is intentionally owner-executed, with a security barrier and
+-- an explicit tenant/admin predicate based on the trusted transaction GUCs.
+CREATE OR REPLACE VIEW v_monthly_access_stats_tenant WITH (security_barrier = true) AS
+SELECT
+  tenant_id,
+  month_year,
+  download_count,
+  checkout_count,
+  view_count,
+  checkin_count,
+  total_access_events,
+  active_accessing_users,
+  distinct_assets_accessed
+FROM mv_monthly_access_stats
+WHERE tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid
+   OR COALESCE(current_setting('app.is_super_admin', true) = 'true', FALSE);
+
+-- Materialized statistics contain multiple tenants and must not be queried directly.
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE mv_monthly_access_stats FROM assetvault_app;
+GRANT SELECT ON TABLE v_monthly_access_stats_tenant TO assetvault_app;
 
 -- Routine to refresh the materialized view
 CREATE OR REPLACE FUNCTION fn_refresh_monthly_access_stats()

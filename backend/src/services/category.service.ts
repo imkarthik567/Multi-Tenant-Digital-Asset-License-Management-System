@@ -7,6 +7,8 @@
 import { categoryRepository } from '../repositories/category.repository';
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/AppError';
 import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.util';
+import { prisma } from '../config/prisma';
+import { Prisma } from '@prisma/client';
 
 export interface CategoryTreeNode {
   id: string;
@@ -62,33 +64,69 @@ export class CategoryService {
     return rootNodes;
   }
 
-  public async createCategory(prismaClient: any, tenantId: string, data: any) {
-    if (data.parentId) {
-      const parent = await categoryRepository.findById(prismaClient, data.parentId);
-      if (!parent) {
-        throw new BadRequestError('Parent category not found.');
-      }
-    }
+  public async createCategory(_prismaClient: any, tenantId: string, data: any) {
+    // Serialize hierarchy changes per tenant so a concurrent reparent cannot
+    // invalidate the cycle check between its read and write.
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', '', true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId}, 0));`
+      );
 
-    return categoryRepository.create(prismaClient, {
-      name: data.name,
-      description: data.description || null,
-      tenant: { connect: { id: tenantId } },
-      parent: data.parentId ? { connect: { id: data.parentId } } : undefined,
+      if (data.parentId) {
+        const parent = await categoryRepository.findById(tx, data.parentId);
+        if (!parent) {
+          throw new BadRequestError('Parent category not found.');
+        }
+      }
+
+      return categoryRepository.create(tx, {
+        name: data.name,
+        description: data.description || null,
+        tenant: { connect: { id: tenantId } },
+        parent: data.parentId ? { connect: { id: data.parentId } } : undefined,
+      });
     });
   }
 
   public async updateCategory(prismaClient: any, id: string, data: any) {
-    await this.getCategoryById(prismaClient, id);
+    // Description/name-only updates do not change the tree and need no lock.
+    if (data.parentId === undefined) {
+      await this.getCategoryById(prismaClient, id);
+      return categoryRepository.update(prismaClient, id, {
+        name: data.name,
+        description: data.description,
+      });
+    }
 
-    // Cycle Prevention Check
-    if (data.parentId !== undefined) {
+    const existing = await this.getCategoryById(prismaClient, id);
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${existing.tenantId}, true),
+          set_config('app.current_user_id', '', true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${existing.tenantId}, 0));`
+      );
+
+      // Re-read after taking the lock so validation uses the latest tree.
+      const category = await categoryRepository.findById(tx, id);
+      if (!category) {
+        throw new NotFoundError('Category not found');
+      }
+
       if (data.parentId === id) {
         throw new ConflictError('A category cannot be its own parent.');
       }
 
       if (data.parentId !== null) {
-        // Traverse upwards from proposed parent; if 'id' is reached, this would form a cycle!
         let currentParentId: string | null = data.parentId;
         const visited = new Set<string>();
 
@@ -101,37 +139,56 @@ export class CategoryService {
           }
           visited.add(currentParentId);
 
-          const ancestor = await categoryRepository.findById(prismaClient, currentParentId);
+          const ancestor = await categoryRepository.findById(tx, currentParentId);
           currentParentId = ancestor?.parentId || null;
         }
       }
-    }
 
-    return categoryRepository.update(prismaClient, id, {
-      name: data.name,
-      description: data.description,
-      parent:
-        data.parentId === null
-          ? { disconnect: true }
-          : data.parentId
-          ? { connect: { id: data.parentId } }
-          : undefined,
+      return categoryRepository.update(tx, id, {
+        name: data.name,
+        description: data.description,
+        parent:
+          data.parentId === null
+            ? { disconnect: true }
+            : data.parentId
+            ? { connect: { id: data.parentId } }
+            : undefined,
+      });
     });
   }
 
   public async deleteCategory(prismaClient: any, id: string) {
-    const category = await this.getCategoryById(prismaClient, id);
+    const existing = await this.getCategoryById(prismaClient, id);
 
-    // Block deletion if it has children or assets (Course requirement: return 409)
-    if (category.children && category.children.length > 0) {
-      throw new ConflictError('Cannot delete category with child subcategories. Please reassign or delete subcategories first.');
-    }
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${existing.tenantId}, true),
+          set_config('app.current_user_id', '', true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
 
-    if (category._count?.assets > 0) {
-      throw new ConflictError('Cannot delete category with associated digital assets. Please reassign assets first.');
-    }
+      // Lock the referenced category row while checking and deleting. Inserts
+      // that attach a child or asset must take a foreign-key key-share lock.
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM categories WHERE id = ${id}::UUID FOR UPDATE;`
+      );
 
-    return categoryRepository.delete(prismaClient, id);
+      const category = await categoryRepository.findById(tx, id);
+      if (!category) {
+        throw new NotFoundError('Category not found');
+      }
+
+      if (category.children && category.children.length > 0) {
+        throw new ConflictError('Cannot delete category with child subcategories. Please reassign or delete subcategories first.');
+      }
+
+      if (category._count?.assets > 0) {
+        throw new ConflictError('Cannot delete category with associated digital assets. Please reassign assets first.');
+      }
+
+      return categoryRepository.delete(tx, id);
+    });
   }
 }
 

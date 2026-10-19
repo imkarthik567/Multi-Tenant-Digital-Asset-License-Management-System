@@ -14,6 +14,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma, prismaForRequest } from '../config/prisma';
 import { Prisma } from '@prisma/client';
+import { costOptimizationService } from '../services/costOptimization.service';
+import { tenantService } from '../services/tenant.service';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
@@ -26,6 +28,7 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
   let vendorAId: string;
   let vendorBId: string;
   let testLicenseId: string;
+  let testLicenseKey: string;
 
   beforeAll(async () => {
     // 1. Fetch TechCorp (Tenant A)
@@ -62,13 +65,14 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
     vendorBId = vendorB!.id;
 
     // 5. Create a dedicated isolated test license for stored procedure verification
+    testLicenseKey = `TEST-SP-${Date.now()}`;
     const testLicense = await systemPrisma.license.create({
       data: {
         tenantId: tenantAId,
         vendorId: vendorAId,
         licenseTypeId: 3, // SEAT_BASED
         name: 'SP Audit Verification Suite License',
-        licenseKey: `TEST-SP-${Date.now()}`,
+        licenseKey: testLicenseKey,
         totalSeats: 2,
         cost: 150.0,
         currency: 'USD',
@@ -310,6 +314,34 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       ).rejects.toThrow(/Cross-tenant violation/i);
     });
 
+    it('redacts license keys from INSERT and UPDATE audit snapshots', async () => {
+      const rotatedKey = `TEST-SP-ROTATED-${Date.now()}`;
+
+      // Update the fixture license so the audit row contains both old and new snapshots.
+      await systemPrisma.license.update({
+        where: { id: testLicenseId },
+        data: { licenseKey: rotatedKey },
+      });
+
+      const audit = await systemPrisma.auditLog.findFirst({
+        where: {
+          tableName: 'licenses',
+          recordId: testLicenseId,
+          action: 'UPDATE',
+        },
+        orderBy: { performedAt: 'desc' },
+      });
+
+      expect(audit).not.toBeNull();
+      const oldSnapshot = JSON.stringify(audit!.oldData ?? {});
+      const newSnapshot = JSON.stringify(audit!.newData ?? {});
+      for (const snapshot of [oldSnapshot, newSnapshot]) {
+        expect(snapshot).not.toContain('license_key');
+        expect(snapshot).not.toContain(testLicenseKey);
+        expect(snapshot).not.toContain(rotatedKey);
+      }
+    });
+
     it('trg_audit_vendors automatically captures vendor mutations', async () => {
       const vendorName = `Audit Test Vendor ${Date.now()}`;
       const newVendor = await systemPrisma.vendor.create({
@@ -440,6 +472,35 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       }
     });
 
+    it('queries monthly spend and top-download analytics views', async () => {
+      const spendRows: any[] = await prisma.$queryRaw`
+        SELECT tenant_id, month_year, monthly_spend, running_total_spend
+        FROM v_monthly_spend
+        WHERE tenant_id = ${tenantAId}::UUID
+        ORDER BY month_year
+        LIMIT 5;
+      `;
+      expect(Array.isArray(spendRows)).toBe(true);
+      if (spendRows.length > 0) {
+        expect(spendRows[0]).toHaveProperty('monthly_spend');
+        expect(spendRows[0]).toHaveProperty('running_total_spend');
+      }
+
+      const topRows: any[] = await prisma.$queryRaw`
+        SELECT tenant_id, asset_id, asset_name, download_count, rank
+        FROM v_top_downloaded_assets
+        WHERE tenant_id = ${tenantAId}::UUID
+        ORDER BY rank, asset_name
+        LIMIT 10;
+      `;
+      expect(Array.isArray(topRows)).toBe(true);
+      expect(topRows.length).toBeLessThanOrEqual(10);
+      if (topRows.length > 0) {
+        expect(topRows[0]).toHaveProperty('download_count');
+        expect(topRows[0]).toHaveProperty('rank');
+      }
+    });
+
     it('fn_tenant_dashboard_stats returns all KPIs including new user_count, unlicensed_assets_count, and asset_type_breakdown', async () => {
       const result: any = await prisma.$queryRaw`
         SELECT fn_tenant_dashboard_stats(${tenantAId}::UUID) AS stats;
@@ -463,6 +524,102 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       expect(typeof stats.unlicensed_assets_count).toBe('number');
       expect(stats).toHaveProperty('asset_type_breakdown');
       expect(typeof stats.asset_type_breakdown).toBe('object');
+    });
+
+    it('does not multiply initial vendor spend when one license has multiple renewals', async () => {
+      // Ensure a single license has at least two renewal rows to catch fan-out bugs.
+      await systemPrisma.licenseRenewal.createMany({
+        data: [
+          {
+            licenseId: testLicenseId,
+            renewedBy: userAAdminId,
+            oldEndDate: new Date('2027-01-01'),
+            newEndDate: new Date('2028-01-01'),
+            cost: new Prisma.Decimal(25),
+            notes: 'vendor-spend aggregation regression fixture A',
+          },
+          {
+            licenseId: testLicenseId,
+            renewedBy: userAAdminId,
+            oldEndDate: new Date('2028-01-01'),
+            newEndDate: new Date('2029-01-01'),
+            cost: new Prisma.Decimal(40),
+            notes: 'vendor-spend aggregation regression fixture B',
+          },
+        ],
+      });
+
+      const [viewRows, expectedRows] = await Promise.all([
+        prisma.$queryRaw<Array<{ total_initial_cost: Prisma.Decimal; total_renewal_cost: Prisma.Decimal; total_seats_contracted: bigint }>>(
+          Prisma.sql`SELECT total_initial_cost, total_renewal_cost, total_seats_contracted
+                      FROM v_vendor_spend
+                      WHERE tenant_id = ${tenantAId}::uuid AND vendor_id = ${vendorAId}::uuid;`
+        ),
+        prisma.$queryRaw<Array<{ total_initial_cost: Prisma.Decimal; total_renewal_cost: Prisma.Decimal; total_seats_contracted: bigint }>>(
+          Prisma.sql`SELECT
+            COALESCE((
+              SELECT SUM(l.cost) FROM licenses l
+              WHERE l.tenant_id = ${tenantAId}::uuid
+                AND l.vendor_id = ${vendorAId}::uuid
+                AND l.deleted_at IS NULL
+            ), 0)::NUMERIC(12,2) AS total_initial_cost,
+            COALESCE((
+              SELECT SUM(lr.cost)
+              FROM license_renewals lr
+              JOIN licenses l ON l.id = lr.license_id
+              WHERE l.tenant_id = ${tenantAId}::uuid
+                AND l.vendor_id = ${vendorAId}::uuid
+                AND l.deleted_at IS NULL
+            ), 0)::NUMERIC(12,2) AS total_renewal_cost,
+            COALESCE((
+              SELECT SUM(l.total_seats) FROM licenses l
+              WHERE l.tenant_id = ${tenantAId}::uuid
+                AND l.vendor_id = ${vendorAId}::uuid
+                AND l.deleted_at IS NULL
+            ), 0)::BIGINT AS total_seats_contracted;`
+        ),
+      ]);
+
+      expect(viewRows).toHaveLength(1);
+      expect(expectedRows).toHaveLength(1);
+      const viewRow = viewRows[0]!;
+      const expectedRow = expectedRows[0]!;
+      expect(Number(viewRow.total_initial_cost)).toBe(Number(expectedRow.total_initial_cost));
+      expect(Number(viewRow.total_renewal_cost)).toBe(Number(expectedRow.total_renewal_cost));
+      expect(Number(viewRow.total_seats_contracted)).toBe(Number(expectedRow.total_seats_contracted));
+    });
+
+    it('marks tenant reporting views as security-invoker views', async () => {
+      const viewOptions: any[] = await prisma.$queryRaw`
+        SELECT relname, reloptions
+        FROM pg_class
+        WHERE relkind = 'v'
+          AND relname IN (
+            'v_license_utilization',
+            'v_expiring_licenses',
+            'v_asset_catalog',
+            'v_vendor_spend',
+            'v_tenant_summary',
+            'v_monthly_spend',
+            'v_top_downloaded_assets'
+          );
+      `;
+
+      expect(viewOptions).toHaveLength(7);
+      for (const view of viewOptions) {
+        expect(view.reloptions || []).toContain('security_invoker=true');
+      }
+    });
+
+    it('does not grant tenant runtime direct SELECT on the all-tenant materialized view', async () => {
+      const privileges: any[] = await prisma.$queryRaw`
+        SELECT
+          has_table_privilege('assetvault_app', 'mv_monthly_access_stats', 'SELECT') AS can_read_raw,
+          has_table_privilege('assetvault_app', 'v_monthly_access_stats_tenant', 'SELECT') AS can_read_filtered;
+      `;
+
+      expect(privileges[0].can_read_raw).toBe(false);
+      expect(privileges[0].can_read_filtered).toBe(true);
     });
 
     it('refreshes materialized view mv_monthly_access_stats concurrently', async () => {
@@ -492,6 +649,36 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       expect((tenantAAssets as any[]).length).toBe(0);
     });
 
+    it('enforces tenant RLS through security-invoker reporting views', async () => {
+      const foreignTenantRows = await prisma.$transaction(async (tx: any) => {
+        await tx.$executeRaw(Prisma.sql`SET LOCAL ROLE assetvault_app;`);
+        await tx.$executeRaw(
+          Prisma.sql`SELECT
+            set_config('app.current_tenant_id', ${tenantAId}, true),
+            set_config('app.is_super_admin', 'false', true);`
+        );
+        return tx.$queryRaw(
+          Prisma.sql`SELECT asset_id, tenant_id FROM v_asset_catalog WHERE tenant_id = ${tenantBId}::uuid;`
+        );
+      });
+
+      expect(foreignTenantRows).toHaveLength(0);
+    });
+
+    it('filters the all-tenant monthly stats wrapper to the current tenant', async () => {
+      const rows = await prisma.$transaction(async (tx: any) => {
+        await tx.$executeRaw(Prisma.sql`SET LOCAL ROLE assetvault_app;`);
+        await tx.$executeRaw(
+          Prisma.sql`SELECT
+            set_config('app.current_tenant_id', ${tenantAId}, true),
+            set_config('app.is_super_admin', 'false', true);`
+        );
+        return tx.$queryRaw(Prisma.sql`SELECT tenant_id FROM v_monthly_access_stats_tenant;`);
+      });
+
+      expect((rows as any[]).every((row) => row.tenant_id === tenantAId)).toBe(true);
+    });
+
     it('allows super admin session to query across all tenants', async () => {
       const allTenantsAssets = await prisma.$transaction(async (tx: any) => {
         await tx.$executeRaw(Prisma.sql`SET LOCAL ROLE assetvault_app;`);
@@ -506,4 +693,128 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
       expect((allTenantsAssets as any[])[0].total).toBeGreaterThan(0);
     });
   });
+
+  it('does not classify a ten-day-old allocation with no access logs as dormant', async () => {
+    // Keep this regression independent of allocations made by other procedure tests.
+    const license = await systemPrisma.license.create({
+      data: {
+        tenantId: tenantAId,
+        vendorId: vendorAId,
+        licenseTypeId: 3,
+        name: 'Recent Allocation Inactivity Regression',
+        licenseKey: `TEST-RECENT-${Date.now()}`,
+        totalSeats: 1,
+        cost: 10,
+        currency: 'USD',
+        status: 'ACTIVE',
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2027-01-01'),
+      },
+    });
+    let allocationId: string | undefined;
+
+    try {
+      const allocation = await systemPrisma.licenseAllocation.create({
+        data: {
+          licenseId: license.id,
+          userId: userAAdminId,
+          allocatedBy: userAAdminId,
+          allocatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          status: 'ACTIVE',
+          notes: 'recent allocation inactivity regression test',
+        },
+      });
+      allocationId = allocation.id;
+
+      const report = await costOptimizationService.getUnusedSeatsReport(tenantAId);
+      expect(report.reclaimCandidates.some((candidate) => candidate.allocationId === allocation.id)).toBe(false);
+    } finally {
+      if (allocationId) await systemPrisma.licenseAllocation.delete({ where: { id: allocationId } });
+      await systemPrisma.license.delete({ where: { id: license.id } });
+    }
+  });
+
+  it('serializes concurrent asset and user inserts against tenant plan quotas', async () => {
+    const unique = Date.now();
+    const plan = await systemPrisma.plan.create({
+      data: {
+        name: `Quota Race Plan ${unique}`,
+        maxUsers: 2,
+        maxAssets: 1,
+      },
+    });
+    let tenantId: string | undefined;
+
+    try {
+      const tenant = await systemPrisma.tenant.create({
+        data: {
+          name: `Quota Race Tenant ${unique}`,
+          slug: `quota-race-${unique}`,
+          contactEmail: `quota-race-${unique}@example.test`,
+          planId: plan.id,
+          status: 'ACTIVE',
+        },
+      });
+      tenantId = tenant.id;
+
+      const role = await systemPrisma.role.findUnique({ where: { name: 'TENANT_ADMIN' } });
+      expect(role).not.toBeNull();
+      const owner = await systemPrisma.user.create({
+        data: {
+          tenantId,
+          roleId: role!.id,
+          email: `quota-owner-${unique}@example.test`,
+          fullName: 'Quota Race Owner',
+          passwordHash: 'quota-race-test-hash',
+        },
+      });
+
+      const attempts = await Promise.allSettled([
+        systemPrisma.asset.create({
+          data: {
+            tenantId,
+            ownerId: owner.id,
+            name: 'Quota Race Asset One',
+            assetCode: `QUOTA-RACE-${unique}-1`,
+            assetType: 'DOCUMENT',
+          },
+        }),
+        systemPrisma.asset.create({
+          data: {
+            tenantId,
+            ownerId: owner.id,
+            name: 'Quota Race Asset Two',
+            assetCode: `QUOTA-RACE-${unique}-2`,
+            assetType: 'DOCUMENT',
+          },
+        }),
+        systemPrisma.user.create({
+          data: {
+            tenantId,
+            roleId: role!.id,
+            email: `quota-user-one-${unique}@example.test`,
+            fullName: 'Quota Race User One',
+          passwordHash: 'quota-race-test-hash',
+          },
+        }),
+        systemPrisma.user.create({
+          data: {
+            tenantId,
+            roleId: role!.id,
+            email: `quota-user-two-${unique}@example.test`,
+            fullName: 'Quota Race User Two',
+          passwordHash: 'quota-race-test-hash',
+          },
+        }),
+      ]);
+
+      expect(attempts.filter((result) => result.status === 'fulfilled')).toHaveLength(2);
+      expect(attempts.slice(0, 2).filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(attempts.slice(2).filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    } finally {
+      if (tenantId) await tenantService.deleteTenant(tenantId);
+      await systemPrisma.plan.delete({ where: { id: plan.id } });
+    }
+  });
+
 });

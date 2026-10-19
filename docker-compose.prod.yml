@@ -20,7 +20,7 @@ services:
         max-file: "5"
 
   api:
-    image: ${DOCKERHUB_USERNAME:-assetvault}/assetvault-api:1.0.0
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/assetvault-api:${ASSETVAULT_IMAGE_TAG:-latest}
     restart: always
     build: !reset null
     deploy:
@@ -35,7 +35,7 @@ services:
         max-file: "5"
 
   worker:
-    image: ${DOCKERHUB_USERNAME:-assetvault}/assetvault-api:1.0.0
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/assetvault-api:${ASSETVAULT_IMAGE_TAG:-latest}
     restart: always
     build: !reset null
     deploy:
@@ -50,7 +50,7 @@ services:
         max-file: "3"
 
   web:
-    image: ${DOCKERHUB_USERNAME:-assetvault}/assetvault-web:1.0.0
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/assetvault-web:${ASSETVAULT_IMAGE_TAG:-latest}
     restart: always
     build: !reset null
     deploy:

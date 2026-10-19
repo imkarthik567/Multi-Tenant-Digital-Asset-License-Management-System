@@ -6,6 +6,24 @@
 
 import { z } from 'zod';
 import { LicenseStatus } from '@prisma/client';
+import { dateStringSchema } from './date.validator';
+
+const licenseDateSchema = dateStringSchema.transform((value) => new Date(value));
+
+const positiveIntegerQuery = z
+  .string()
+  .regex(/^[1-9]\d*$/, 'Must be a positive integer')
+  .refine((value) => Number(value) <= 2147483647, 'Must fit a PostgreSQL integer');
+
+const nonNegativeIntegerQuery = z
+  .string()
+  .regex(/^(0|[1-9]\d*)$/, 'Must be a non-negative integer')
+  .refine((value) => Number(value) <= 2147483647, 'Must fit a PostgreSQL integer');
+
+const nonNegativeCostQuery = z
+  .string()
+  .regex(/^\d+(?:\.\d{1,2})?$/, 'Must be a non-negative amount with at most two decimal places')
+  .refine((value) => Number(value) <= 9999999999.99, 'Must fit the license cost range');
 
 export const createLicenseSchema = z
   .object({
@@ -16,8 +34,8 @@ export const createLicenseSchema = z
     totalSeats: z.number().int().positive('totalSeats must be at least 1'),
     cost: z.number().min(0).default(0),
     currency: z.string().length(3).default('USD'),
-    startDate: z.string().transform((str) => new Date(str)),
-    endDate: z.string().optional().nullable().transform((str) => (str ? new Date(str) : null)),
+    startDate: licenseDateSchema,
+    endDate: licenseDateSchema.optional().nullable(),
     autoRenew: z.boolean().default(false),
   })
   .strip()
@@ -40,8 +58,8 @@ export const updateLicenseSchema = z
     totalSeats: z.number().int().positive().optional(),
     cost: z.number().min(0).optional(),
     currency: z.string().length(3).optional(),
-    startDate: z.string().optional().transform((str) => (str ? new Date(str) : undefined)),
-    endDate: z.string().optional().nullable().transform((str) => (str ? new Date(str) : null)),
+    startDate: licenseDateSchema.optional(),
+    endDate: licenseDateSchema.optional().nullable(),
     status: z.nativeEnum(LicenseStatus).optional(),
     autoRenew: z.boolean().optional(),
   })
@@ -53,7 +71,7 @@ export const updateLicenseSchema = z
 
 export const renewLicenseSchema = z
   .object({
-    newEndDate: z.string().transform((str) => new Date(str)),
+    newEndDate: licenseDateSchema,
     cost: z.number().min(0, 'Renewal cost must be non-negative'),
     notes: z.string().max(1000).optional(),
   })
@@ -68,10 +86,14 @@ export const queryLicenseSchema = z
     order: z.enum(['asc', 'desc']).optional(),
     status: z.nativeEnum(LicenseStatus).optional(),
     vendorId: z.string().uuid().optional(),
-    licenseTypeId: z.string().optional(),
-    expiringWithinDays: z.string().optional(),
-    minCost: z.string().optional(),
-    maxCost: z.string().optional(),
+    licenseTypeId: positiveIntegerQuery.optional(),
+    expiringWithinDays: nonNegativeIntegerQuery.optional(),
+    minCost: nonNegativeCostQuery.optional(),
+    maxCost: nonNegativeCostQuery.optional(),
     fullyAllocated: z.enum(['true', 'false']).optional(),
   })
-  .strip();
+  .strip()
+  .refine(
+    (data) => data.minCost === undefined || data.maxCost === undefined || Number(data.minCost) <= Number(data.maxCost),
+    { message: 'minCost must be less than or equal to maxCost', path: ['maxCost'] }
+  );

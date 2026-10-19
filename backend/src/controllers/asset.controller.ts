@@ -57,7 +57,7 @@ export class AssetController {
 
   public attachTags = asyncHandler(async (req: Request, res: Response) => {
     const tagIds = Array.isArray(req.body.tagIds) ? req.body.tagIds : [req.body.tagId];
-    const results = await assetService.attachTags(req.prisma, req.params.id as string, tagIds);
+    const results = await assetService.attachTags(req.user!.tenantId as string, req.user!.id, req.params.id as string, tagIds);
     sendResponse(res, 200, results);
   });
 
@@ -82,7 +82,7 @@ export class AssetController {
   });
 
   public getVersionByNo = asyncHandler(async (req: Request, res: Response) => {
-    const versionNo = parseInt(req.params.versionNo as string, 10);
+    const versionNo = Number(req.params.versionNo);
     const version = await assetService.getVersionByNo(req.prisma, req.params.id as string, versionNo);
     sendResponse(res, 200, version);
   });

@@ -4,17 +4,22 @@
 // ==============================================================================
 
 import { z } from 'zod';
+import { dateStringSchema } from './date.validator';
 import { AccessAction } from '@prisma/client';
+import { cursorIdSchema } from './pagination.validator';
+
+const queryDateSchema = dateStringSchema;
 
 export const queryAccessLogSchema = z
   .object({
     page: z.string().optional(),
-    limit: z.string().optional(),
+    limit: z.string().regex(/^\d+$/, 'limit must be a positive integer').optional(),
     action: z.nativeEnum(AccessAction).optional(),
     userId: z.string().uuid().optional(),
     assetId: z.string().uuid().optional(),
-    dateFrom: z.string().datetime().optional(),
-    dateTo: z.string().datetime().optional(),
+    cursor: cursorIdSchema.optional(),
+    dateFrom: queryDateSchema.optional(),
+    dateTo: queryDateSchema.optional(),
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).optional(),
   })

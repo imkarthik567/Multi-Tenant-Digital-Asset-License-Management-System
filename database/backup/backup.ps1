@@ -17,6 +17,22 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Resolve-Path (Join-Path $ScriptDir "..\..")
 
+function Load-EnvFile([string]$Path) {
+    if (Test-Path $Path) {
+        Get-Content $Path | ForEach-Object {
+            $line = $_.Trim()
+            if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+                $idx = $line.IndexOf("=")
+                $key = $line.Substring(0, $idx).Trim()
+                $value = $line.Substring($idx + 1).Trim().Trim('"').Trim("'")
+                if (-not [Environment]::GetEnvironmentVariable($key, "Process")) {
+                    [Environment]::SetEnvironmentVariable($key, $value, "Process")
+                }
+            }
+        }
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($BackupDir)) {
     $BackupDir = Join-Path $ProjectRoot "backups"
 }
@@ -26,53 +42,24 @@ if (-not (Test-Path $BackupDir)) {
     Write-Host "[INFO] Created backup directory: $BackupDir" -ForegroundColor Cyan
 }
 
-# 2. Load Environment Variables from .env if not already set
-function Load-EnvFile([string]$path) {
-    if (Test-Path $path) {
-        Write-Host "[INFO] Loading connection parameters from: $path" -ForegroundColor Cyan
-        Get-Content $path | ForEach-Object {
-            $line = $_.Trim()
-            if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
-                $idx = $line.IndexOf("=")
-                $key = $line.Substring(0, $idx).Trim()
-                $val = $line.Substring($idx + 1).Trim().Trim('"').Trim("'")
-                if (-not [System.Environment]::GetEnvironmentVariable($key)) {
-                    [System.Environment]::SetEnvironmentVariable($key, $val, "Process")
-                }
-            }
-        }
-    }
+# 2. Load .env sources without replacing explicitly supplied environment variables.
+Load-EnvFile (Join-Path $ProjectRoot ".env")
+Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
+Load-EnvFile (Join-Path $ProjectRoot "apps\api\.env")
+
+. (Join-Path $ScriptDir "connection.ps1")
+$ConnectionUrl = Get-PreferredPgConnectionUrl -Docker:$Docker
+$ConnectionDetails = Get-PgConnectionDetails -Url $ConnectionUrl
+$DbHost = $ConnectionDetails.hostname
+$DbPort = $ConnectionDetails.port
+$DbUser = $ConnectionDetails.username
+$DbPass = $ConnectionDetails.password
+$DbName = if ($TargetDb) { $TargetDb } else { $ConnectionDetails.database }
+
+if ([string]::IsNullOrWhiteSpace($DbName)) {
+    throw "The PostgreSQL URL must include a database name, or pass -TargetDb."
 }
-
-if (-not $env:DATABASE_URL) {
-    Load-EnvFile (Join-Path $ProjectRoot ".env")
-    if (-not $env:DATABASE_URL) {
-        Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
-        if (-not $env:DATABASE_URL) {
-            Load-EnvFile (Join-Path $ProjectRoot "apps\api\.env")
-        }
-    }
-}
-
-# 3. Parse Database Parameters
-$DbHost = if ($env:PGHOST) { $env:PGHOST } else { "localhost" }
-$DbPort = if ($env:PGPORT) { $env:PGPORT } else { "5432" }
-$DbUser = if ($env:PGUSER) { $env:PGUSER } elseif ($env:POSTGRES_USER) { $env:POSTGRES_USER } else { "postgres" }
-$DbPass = if ($env:PGPASSWORD) { $env:PGPASSWORD } elseif ($env:POSTGRES_PASSWORD) { $env:POSTGRES_PASSWORD } else { "" }
-$DbName = if ($TargetDb) { $TargetDb } elseif ($env:PGDATABASE) { $env:PGDATABASE } elseif ($env:POSTGRES_DB) { $env:POSTGRES_DB } else { "assetvault_db" }
-
-# If DATABASE_URL is set, extract parameters
-if ($env:DATABASE_URL -and -not $TargetDb) {
-    if ($env:DATABASE_URL -match "^postgresql://([^:]+):([^@]+)@([^:/]+):?(\d+)?/(.+)$") {
-        $DbUser = $matches[1]
-        $DbPass = $matches[2]
-        $DbHost = $matches[3]
-        if ($matches[4]) { $DbPort = $matches[4] }
-        $cleanDb = $matches[5].Split('?')[0]
-        $DbName = $cleanDb
-    }
-}
-
+$ConnectionUrl = Normalize-PgConnectionUrl -Url $ConnectionUrl -Database $DbName
 $env:PGPASSWORD = $DbPass
 
 # 4. Locate pg_dump tool
@@ -113,17 +100,36 @@ $ChecksumPath   = Join-Path $BackupDir "$CustomDumpName.sha256"
 
 # 6. Execute Backups
 if ($Docker) {
-    Write-Host "[1/3] Generating custom format binary dump (-Fc) via Docker..." -ForegroundColor Yellow
-    docker compose exec -T db pg_dump -U $DbUser -d $DbName -Fc > $CustomDumpPath
-    Write-Host "[2/3] Generating readable plain SQL dump (-Fp) via Docker..." -ForegroundColor Yellow
-    docker compose exec -T db pg_dump -U $DbUser -d $DbName -Fp > $PlainSqlPath
+    # Keep dump bytes inside the container until docker cp transfers them. Redirecting
+    # native binary output through Windows PowerShell 5 can transcode and corrupt it.
+    $containerId = (& docker compose ps -q db).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($containerId)) {
+        throw "Unable to locate the running database container for Docker backup."
+    }
+    $containerCustomPath = "/tmp/assetvault_backup_$([Guid]::NewGuid().ToString('N')).dump"
+    $containerSqlPath = "$containerCustomPath.sql"
+    try {
+        Write-Host "[1/3] Generating custom format binary dump (-Fc) via Docker..." -ForegroundColor Yellow
+        & docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_dump -U $DbUser -d $DbName -Fc -f $containerCustomPath
+        if ($LASTEXITCODE -ne 0) { throw "Docker pg_dump custom format failed with code $LASTEXITCODE" }
+        & docker cp "${containerId}:$containerCustomPath" $CustomDumpPath
+        if ($LASTEXITCODE -ne 0) { throw "Could not copy the custom dump archive from the database container." }
+
+        Write-Host "[2/3] Generating readable plain SQL dump (-Fp) via Docker..." -ForegroundColor Yellow
+        & docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_dump -U $DbUser -d $DbName -Fp -f $containerSqlPath
+        if ($LASTEXITCODE -ne 0) { throw "Docker pg_dump plain SQL failed with code $LASTEXITCODE" }
+        & docker cp "${containerId}:$containerSqlPath" $PlainSqlPath
+        if ($LASTEXITCODE -ne 0) { throw "Could not copy the plain SQL dump from the database container." }
+    } finally {
+        & docker compose exec -T db rm -f $containerCustomPath $containerSqlPath | Out-Null
+    }
 } else {
     Write-Host "[1/3] Generating custom format binary dump (-Fc)..." -ForegroundColor Yellow
-    & $PgDumpExe -h $DbHost -p $DbPort -U $DbUser -d $DbName -Fc -f $CustomDumpPath
+    & $PgDumpExe $ConnectionUrl -Fc -f $CustomDumpPath
     if ($LASTEXITCODE -ne 0) { throw "pg_dump custom format failed with code $LASTEXITCODE" }
 
     Write-Host "[2/3] Generating readable plain SQL dump (-Fp)..." -ForegroundColor Yellow
-    & $PgDumpExe -h $DbHost -p $DbPort -U $DbUser -d $DbName -Fp -f $PlainSqlPath
+    & $PgDumpExe $ConnectionUrl -Fp -f $PlainSqlPath
     if ($LASTEXITCODE -ne 0) { throw "pg_dump plain SQL failed with code $LASTEXITCODE" }
 }
 
@@ -143,7 +149,7 @@ Write-Host "  - SHA-256 Checksum  : $($hashResult.Hash)" -ForegroundColor Gray
 
 # 8. Retention Policy: Retain Only Latest 7 Backups
 Write-Host "`n[INFO] Enforcing 7-Day Backup Retention Policy..." -ForegroundColor Cyan
-$allDumps = Get-ChildItem -Path $BackupDir -Filter "assetvault_*.dump" | Sort-Object CreationTime -Descending
+$allDumps = Get-ChildItem -Path $BackupDir -Filter "assetvault_*.dump" | Sort-Object LastWriteTime -Descending
 
 if ($allDumps.Count -gt 7) {
     $staleDumps = $allDumps | Select-Object -Skip 7

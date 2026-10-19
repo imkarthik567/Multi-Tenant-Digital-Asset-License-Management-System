@@ -9,20 +9,36 @@
 
 import { PrismaClient, AssetType, AssetStatus, LicenseStatus, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import path from 'path';
 
-const prisma = new PrismaClient();
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+}
+
+const seedDatabaseUrl = process.env.SEED_DATABASE_URL || process.env.DIRECT_URL || process.env.DATABASE_URL;
+const prisma = new PrismaClient(
+  seedDatabaseUrl ? { datasources: { db: { url: seedDatabaseUrl } } } : undefined
+);
 
 async function main() {
   const isProduction = process.env.NODE_ENV === 'production';
-  const superAdminEmail =
-    process.env.SUPER_ADMIN_EMAIL?.trim() || (isProduction ? '' : 'superadmin@assetvault.io');
-  const superAdminPassword =
-    process.env.SUPER_ADMIN_PASSWORD || (isProduction ? '' : 'Password123!');
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL?.trim() || '';
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || '';
   const superAdminName = process.env.SUPER_ADMIN_NAME || 'Global Super Administrator';
+  const shouldSeedDemo = process.env.SEED_DEMO === 'true' || !isProduction;
+  const demoPassword = process.env.DEFAULT_SEED_PASSWORD || '';
 
-  if (isProduction && (!superAdminEmail || !superAdminPassword)) {
+  if (!superAdminEmail || !superAdminPassword) {
     throw new Error(
-      'SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD must be configured before production seeding.'
+      'SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD must be configured before seeding; no default administrator password is provided.'
+    );
+  }
+
+  if (shouldSeedDemo && !demoPassword) {
+    throw new Error(
+      'DEFAULT_SEED_PASSWORD must be configured before demo users are seeded; no shared default demo password is provided.'
     );
   }
 
@@ -104,7 +120,7 @@ async function main() {
   const superAdminHash = await bcrypt.hash(superAdminPassword, 10);
 
   // Common password hash for test accounts
-  const passwordHash = await bcrypt.hash('Password123!', 10);
+  const passwordHash = shouldSeedDemo ? await bcrypt.hash(demoPassword, 12) : '';
 
   // ----------------------------------------------------------------------------
   // 4. SUPER ADMIN USER (tenant_id = null)
@@ -130,8 +146,6 @@ async function main() {
   console.log(`    ✓ Super Admin configured: ${superAdmin.email}`);
 
   // Check if demo seed should run (production skips demo entities unless SEED_DEMO=true)
-  const shouldSeedDemo = process.env.SEED_DEMO === 'true' || !isProduction;
-
   if (!shouldSeedDemo) {
     console.log('✨ Production mode detected without SEED_DEMO=true. Skipping demo tenants, vendors, assets, and licenses.');
     console.log('✅ Core reference tables (roles, plans, license types) and Super Admin seeded successfully.');

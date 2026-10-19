@@ -1,101 +1,56 @@
-# AssetVault: Production Go-Live Verification Checklist
-**Target Release**: v1.0.0 Enterprise SaaS  
-**Audit Standard**: BCSE307L Database Systems Final Release Gate  
-**Deployment Stack**: Supabase PostgreSQL 16 + Render Docker + Vercel React SPA
+# AssetVault — Go-Live Checklist
+**Review date:** October 18, 2026  
+**Scope:** Source and GitHub Actions configuration review for the BCSE307L Database Systems project.
 
----
+> **This is a checklist, not a production sign-off.** The live PostgreSQL database, hosting accounts, repository collaborator list, external uptime service and browser-based deployment were not independently inspected. Do not mark those items complete based solely on configuration files or historical screenshots/reports.
 
-## 1. Security & Hygiene Pre-Flight Gate
+## 1. Repository and academic requirements
 
-- [x] **Zero Secrets in Repository**: Full history scanned with `npm run check:secrets`. Zero private keys, unignored `.env` files, or production secrets committed.
-- [x] **SQL Injection Prevention**: `npm run check:sqli` passes cleanly with zero instances of `$queryRawUnsafe` or `$executeRawUnsafe`. All dynamic queries utilize parameterized `Prisma.sql` templates or typed methods.
-- [x] **Least Privilege Database Role**: `assetvault_app` runtime role provisioned via [`database/sql/08_production_bootstrap.sql`](../database/sql/08_production_bootstrap.sql). `CREATE` and `DROP` privileges revoked from public schema.
-- [x] **Reverse Proxy Security**: `app.set('trust proxy', 1)` configured so client IPs are verified correctly behind Render/Vercel reverse proxies.
-- [x] **HTTP Strict Transport Security (HSTS)**: Helmet configured with `maxAge: 31536000`, `includeSubDomains: true`, and `preload: true` in production.
-- [x] **Secure Cookie Flags**: `refreshToken` cookie enforces `httpOnly: true`, `secure: true` (in production), configurable `sameSite: 'lax'|'strict'|'none'`, and path scoping to `/api/auth`.
-- [x] **Input Sanitization & Body Limits**: Express configured with `2mb` body limits and `hpp` parameter pollution prevention.
+- [x] Repository has `main` and `dev` branches (checked through GitHub branch metadata).
+- [x] Repository history contains more than 10 commits and meaningful-looking commit messages.
+- [ ] **Make the repository private.** GitHub metadata returned `private=false` / `visibility=public` on October 18, 2026. The rubric requires one private repository.
+- [ ] Confirm every project team member is added as a collaborator.
+- [ ] Check names, team assignments and registration metadata in the final submitted proposal/report for accuracy.
+- [ ] After review, merge the approved draft PR into `main` and confirm `main` and `dev` are in the expected final state.
 
----
+## 2. Credentials and secrets
 
-## 2. Database Schema & Business Logic Integrity
+- [x] The latest reviewed CI revision passed the repository secret scanner.
+- [x] The latest reviewed CI revision passed the SQL-injection static scan.
+- [x] Login no longer pre-fills seeded credentials or offers a one-click demo credential picker.
+- [ ] Store real, unique values for `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `COOKIE_SECRET`, `METRICS_BEARER_TOKEN` and `APP_DB_PASSWORD` in the appropriate hosting secret stores.
+- [ ] Set `DATABASE_URL` to the restricted `assetvault_app` runtime role and verify the URL password matches `APP_DB_PASSWORD`; URL-encode special characters.
+- [ ] **Review the elevated-credential trade-off:** the current Render blueprint runs scheduled maintenance in the API process and passes `DIRECT_URL` into that long-lived process. For strict least privilege, move cross-tenant maintenance into a separate worker service and avoid retaining migration/admin credentials in the public API process.
+- [ ] Rotate any credentials that were previously used as public demo/default credentials in an actual deployed environment. Removing the default from source does not rotate an already-created account's database password.
 
-- [x] **PostgreSQL 16 Extensions Enabled**: `uuid-ossp`, `pg_trgm`, `btree_gist` active on cloud database.
-- [x] **Prisma Cloud Connectivity**: `DATABASE_URL` configured with transaction pooler (`?pgbouncer=true`) and `DIRECT_URL` configured for migrations.
-- [x] **Migration Alignment**: `npx prisma migrate deploy` executed cleanly with zero pending migrations.
-- [x] **Row-Level Security (RLS)**: PostgreSQL RLS policies enforce tenant isolation across all multi-tenant tables.
-- [x] **Views & Procedures Operational**:
-  - `v_asset_catalog`
-  - `v_license_utilization`
-  - `v_expiring_licenses`
-  - `v_vendor_spend`
-  - `mv_monthly_access_stats`
-  - Stored procedure `sp_allocate_license_seat`
-  - Stored procedure `sp_release_license_seat`
-  - Stored procedure `sp_renew_license`
-  - Stored function `fn_generate_expiry_notifications`
-- [x] **PostgreSQL Advisory Locks**: Schedulers lock IDs 1001 (Daily Expiry), 1002 (MV Refresh), 1003 (Auto Renew) preventing race conditions across instances.
+## 3. Database, RLS and reporting
 
----
+- [x] PostgreSQL migrations, custom SQL setup and seeding passed in the latest reviewed CI run (October 18, 2026).
+- [x] Reporting views are configured with `security_invoker=true`, and the raw all-tenant monthly access materialization is intended to be revoked from the runtime role.
+- [x] Regression tests now cover reporting view options and access boundaries.
+- [x] Latest CI run passed the privilege/RLS tests after the final grant ordering in `database/sql/04_rls.sql` ([run 39136189166](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189166)).
+- [ ] Apply migrations to the intended production database and verify all extensions, constraints, views, functions, triggers, privileges and RLS policies against the live catalog.
+- [ ] Test tenant A cannot read tenant B rows through base tables, ordinary reporting views and `v_monthly_access_stats_tenant`; verify the runtime role cannot directly select `mv_monthly_access_stats`.
+- [ ] Recheck dashboard queries, report filters and stored procedure behavior after the reporting-view changes.
 
-## 3. Background Workers & Schedulers
+## 4. Application and authentication
 
-- [x] **In-Process Worker Configuration**: `ENABLE_IN_PROCESS_WORKER=true` activates background cron inside API process when standalone worker container is not deployed.
-- [x] **Daily Expiry Audit**: Runs at 02:00 UTC, invokes `fn_generate_expiry_notifications()`, and triggers real-time SSE broadcast.
-- [x] **Materialized View Concurrent Refresh**: Hourly concurrent refresh of `mv_monthly_access_stats`.
-- [x] **Automated License Renewal**: Daily scan auto-renews licenses with `auto_renew = true` within 3 days of expiration.
-- [x] **Transactional Email Alerts**: 30-day, 15-day, 7-day and expired alerts dispatched via Nodemailer.
+- [ ] Run the current browser-level Playwright tests and manually verify desktop/mobile layouts, login/logout, refresh-token rotation, Google OAuth (if enabled), role-based menus/pages/APIs, CRUD, filtering and pagination.
+- [ ] For the default Vercel + Render cross-site deployment, set `COOKIE_SAMESITE=none` and confirm the cookie is sent over HTTPS with `Secure` and `HttpOnly`. Same-site/local development can use a stricter policy.
+- [ ] Verify the live frontend and API health/readiness routes from a browser and from an external client. Example hostnames in the docs are not proof that the deployed services currently exist or are healthy.
+- [ ] Record the actual working frontend URL and API URL for submission; the faculty requirement explicitly asks for a live URL.
 
----
+## 5. Docker, CI/CD and backup/recovery
 
-## 4. Telemetry, Observability & Monitoring
+- [x] Docker images built and Trivy-scanned successfully on the latest reviewed branch revision ([run 39136189118](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189118)). GitHub Container Registry steps ran; **Docker Hub login/publish steps were skipped for the pull-request event**, so Hub images still need credentials and confirmation.
+- [ ] Configure `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in repository Actions secrets, then verify the API and web images are published to the intended Docker Hub repositories.
+- [ ] Run `.github/workflows/db-backup.yml` with `DATABASE_DIRECT_URL` (preferred) or `DATABASE_URL` configured and confirm an artifact/checksum is created.
+- [ ] Execute a restore to a scratch database and compare table counts/data, not just a successful `pg_dump`.
+- [ ] Confirm that backup secrets, runtime credentials and production environment files are not committed.
+- [ ] Verify Render deployment and Vercel builds/deployments against their live dashboards; workflow YAML alone is not proof of a working deployment.
 
-- [x] **Health Check Endpoint**: `GET /api/health` returns status `healthy` with uptime.
-- [x] **Readiness Check Endpoint**: `GET /api/ready` validates database connectivity and latency.
-- [x] **Prometheus Scrape Endpoint**: `GET /metrics` protected by `METRICS_BEARER_TOKEN`.
-- [x] **Docker Compose Monitoring Profile**:
-  - Prometheus scraping `api:5000/metrics` every 15s.
-  - Grafana pre-provisioned datasource and dashboard at [`monitoring/grafana/dashboards/assetvault-overview.json`](../monitoring/grafana/dashboards/assetvault-overview.json).
-- [x] **Free-Tier Keepalive**: GitHub Actions workflow [`.github/workflows/keepalive.yml`](../.github/workflows/keepalive.yml) pings `/api/health` every 10 minutes to prevent Render free-tier cold starts.
-- [x] **UptimeRobot Integration**: Free external ping monitoring configured for `/api/health` at 5-minute intervals.
+## 6. Current CI evidence
 
----
-
-## 5. Automated Backup & Disaster Recovery
-
-- [x] **Native Backup Tools**: `database/backup/backup.sh` and `backup.ps1` generate custom format (`.dump`) and plain SQL dumps with SHA-256 checksums.
-- [x] **Rotation Policy**: Maintains 7 latest backups locally.
-- [x] **Restoration Drill**: Verified via `database/backup/restore.sh` and `verify-restore.sh`.
-- [x] **Nightly Cloud Backup Workflow**: [`.github/workflows/nightly-backup.yml`](../.github/workflows/nightly-backup.yml) runs `pg_dump` daily at 02:00 UTC and stores artifacts with 7-day retention.
-
----
-
-## 6. CI/CD Pipeline Verification
-
-- [x] **CI Pipeline ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml))**:
-  - Secret scan gate (`npm run check:secrets`)
-  - SQL injection gate (`npm run check:sqli`)
-  - Dependency audit (`npm audit`)
-  - TypeScript type-check and lint (`npm run lint`)
-  - PostgreSQL 16 service container migration & seed
-  - Unit and integration test suite (`npm run test -- --coverage`)
-  - Monorepo production build (`npm run build`)
-- [x] **Docker Pipeline ([`.github/workflows/docker.yml`](../.github/workflows/docker.yml))**:
-  - Buildx multi-stage build for API and Web
-  - Image tagging (`:latest`, `:sha-<sha>`, `:semver`)
-  - Trivy vulnerability scanning
-- [x] **CD Pipeline ([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml))**:
-  - Triggers Render deploy hook
-  - 3-minute timeout health verification polling `/api/health` and `/api/ready`
-
----
-
-## 7. Sign-Off Summary
-
-| Component | Status | Verified By | Date |
-|---|---|---|---|
-| PostgreSQL Database & RLS | **PASS** | Automated Test Suite | 2026-10-14 |
-| Express API & Security Middleware | **PASS** | Vitest (81/81 Passed) | 2026-10-14 |
-| React Web Frontend SPA | **PASS** | Vite Production Build | 2026-10-14 |
-| Background Schedulers & Advisory Locks | **PASS** | Automated Integration Tests | 2026-10-14 |
-| Docker Multi-Stage Packaging | **PASS** | Docker Compose Engine | 2026-10-14 |
-| GitHub Actions Workflows | **PASS** | Workflow Lint & YAML Parse | 2026-10-14 |
+- Latest reviewed CI revision: **139/139 tests passed**, 8 test files, TypeScript/lint, secret scan, SQL-injection static scan, shell syntax, database migration/custom SQL/seed, production seed compilation and production build all passed.
+- Docker build and vulnerability scan succeeded for the same reviewed branch revision. These CI results do not verify the deployed database, hosting secrets, live URLs or backup recovery drill.
+- The dependency audit previously reported 18 total vulnerabilities, including high-severity development dependency advisories and moderate React Router advisories in the production tree. Do not claim a clean all-dependencies audit until those findings are either fixed or explicitly risk-accepted with evidence.

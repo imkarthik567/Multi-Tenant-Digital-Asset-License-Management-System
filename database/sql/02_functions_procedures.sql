@@ -57,10 +57,13 @@ BEGIN
     END IF;
 
     -- 3. Verify user exists, is active, and shares the same tenant
+    -- Serialize against account deactivation so the active-state check and
+    -- allocation insert cannot straddle a concurrent user status change.
     SELECT id, tenant_id, full_name, is_active
     INTO v_user
     FROM users
-    WHERE id = p_user_id;
+    WHERE id = p_user_id
+    FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'User % does not exist', p_user_id

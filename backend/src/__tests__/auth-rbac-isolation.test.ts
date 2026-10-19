@@ -20,6 +20,10 @@ import app from '../app';
 import { prismaForRequest } from '../config/prisma';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
+const testPassword = process.env.DEFAULT_SEED_PASSWORD;
+if (!testPassword) {
+  throw new Error('Set DEFAULT_SEED_PASSWORD before running seeded-user authentication tests.');
+}
 
 describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
   let techcorpAdminToken: string;
@@ -87,7 +91,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.admin@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     expect(res.status).toBe(200);
@@ -175,7 +179,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.mgr1@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     expect(loginRes.status).toBe(200);
@@ -211,7 +215,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.mgr2@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     const cookies1 = loginRes.headers['set-cookie'];
@@ -245,6 +249,42 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
   });
 
   // ----------------------------------------------------------------------------
+  // Test 5b: Concurrent refresh reuse has one winner and revokes the session family
+  // ----------------------------------------------------------------------------
+  it('rejects concurrent reuse of one refresh token and revokes both resulting sessions', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'techcorp.dev2@techcorp.io',
+        password: testPassword,
+      });
+
+    expect(loginRes.status).toBe(200);
+    const cookies = loginRes.headers['set-cookie'];
+    const cookie = Array.isArray(cookies) ? cookies[0] : cookies;
+    const token = cookie.match(/refreshToken=([^;]+)/)![1];
+
+    const [first, second] = await Promise.all([
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+      request(app).post('/api/auth/refresh').set('Cookie', [`refreshToken=${token}`]),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([200, 401]);
+    const rejected = first.status === 401 ? first : second;
+    expect(rejected.body.error.message).toContain('Compromised refresh token reuse detected');
+
+    const successful = first.status === 200 ? first : second;
+    const rotatedCookies = successful.headers['set-cookie'];
+    const rotatedCookie = Array.isArray(rotatedCookies) ? rotatedCookies[0] : rotatedCookies;
+    const rotatedToken = rotatedCookie.match(/refreshToken=([^;]+)/)![1];
+
+    const replayedReplacement = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${rotatedToken}`]);
+    expect(replayedReplacement.status).toBe(401);
+  });
+
+  // ----------------------------------------------------------------------------
   // Test 6: Logout revokes refresh token and clears cookie
   // ----------------------------------------------------------------------------
   it('6. Logout revokes refresh token and clears cookie, preventing future refreshes', async () => {
@@ -252,7 +292,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.dev3@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     const cookies = loginRes.headers['set-cookie'];
@@ -289,7 +329,7 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       .post('/api/auth/login')
       .send({
         email: 'techcorp.dev1@techcorp.io',
-        password: 'Password123!',
+        password: testPassword,
       });
 
     expect(memberLogin.status).toBe(200);
@@ -404,9 +444,36 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
 
     const createdUser = await systemPrisma.user.findUnique({
       where: { email: adminEmail },
-      select: { lastLoginAt: true },
+      select: { id: true, lastLoginAt: true },
     });
     expect(createdUser?.lastLoginAt).toBeInstanceOf(Date);
+
+    const initialSession = await systemPrisma.refreshToken.findFirst({
+      where: { userId: createdUser!.id, revokedAt: null },
+      select: { id: true },
+    });
+    expect(initialSession).not.toBeNull();
+  });
+
+  it('concurrent tenant registrations return a conflict for the duplicate request', async () => {
+    const suffix = `signup-race-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const payload = {
+      tenantName: `Signup Race ${suffix}`,
+      slug: suffix,
+      contactEmail: `contact-${suffix}@example.com`,
+      adminFullName: 'Signup Race Admin',
+      adminEmail: `admin-${suffix}@example.com`,
+      password: 'Strong-QA-Pass123!',
+    };
+
+    const responses = await Promise.all([
+      request(app).post('/api/auth/register-tenant').send(payload),
+      request(app).post('/api/auth/register-tenant').send(payload),
+    ]);
+
+    expect(responses.map((response) => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
+    expect(await systemPrisma.tenant.count({ where: { slug: suffix } })).toBe(1);
+    expect(await systemPrisma.user.count({ where: { email: payload.adminEmail } })).toBe(1);
   });
 
   afterAll(async () => {

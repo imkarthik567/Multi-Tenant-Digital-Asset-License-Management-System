@@ -91,22 +91,68 @@ export class LicenseService {
     });
   }
 
-  public async updateLicense(prismaClient: any, id: string, data: any) {
+  public async updateLicense(
+    prismaClient: any,
+    id: string,
+    data: any,
+    actor: { tenantId?: string; userId?: string } = {}
+  ) {
     const existing = await licenseRepository.findById(prismaClient, id);
     if (!existing) throw new NotFoundError('License not found');
 
-    return licenseRepository.update(prismaClient, id, {
-      name: data.name,
-      licenseKey: data.licenseKey,
-      totalSeats: data.totalSeats,
-      cost: data.cost,
-      currency: data.currency,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      status: data.status,
-      autoRenew: data.autoRenew,
-      vendor: data.vendorId ? { connect: { id: data.vendorId } } : undefined,
-      licenseType: data.licenseTypeId ? { connect: { id: data.licenseTypeId } } : undefined,
+    const tenantId = actor.tenantId || existing.tenantId;
+    return prismaClient.$transaction(async (tx: any) => {
+      // Serialize capacity changes with seat allocations, which lock this same
+      // license row before counting active allocations.
+      await tx.$executeRaw(
+        Prisma.sql`SELECT
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${actor.userId || ''}, true),
+          set_config('app.is_super_admin', 'false', true);`
+      );
+
+      const lockedRows = await tx.$queryRaw(
+        Prisma.sql`SELECT start_date, end_date
+                    FROM licenses
+                    WHERE id = ${id}::UUID AND deleted_at IS NULL
+                    FOR UPDATE;`
+      );
+      const lockedLicense = (lockedRows as any[])[0];
+      if (!lockedLicense) throw new NotFoundError('License not found');
+
+      const nextStartDate = data.startDate ?? lockedLicense.start_date;
+      const nextEndDate = data.endDate === undefined ? lockedLicense.end_date : data.endDate;
+      if (nextEndDate && nextEndDate <= nextStartDate) {
+        throw new BadRequestError('End date must be after start date');
+      }
+
+      if (data.totalSeats !== undefined) {
+        const allocationRows = await tx.$queryRaw(
+          Prisma.sql`SELECT COUNT(*)::int AS active_count
+                      FROM license_allocations
+                      WHERE license_id = ${id}::UUID AND status = 'ACTIVE';`
+        );
+        const activeCount = Number((allocationRows as any[])[0]?.active_count || 0);
+        if (data.totalSeats < activeCount) {
+          throw new ConflictError(
+            `Cannot reduce total seats below the ${activeCount} active allocation(s).`
+          );
+        }
+      }
+
+      return licenseRepository.update(tx, id, {
+        name: data.name,
+        licenseKey: data.licenseKey,
+        totalSeats: data.totalSeats,
+        cost: data.cost,
+        currency: data.currency,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        status: data.status,
+        autoRenew: data.autoRenew,
+        vendor: data.vendorId ? { connect: { id: data.vendorId } } : undefined,
+        licenseType: data.licenseTypeId ? { connect: { id: data.licenseTypeId } } : undefined,
+      });
     });
   }
 
@@ -160,8 +206,8 @@ export class LicenseService {
 
   public async linkAsset(prismaClient: any, assetId: string, licenseId: string) {
     const [asset, license] = await Promise.all([
-      prismaClient.asset.findUnique({ where: { id: assetId } }),
-      prismaClient.license.findUnique({ where: { id: licenseId } }),
+      prismaClient.asset.findFirst({ where: { id: assetId, deletedAt: null } }),
+      prismaClient.license.findFirst({ where: { id: licenseId, deletedAt: null } }),
     ]);
 
     if (!asset) throw new NotFoundError('Asset not found');
@@ -174,7 +220,16 @@ export class LicenseService {
       throw new ConflictError('Asset is already covered by this license.');
     }
 
-    return licenseRepository.linkAsset(prismaClient, assetId, licenseId);
+    try {
+      return await licenseRepository.linkAsset(prismaClient, assetId, licenseId);
+    } catch (error: any) {
+      // The preflight check is useful for normal duplicates, but concurrent
+      // requests can still collide at the unique constraint.
+      if (error?.code === 'P2002') {
+        throw new ConflictError('Asset is already covered by this license.');
+      }
+      throw error;
+    }
   }
 
   public async unlinkAsset(prismaClient: any, assetId: string, licenseId: string) {

@@ -5,6 +5,7 @@
 // ==============================================================================
 
 import { z } from 'zod';
+import { dateStringSchema } from './date.validator';
 import { AssetType, AssetStatus } from '@prisma/client';
 
 export const createAssetSchema = z
@@ -15,11 +16,15 @@ export const createAssetSchema = z
     description: z.string().max(1000).optional().nullable(),
     categoryId: z.preprocess((v) => (v === '' ? null : v), z.string().uuid().optional().nullable()),
     fileUrl: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
-    fileSizeBytes: z.number().int().positive().optional(),
-    checksumSha256: z.string().length(64).optional(),
+    fileSizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER, 'fileSizeBytes exceeds the safely representable byte range').optional(),
+    checksumSha256: z.string().trim().regex(/^[a-fA-F0-9]{64}$/, 'checksumSha256 must be a 64-character hexadecimal SHA-256 checksum').optional(),
     tags: z.array(z.string()).optional(),
   })
-  .strip();
+  .strip()
+  .refine((data) => !data.fileUrl || Boolean(data.checksumSha256), {
+    message: 'checksumSha256 is required when fileUrl is provided',
+    path: ['checksumSha256'],
+  });
 
 export const updateAssetSchema = z
   .object({
@@ -37,6 +42,8 @@ export const attachTagsSchema = z
   })
   .strip();
 
+const queryDateSchema = dateStringSchema;
+
 export const queryAssetSchema = z
   .object({
     page: z.string().optional(),
@@ -50,7 +57,18 @@ export const queryAssetSchema = z
     tag: z.string().optional(),
     ownerId: z.string().uuid().optional(),
     complianceStatus: z.enum(['COMPLIANT', 'EXPIRED_LICENSE', 'UNLICENSED']).optional(),
-    createdFrom: z.string().datetime().optional(),
-    createdTo: z.string().datetime().optional(),
+    createdFrom: queryDateSchema.optional(),
+    createdTo: queryDateSchema.optional(),
+  })
+  .strip();
+
+export const assetIdParamsSchema = z
+  .object({ id: z.string().uuid('Asset ID must be a valid UUID') })
+  .strip();
+
+export const assetTagParamsSchema = z
+  .object({
+    id: z.string().uuid('Asset ID must be a valid UUID'),
+    tagId: z.string().uuid('Tag ID must be a valid UUID'),
   })
   .strip();

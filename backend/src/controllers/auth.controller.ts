@@ -12,7 +12,7 @@ import {
   generateAccessToken,
   generateRefreshTokenData,
 } from '../utils/token.util';
-import { prisma } from '../config/prisma';
+import { prismaForRequest } from '../config/prisma';
 import { env } from '../config/env';
 
 export class AuthController {
@@ -192,7 +192,12 @@ export class AuthController {
 
       const refreshData = generateRefreshTokenData();
 
-      await prisma.refreshToken.create({
+      const oauthPrisma = prismaForRequest({
+        tenantId: user.tenantId,
+        userId: user.id,
+        isSuperAdmin: user.isSuperAdmin,
+      });
+      await oauthPrisma.refreshToken.create({
         data: {
           userId: user.id,
           tokenHash: refreshData.tokenHash,

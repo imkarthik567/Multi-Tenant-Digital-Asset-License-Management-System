@@ -24,7 +24,7 @@ $BackupDir = Join-Path $ProjectRoot "backups"
 # 2. Resolve Dump File
 if ([string]::IsNullOrWhiteSpace($DumpFile)) {
     # Find latest dump file in backups directory
-    $latestDump = Get-ChildItem -Path $BackupDir -Filter "assetvault_*.dump" -ErrorAction SilentlyContinue | Sort-Object CreationTime -Descending | Select-Object -First 1
+    $latestDump = Get-ChildItem -Path $BackupDir -Filter "assetvault_*.dump" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $latestDump) {
         throw "No backup file specified and no .dump files found in $BackupDir"
     }
@@ -62,7 +62,7 @@ if (Test-Path $ChecksumFile) {
     }
     Write-Host "[PASS] Checksum matched: $actualHash" -ForegroundColor Green
 } else {
-    Write-Host "[WARN] No .sha256 checksum file found next to $DumpFileName; proceeding without verification" -ForegroundColor DarkYellow
+    throw "Checksum file is required before restore: $ChecksumFile"
 }
 
 # 4. Load Environment Variables from .env
@@ -82,34 +82,32 @@ function Load-EnvFile([string]$path) {
     }
 }
 
-if (-not $env:DATABASE_URL) {
-    Load-EnvFile (Join-Path $ProjectRoot ".env")
-    if (-not $env:DATABASE_URL) {
-        Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
-        if (-not $env:DATABASE_URL) {
-            Load-EnvFile (Join-Path $ProjectRoot "apps\api\.env")
-        }
-    }
+# Load each candidate .env file; Load-EnvFile does not override explicitly set process variables.
+Load-EnvFile (Join-Path $ProjectRoot ".env")
+Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
+Load-EnvFile (Join-Path $ProjectRoot "apps\api\.env")
+
+. (Join-Path $ScriptDir "connection.ps1")
+$ConnectionUrl = Get-PreferredPgConnectionUrl -Docker:$Docker
+$ConnectionDetails = Get-PgConnectionDetails -Url $ConnectionUrl
+$DbHost = $ConnectionDetails.hostname
+$DbPort = $ConnectionDetails.port
+$DbUser = $ConnectionDetails.username
+$DbPass = $ConnectionDetails.password
+$SourceDb = $ConnectionDetails.database
+
+if ($Scratch) {
+    $DbName = if ($TargetDb) { $TargetDb } else { "assetvault_restore_test" }
+} else {
+    $DbName = if ($TargetDb) { $TargetDb } else { $SourceDb }
 }
 
-# 5. Determine Database Connection Parameters
-$DbHost = if ($env:PGHOST) { $env:PGHOST } else { "localhost" }
-$DbPort = if ($env:PGPORT) { $env:PGPORT } else { "5432" }
-$DbUser = if ($env:PGUSER) { $env:PGUSER } elseif ($env:POSTGRES_USER) { $env:POSTGRES_USER } else { "postgres" }
-$DbPass = if ($env:PGPASSWORD) { $env:PGPASSWORD } elseif ($env:POSTGRES_PASSWORD) { $env:POSTGRES_PASSWORD } else { "" }
-$DbName = if ($TargetDb) { $TargetDb } elseif ($Scratch) { "assetvault_restore_test" } elseif ($env:PGDATABASE) { $env:PGDATABASE } elseif ($env:POSTGRES_DB) { $env:POSTGRES_DB } else { "assetvault_db" }
-
-if ($env:DATABASE_URL -and -not $TargetDb -and -not $Scratch) {
-    if ($env:DATABASE_URL -match "^postgresql://([^:]+):([^@]+)@([^:/]+):?(\d+)?/(.+)$") {
-        $DbUser = $matches[1]
-        $DbPass = $matches[2]
-        $DbHost = $matches[3]
-        if ($matches[4]) { $DbPort = $matches[4] }
-        $cleanDb = $matches[5].Split('?')[0]
-        $DbName = $cleanDb
-    }
+if ([string]::IsNullOrWhiteSpace($DbName) -or $DbName -notmatch '^[A-Za-z_][A-Za-z0-9_]{0,62}$') {
+    throw "Invalid target database name. Use a PostgreSQL identifier containing letters, digits and underscores (max 63 characters)."
 }
 
+$AdminUrl = Normalize-PgConnectionUrl -Url $ConnectionUrl -Database "postgres"
+$TargetUrl = Normalize-PgConnectionUrl -Url $ConnectionUrl -Database $DbName
 $env:PGPASSWORD = $DbPass
 
 # 6. Locate native tools (pg_restore, psql)
@@ -162,9 +160,20 @@ if (-not $Yes -and -not $Scratch) {
 if ($Scratch) {
     Write-Host "[2/3] Preparing scratch database '$DbName'..." -ForegroundColor Cyan
     if ($Docker) {
-        docker compose exec -T db psql -U $DbUser -d postgres -c "DROP DATABASE IF EXISTS $DbName;" -c "CREATE DATABASE $DbName;"
+        $existingScratch = & docker compose exec -T -e "PGPASSWORD=$DbPass" db psql -v ON_ERROR_STOP=1 -U $DbUser -d postgres -t -A -c "SELECT 1 FROM pg_database WHERE datname = '$DbName';"
     } else {
-        & $PsqlExe -h $DbHost -p $DbPort -U $DbUser -d postgres -c "DROP DATABASE IF EXISTS $DbName;" -c "CREATE DATABASE $DbName;"
+        $existingScratch = & $PsqlExe $AdminUrl -v ON_ERROR_STOP=1 -t -A -c "SELECT 1 FROM pg_database WHERE datname = '$DbName';"
+    }
+    if ($LASTEXITCODE -ne 0) { throw "Could not check whether scratch database '$DbName' exists." }
+    if (-not [string]::IsNullOrWhiteSpace(($existingScratch -join "").Trim())) {
+        throw "Scratch database '$DbName' already exists; refusing to overwrite it."
+    }
+    if ($Docker) {
+        & docker compose exec -T -e "PGPASSWORD=$DbPass" db psql -v ON_ERROR_STOP=1 -U $DbUser -d postgres -c "CREATE DATABASE $DbName;"
+        if ($LASTEXITCODE -ne 0) { throw "Docker scratch database create failed with code $LASTEXITCODE" }
+    } else {
+        & $PsqlExe $AdminUrl -v ON_ERROR_STOP=1 -c "CREATE DATABASE $DbName;"
+        if ($LASTEXITCODE -ne 0) { throw "Scratch database create failed with code $LASTEXITCODE" }
     }
 }
 
@@ -175,21 +184,35 @@ $isPlainSql = $DumpFile.EndsWith(".sql")
 
 if ($Docker) {
     if ($isPlainSql) {
-        Get-Content $DumpFile | docker compose exec -T db psql -U $DbUser -d $DbName
+        Get-Content $DumpFile | docker compose exec -T -e "PGPASSWORD=$DbPass" db psql -v ON_ERROR_STOP=1 -U $DbUser -d $DbName
+        if ($LASTEXITCODE -ne 0) { throw "Docker psql restoration failed with code $LASTEXITCODE" }
     } else {
-        # Stream custom dump to pg_restore in container
-        Get-Content -Encoding Byte $DumpFile | docker compose exec -T db pg_restore -U $DbUser -d $DbName --clean --if-exists --no-owner
+        # Copy the binary archive into the container. PowerShell's native pipeline
+        # converts byte arrays to text on Windows PowerShell 5 and corrupts dumps.
+        $containerId = (& docker compose ps -q db).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($containerId)) {
+            throw "Unable to locate the running database container for Docker restore."
+        }
+        $containerDumpPath = "/tmp/assetvault_restore_$([Guid]::NewGuid().ToString('N')).dump"
+        $resolvedDumpPath = (Resolve-Path $DumpFile).Path
+        try {
+            & docker cp $resolvedDumpPath "${containerId}:$containerDumpPath"
+            if ($LASTEXITCODE -ne 0) { throw "Could not copy the dump archive into the database container." }
+
+            & docker compose exec -T -e "PGPASSWORD=$DbPass" db pg_restore -U $DbUser -d $DbName --exit-on-error --clean --if-exists --no-owner $containerDumpPath
+            if ($LASTEXITCODE -ne 0) { throw "Docker pg_restore failed with code $LASTEXITCODE" }
+        } finally {
+            & docker compose exec -T db rm -f $containerDumpPath | Out-Null
+        }
     }
 } else {
     if ($isPlainSql) {
-        & $PsqlExe -h $DbHost -p $DbPort -U $DbUser -d $DbName -f $DumpFile
+        & $PsqlExe $TargetUrl -v ON_ERROR_STOP=1 -f $DumpFile
         if ($LASTEXITCODE -ne 0) { throw "psql restoration failed with code $LASTEXITCODE" }
     } else {
-        # pg_restore --clean --if-exists --no-owner
-        # Note: pg_restore may return code 1 for non-critical warnings (e.g. notices about objects not existing yet during clean drop).
-        & $PgRestoreExe -h $DbHost -p $DbPort -U $DbUser -d $DbName --clean --if-exists --no-owner $DumpFile
-        if ($LASTEXITCODE -gt 1) {
-            throw "pg_restore failed with critical error code $LASTEXITCODE"
+        & $PgRestoreExe --dbname=$TargetUrl --exit-on-error --clean --if-exists --no-owner $DumpFile
+        if ($LASTEXITCODE -ne 0) {
+            throw "pg_restore failed with error code $LASTEXITCODE"
         }
     }
 }

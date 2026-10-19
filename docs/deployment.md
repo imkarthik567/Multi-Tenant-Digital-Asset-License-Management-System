@@ -24,7 +24,7 @@ AssetVault is designed for zero-cost, high-reliability deployment on modern free
                                              ▼
                       ┌──────────────────────────────────────────────┐
                       │             Render Web Service               │
-                      │  - Multi-stage Docker Container (Node 20)    │
+                      │  - Multi-stage Docker Container (Node 22)    │
                       │  - Express API + In-Process Worker Cron      │
                       │  - PostgreSQL Advisory Locks (1001-1003)     │
                       └──────────────┬───────────────────────────────┘
@@ -56,24 +56,27 @@ AssetVault is designed for zero-cost, high-reliability deployment on modern free
 
 ### B. Connection String Architecture
 Supabase provides two distinct connection strings in **Project Settings** -> **Database**:
-1. **Transaction Pooler (Port 6543)**: Used for application runtime (`DATABASE_URL`). Add `?pgbouncer=true` to the connection string so Prisma disables prepared statement caching:
+1. **Transaction Pooler (Port 6543)**: Used for application runtime (`DATABASE_URL`) and must authenticate as the restricted `assetvault_app` role. On Supabase, use the role-qualified username required by your project/pooler:
    ```
-   postgresql://postgres.[project-ref]:[DB_PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&schema=public
+   postgresql://assetvault_app.[project-ref]:[APP_DB_PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&schema=public
    ```
-2. **Direct Connection (Port 5432)**: Used for running schema migrations and DDL operations (`DIRECT_URL`):
+2. **Direct Connection (Port 5432)**: Used only for migrations, initial role bootstrap, seeding, and trusted background maintenance (`DIRECT_URL`). Keep this privileged credential separate from the runtime URL:
    ```
-   postgresql://postgres.[project-ref]:[DB_PASSWORD]@aws-0-[region].pooler.supabase.com:5432/postgres?schema=public
+   postgresql://postgres.[project-ref]:[DB_PASSWORD]@db.[project-ref].supabase.co:5432/postgres
    ```
+
+Set `APP_DB_PASSWORD` to a strong random value of at least 32 characters and use the same value for the password embedded in the restricted `DATABASE_URL`. Prefer a `DIRECT_URL` without Prisma-only query parameters (notably `schema=public`) because it is used by the psql bootstrap command; the entrypoint defensively removes the `schema` parameter before invoking psql. The startup entrypoint uses `DIRECT_URL` to create/update the restricted role, then the HTTP API connects using `DATABASE_URL`. Do not configure `DATABASE_URL` with the `postgres` administrator credentials.
 
 ### C. Create Restricted Runtime Role (`assetvault_app`)
 To adhere strictly to the principle of least privilege, run the production bootstrap script using the Supabase SQL Editor or `psql`:
 
 ```bash
 # Execute 08_production_bootstrap.sql against your Supabase Direct URL
-psql "$DIRECT_URL" -v APP_PASSWORD="'<STRONG_APP_PASSWORD_HERE>'" -f database/sql/08_production_bootstrap.sql
+APP_DB_PASSWORD="<STRONG_RANDOM_DBPASS>"
+psql "$DIRECT_URL" -v DBPASS="$APP_DB_PASSWORD" -f database/sql/08_production_bootstrap.sql
 ```
 
-This creates the `assetvault_app` role with standard CRUD permissions and revokes `CREATE/DROP` DDL capabilities.
+The Docker/Render entrypoint runs this bootstrap after migrations. For manual setup, the same script sets a supplied password, enables login for `assetvault_app`, grants runtime DML access, and revokes schema-creation rights. Never use a fallback/default password.
 
 ### D. Apply Migrations & Reference Data
 From your local terminal or CI/CD runner:
@@ -84,10 +87,12 @@ DIRECT_URL="<YOUR_SUPABASE_DIRECT_URL>" npx prisma migrate deploy --schema backe
 
 # 2. Seed system roles, subscription plans, license types and initial Super Admin
 DIRECT_URL="<YOUR_SUPABASE_DIRECT_URL>" \
-DATABASE_URL="<YOUR_SUPABASE_POOLED_URL>" \
+DATABASE_URL="<YOUR_RESTRICTED_ASSETVAULT_APP_POOLED_URL>" \
+SEED_DATABASE_URL="<YOUR_SUPABASE_DIRECT_URL>" \
 SEED_DEMO="false" \
 SUPER_ADMIN_EMAIL="admin@yourdomain.com" \
 SUPER_ADMIN_PASSWORD="<STRONG_ADMIN_PASSWORD>" \
+APP_DB_PASSWORD="<STRONG_RANDOM_DBPASS>" \
 npm run db:seed
 ```
 
@@ -99,7 +104,7 @@ npm run db:seed
 1. Fork or push your AssetVault repository to GitHub.
 2. In [dashboard.render.com](https://dashboard.render.com), click **New** -> **Blueprint**.
 3. Connect your repository. Render automatically reads root [`render.yaml`](../render.yaml).
-4. Fill in the prompted secret values (Render will auto-generate strong random strings for `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET`).
+4. Set `DATABASE_URL` to the restricted `assetvault_app` pooler URL, `DIRECT_URL` to the privileged direct URL, and `APP_DB_PASSWORD` to a strong random password of at least 32 characters. Render can auto-generate `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and `COOKIE_SECRET`; they must remain distinct.
 5. Click **Apply**.
 
 ### Option B: Manual Web Service
@@ -124,7 +129,7 @@ npm run db:seed
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
 4. Set Environment Variables:
-   - `VITE_API_BASE_URL`: `https://assetvault-api.onrender.com/api` (or `/api` if using Vercel rewrites)
+   - `VITE_API_URL`: `https://assetvault-api.onrender.com/api` (or `/api` if using Vercel rewrites)
 5. Deploy. Vercel automatically honors [`frontend/vercel.json`](../frontend/vercel.json) for SPA routing and API reverse-proxying.
 
 ---
@@ -142,7 +147,7 @@ npm run db:seed
 | `JWT_ACCESS_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Signs short-lived access JWTs (15m expiry). |
 | `JWT_REFRESH_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Validates refresh tokens (7d expiry). |
 | `COOKIE_SECRET` | Render | Yes | `min-32-chars-random-cryptographic-key` | Signs httpOnly cookies. |
-| `COOKIE_SAMESITE` | Render | No | `lax` | Set to `lax` (default) or `none` if cross-site. |
+| `COOKIE_SAMESITE` | Render | Yes | `none` | Required for the default Vercel (`vercel.app`) + Render (`onrender.com`) cross-site deployment; the refresh cookie is `Secure` in production. Use `strict`/`lax` only when frontend and API are same-site. |
 | `ENABLE_IN_PROCESS_WORKER` | Render | Yes | `true` | Runs cron jobs inside the API process with advisory locks. |
 | `METRICS_BEARER_TOKEN` | Render | Yes | `assetvault-metrics-secret-token` | Protects `/metrics` Prometheus telemetry endpoint. |
 | `GOOGLE_CLIENT_ID` | Render | Optional | `12345.apps.googleusercontent.com` | Google OAuth Client ID for enterprise SSO. |
@@ -154,7 +159,7 @@ npm run db:seed
 | `SMTP_PASS` | Render | Optional | `your_smtp_password` | SMTP authentication password. |
 | `SMTP_FROM` | Render | Optional | `AssetVault <notifications@assetvault.io>` | Outgoing sender identity. |
 | `SUPER_ADMIN_EMAIL` | Render / Local | Yes | `superadmin@assetvault.io` | Initial global administrator login email. |
-| `SUPER_ADMIN_PASSWORD` | Render / Local | Yes | `ChangeMe123!` | Initial administrator password. Rotate upon first login. |
+| `SUPER_ADMIN_PASSWORD` | Render / Local | Yes | `<Set in secret store>` | Initial administrator password. Rotate upon first login. |
 | `SEED_DEMO` | Render | Optional | `false` | Set to `false` for production, `true` for demo tenants. |
 | `RENDER_DEPLOY_HOOK_URL`| GitHub Secret| Optional | `https://api.render.com/deploy/srv-xxx?key=yyy` | Triggered by CI/CD upon successful main builds. |
 | `RENDER_API_URL` | GitHub Secret| Optional | `https://assetvault-api.onrender.com` | Target URL polled by health verification & keepalive. |

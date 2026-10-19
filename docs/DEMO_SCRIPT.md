@@ -6,16 +6,17 @@
 
 ---
 
-## Demo Credentials Quick Reference
-| Organization / Tenant | Role | Email | Password |
-| :--- | :--- | :--- | :--- |
-| **System Operator** | `SUPER_ADMIN` | `superadmin@assetvault.io` | `Password123!` |
-| **TechCorp Solutions (Tenant A)** | `TENANT_ADMIN` | `techcorp.admin@techcorp.io` | `Password123!` |
-| **TechCorp Solutions (Tenant A)** | `ASSET_MANAGER`| `techcorp.mgr1@techcorp.io`| `Password123!` |
-| **TechCorp Solutions (Tenant A)** | `MEMBER` | `techcorp.dev1@techcorp.io` | `Password123!` |
-| **InnovateLabs (Tenant B)** | `TENANT_ADMIN` | `innovatelabs.admin@innovatelabs.io`| `Password123!` |
+## Demo Credentials Setup
 
-*(Note: The login page includes 1-click demo credential pills for instant auto-fill).*
+There are no shared demo passwords or one-click credential-fill controls in the login page. Before the demo, configure `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, and `DEFAULT_SEED_PASSWORD` in your local, untracked environment file, then run the migration and seed steps from the README. The seeded persona email addresses below are examples; use the exact addresses configured and created in your test database. Never use these demo accounts in a public or production deployment.
+
+| Organization / Tenant | Role | Example email |
+| :--- | :--- | :--- |
+| System Operator | `SUPER_ADMIN` | Value of `SUPER_ADMIN_EMAIL` |
+| TechCorp (Tenant A) | `TENANT_ADMIN` | `techcorp.admin@techcorp.io` |
+| TechCorp (Tenant A) | `ASSET_MANAGER` | `techcorp.mgr1@techcorp.io` |
+| TechCorp (Tenant A) | `MEMBER` | `techcorp.dev1@techcorp.io` |
+| InnovateLabs (Tenant B) | `TENANT_ADMIN` | `innovatelabs.admin@innovatelabs.io` |
 
 ---
 

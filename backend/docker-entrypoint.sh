@@ -8,12 +8,35 @@ set -e
 
 echo "[AssetVault API] Starting container initialization..."
 
+if [ "${NODE_ENV:-production}" = "production" ]; then
+  if [ -z "${DIRECT_URL:-}" ]; then
+    echo "[AssetVault API] FATAL: DIRECT_URL is required for production migrations and role bootstrap."
+    exit 1
+  fi
+  if [ -z "${APP_DB_PASSWORD:-}" ] || [ "${#APP_DB_PASSWORD}" -lt 32 ]; then
+    echo "[AssetVault API] FATAL: APP_DB_PASSWORD must be set to a unique value of at least 32 characters."
+    exit 1
+  fi
+fi
+
 if [ -n "$DATABASE_URL" ]; then
   echo "[AssetVault API] Applying production database migrations..."
   npx prisma migrate deploy || {
     echo "[AssetVault API] FATAL: Database migration failed! Exiting container."
     exit 1
   }
+fi
+
+if [ "${NODE_ENV:-production}" = "production" ]; then
+  echo "[AssetVault API] Configuring restricted assetvault_app runtime role..."
+  # Prisma connection strings may include ?schema=public, which is not a libpq
+  # connection parameter. Remove only that Prisma-specific parameter for psql.
+  PSQL_DIRECT_URL="$(node -e 'const u = new URL(process.argv[1]); u.searchParams.delete("schema"); process.stdout.write(u.toString());' "$DIRECT_URL")"
+  psql "$PSQL_DIRECT_URL" -v ON_ERROR_STOP=1 -v DBPASS="$APP_DB_PASSWORD" \
+    -f /app/database/sql/08_production_bootstrap.sql || {
+      echo "[AssetVault API] FATAL: Restricted runtime-role bootstrap failed."
+      exit 1
+    }
 fi
 
 if [ "$RUN_SEED" = "true" ]; then

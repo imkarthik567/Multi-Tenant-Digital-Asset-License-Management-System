@@ -1,11 +1,13 @@
 # AssetVault - Course Brief & Marking Scheme Final Audit
 **Course:** BCSE307L Database Systems (Fall 2026-27)  
 **Examiner Evaluation Mode:** Demanding Examiner Strict Audit  
-**Date of Audit:** October 14, 2026  
-**Auditor:** Automated Rigorous Code & Catalog Inspector (Antigravity Agent)  
-**Overall Project Status:** **100% PASS (ALL CRITERIA VERIFIED ON RUNNING SYSTEM)**  
+**Date of Audit:** October 18, 2026  
+**Auditor:** Source-level repository review  
+**Overall Project Status:** **IN PROGRESS — source-level review; live-system verification and rubric gaps remain**  
 
 ---
+
+> **Verification scope:** This document contains historical project claims and evidence descriptions. During the current review, source files and workflow configuration were inspected, but the production database was not queried and a full local/runtime test was not executed. Catalog counts, live deployment behavior, backup recovery, repository privacy, and collaborator access must be independently re-verified before this can be marked fully compliant.
 
 ## 1. Requirement-by-Requirement Verification Matrix
 
@@ -19,7 +21,7 @@
 | **Team Members & Responsibilities** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L106-L125) | **PASS** | Structured responsibility distribution matrix across Database Architecture, Backend API, Frontend SPA, and DevOps/QA. |
 | **Technology Stack** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L126-L155) | **PASS** | PostgreSQL 16, Prisma ORM, Node.js/Express TypeScript, React 18/Vite/Tailwind, Docker, Prometheus/Grafana. |
 | **Major Deliverables** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md#L156-L180) | **PASS** | Schema DDL, REST API, Web Dashboard, Backup/Restore Tooling, Test Suites, Deployment Blueprints. |
-| **Gantt Chart** | [`docs/gantt-chart.md`](./PROJECT_SCHEDULE_GANTT.md), [`docs/gantt.svg`](./gantt.svg) | **PASS** | Complete 12-week Gantt timeline in Markdown and vector SVG formats. |
+| **Gantt Chart** | [`PROJECT_PROPOSAL.md`](./PROJECT_PROPOSAL.md) Mermaid Gantt, [`gantt.svg`](./gantt.svg) | **PRESENT** | Timeline is embedded in the proposal and a vector graphic exists. |
 
 ---
 
@@ -50,7 +52,7 @@
 | **CRUD Operations** | `backend/src/repositories/` | **PASS** | Full Create, Read, Update, and Delete across Assets, Licenses, Allocations, Users, Vendors, and Categories. |
 | **SQL Joins** | `backend/src/repositories/asset.repository.ts` | **PASS** | Multi-table INNER and LEFT JOINs across `assets`, `categories`, `users`, `asset_versions`, `asset_licenses`, `licenses`, `vendors`. |
 | **Aggregate Queries** | `compliance.service.ts`, `costOptimization.service.ts` | **PASS** | `COUNT(*)`, `SUM(l.cost)`, `AVG(monthly_cost)`, `GROUP BY v.id` in compliance scoring and cost optimization queries. |
-| **Database Views** | `v_asset_catalog`, `mv_monthly_access_stats` | **PASS** | Standard view `v_asset_catalog` (denormalizes catalog for performant listing); Materialized view `mv_monthly_access_stats` (aggregates monthly download metrics with concurrent refresh). |
+| **Database Views & Materialized Views** | `database/sql/01_views.sql`, `20261018140000_secure_reporting_views/migration.sql`, [green CI](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189166) | **PASS IN CI** | Seven ordinary views are present, including tenant-scoped `v_monthly_spend` and `v_top_downloaded_assets`; the all-tenant monthly statistics materialized view is exposed through `v_monthly_access_stats_tenant`. Regression tests pass for security-invoker flags, filtered access and runtime SELECT privileges. Live deployment still requires verification. |
 | **Database Transactions** | `sp_renew_license`, `user.service.ts` | **PASS** | Atomic multi-step operations wrapped in Prisma `$transaction` and PostgreSQL transaction blocks. |
 | **Stored Procedures** | `sp_allocate_license_seat`, `sp_release_license_seat`, `sp_renew_license` | **PASS** | 3 enterprise stored procedures in PL/pgSQL handling row locking (`FOR UPDATE`), seat validation, and renewal histories. |
 | **Triggers** | `trg_audit_log_immutable`, `trg_set_timestamp`, `trg_check_seat_limits` | **PASS** | Append-only immutability trigger on `audit_logs` (rejects updates/deletes with error `28000`); Automatic `updated_at` triggers; Allocation boundary triggers. |
@@ -75,7 +77,7 @@
 | :--- | :--- | :---: | :--- |
 | **Modern Framework** | React 18, Vite, Express TypeScript | **PASS** | Modular, type-safe full-stack monorepo with high-performance bundling and sub-second HMR. |
 | **Responsive UI** | Tailwind CSS + Lucide Icons | **PASS** | Fully responsive layout spanning mobile viewports ($<640\text{px}$), tablets, and widescreen desktop displays ($>1280\text{px}$). |
-| **Login Page** | `frontend/src/pages/LoginPage.tsx` | **PASS** | Branded enterprise authentication portal with Email/Password, quick demo credentials buttons, and Google OAuth 2.0 CTA. |
+| **Login Page** | `frontend/src/pages/auth/LoginPage.tsx` | **PASS IN CI** | Email/password validation and optional Google OAuth; no prefilled demo credentials or one-click persona/password shortcuts. |
 | **Dashboard** | `frontend/src/pages/DashboardPage.tsx` | **PASS** | Real-time KPI summary cards, interactive Compliance Gauge (0-100), Unused Seats cost alerts, recent activity feed, and quick-action modals. |
 | **Full CRUD UI** | `AssetsPage.tsx`, `LicensesPage.tsx`, `UsersPage.tsx` | **PASS** | Complete creation, detail modal, editing, soft-deletion, and restoration workflows. |
 | **Search Functionality** | `frontend/src/components/GlobalSearchModal.tsx` | **PASS** | Real-time global search querying Assets, Licenses, and Users simultaneously (`GET /api/search?q=`). |
@@ -89,7 +91,7 @@
 ### Section 5: Authentication & Role-Based Access Control (RBAC)
 | Requirement | Evidence (File Path / Output) | Status | Fix Applied / Details |
 | :--- | :--- | :---: | :--- |
-| **Secure Token Handling** | `auth.service.ts`, `auth.middleware.ts` | **PASS** | Short-lived Access Tokens (15m) in memory/Bearer header; Long-lived Refresh Tokens (7d) in `HttpOnly`, `SameSite=Strict` cookies. |
+| **Secure Token Handling** | `auth.service.ts`, `auth.middleware.ts`, `token.util.ts`, `render.yaml` | **SOURCE + CI PASS; DEPLOYMENT CHECK PENDING** | Short-lived access tokens (15m) in memory/Bearer header; refresh tokens in `HttpOnly`, secure production cookies. `COOKIE_SAMESITE=none` is required for the configured cross-site Vercel/Render topology; verify the live cookie attributes. |
 | **Authenticated User Retrieval** | `GET /api/auth/me` | **PASS** | Returns current user profile, organization details, role, and granular permission array. |
 | **Google OAuth 2.0 Integration** | `passport.config.ts`, `auth.routes.ts` | **PASS** | Seamless single sign-on linking Google identity to existing tenant user or self-service onboarding. |
 | **JWT Implementation** | `backend/src/utils/token.util.ts` | **PASS** | Cryptographically signed using HMAC-SHA256 with distinct secrets (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). |
@@ -114,7 +116,7 @@
 | **Docker Compose Orchestration** | `docker-compose.yml` | **PASS** | Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies. |
 | **Git Hygiene & Commit History** | `git log --oneline` | **PASS** | Clean history with Conventional Commit messages (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `ci:`); dual-branch model (`main`, `dev`). |
 | **CI/CD Automation (5 Workflows)** | `.github/workflows/` | **PASS** | `ci.yml`, `docker-publish.yml`, `deploy.yml`, `keepalive.yml`, and `db-backup.yml`. |
-| **Automated Test Coverage** | `backend/src/__tests__/` | **PASS** | **126 tests passing across 6 suites** (100% pass rate: `break-it-security`, `rest-api`, `services-coverage`, `auth-rbac-isolation`, `advanced-features`, `database-functions`). |
+| **Automated Tests** | `backend/src/__tests__/`, [CI run](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39136189166) | **PASS IN CI** | Latest run on the draft branch: 8 test files, 139 tests passed, 0 failed; secret scan, SQLi scan, shell syntax, lint/type-check, migrations/seeding, seed compilation and production build passed. Coverage was 69.60% statements / 50.25% branches / 80.26% functions / 71.68% lines. The faculty brief specifies no numeric coverage threshold; live deployment and restore are not verified by CI. |
 
 ---
 

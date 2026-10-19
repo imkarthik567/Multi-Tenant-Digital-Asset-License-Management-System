@@ -42,7 +42,13 @@ services:
     environment:
       PORT: 5000
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-assetvault_db}?schema=public
+      # The API uses the restricted role. Direct credentials are used for migrations,
+      # bootstrap, seeding, and trusted maintenance jobs only.
+      DATABASE_URL: ${DOCKER_DATABASE_URL:?Set DOCKER_DATABASE_URL for assetvault_app using host db}
+      DIRECT_URL: ${DOCKER_DIRECT_URL:?Set DOCKER_DIRECT_URL for admin maintenance using host db}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD to a unique value of at least 32 characters}
+      ENABLE_IN_PROCESS_WORKER: "false"
+      RUN_WORKER_IN_API: "false"
       RUN_SEED: ${RUN_SEED:-true}
     ports:
       - "${API_PORT:-5000}:5000"
@@ -64,7 +70,9 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-assetvault_db}?schema=public
+      DATABASE_URL: ${DOCKER_DATABASE_URL:?Set DOCKER_DATABASE_URL for assetvault_app using host db}
+      DIRECT_URL: ${DOCKER_DIRECT_URL:?Set DOCKER_DIRECT_URL for admin maintenance using host db}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD to a unique value of at least 32 characters}
       RUN_WORKER: "true"
     entrypoint: ["node", "dist/worker.js"]
     networks:
@@ -91,7 +99,7 @@ services:
       - tools
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@assetvault.internal}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-Admin123!}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?Set PGADMIN_PASSWORD in .env}
     ports:
       - "${PGADMIN_PORT:-5050}:80"
     depends_on:
@@ -123,7 +131,7 @@ services:
       - monitoring
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD in .env}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

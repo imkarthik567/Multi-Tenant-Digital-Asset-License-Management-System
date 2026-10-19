@@ -20,7 +20,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: assetvault_test_db
         ports:
           - 5432:5432
@@ -52,6 +52,27 @@ jobs:
       - name: Security Gate - SQL Injection Static Analysis
         run: npm run check:sqli
 
+      - name: Validate Shell Script Syntax
+        run: |
+          bash -n backend/docker-entrypoint.sh
+          find database/backup -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+
+      - name: Test backup environment variable precedence
+        run: bash database/backup/tests/environment-loader.sh
+
+      - name: Validate PowerShell Script Syntax
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path database/backup -Filter '*.ps1' -File | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+            }
+          }
+
       - name: Static Type-Check & Linting
         run: npm run lint
 
@@ -62,10 +83,31 @@ jobs:
 
       - name: Apply Database Migrations, Custom SQL Objects & Seed Data
         env:
-          PGPASSWORD: postgrespassword
-          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
-          DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
+          PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          DATABASE_URL: postgresql://postgres:${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/assetvault_test_db?schema=public
+          DIRECT_URL: postgresql://postgres:${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/assetvault_test_db?schema=public
         run: |
+          # Use disposable per-run credentials; do not commit shared test passwords.
+          export SUPER_ADMIN_EMAIL="ci-superadmin@assetvault.test"
+          export SUPER_ADMIN_PASSWORD="$(openssl rand -hex 32)"
+          export DEFAULT_SEED_PASSWORD="$(openssl rand -hex 32)"
+          export JWT_ACCESS_SECRET="$(openssl rand -hex 32)"
+          export JWT_SECRET="$JWT_ACCESS_SECRET"
+          export JWT_REFRESH_SECRET="$(openssl rand -hex 32)"
+          export COOKIE_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$SUPER_ADMIN_PASSWORD"
+          echo "::add-mask::$DEFAULT_SEED_PASSWORD"
+          echo "::add-mask::$JWT_ACCESS_SECRET"
+          echo "::add-mask::$JWT_REFRESH_SECRET"
+          echo "::add-mask::$COOKIE_SECRET"
+          echo "SUPER_ADMIN_EMAIL=$SUPER_ADMIN_EMAIL" >> "$GITHUB_ENV"
+          echo "SUPER_ADMIN_PASSWORD=$SUPER_ADMIN_PASSWORD" >> "$GITHUB_ENV"
+          echo "DEFAULT_SEED_PASSWORD=$DEFAULT_SEED_PASSWORD" >> "$GITHUB_ENV"
+          echo "JWT_ACCESS_SECRET=$JWT_ACCESS_SECRET" >> "$GITHUB_ENV"
+          echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
+          echo "JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET" >> "$GITHUB_ENV"
+          echo "COOKIE_SECRET=$COOKIE_SECRET" >> "$GITHUB_ENV"
+          export SEED_DEMO="true"
           npx prisma migrate deploy --schema backend/prisma/schema.prisma
           psql -h localhost -p 5432 -U postgres -d assetvault_test_db -f database/sql/01_views.sql
           psql -h localhost -p 5432 -U postgres -d assetvault_test_db -f database/sql/02_functions_procedures.sql
@@ -77,12 +119,8 @@ jobs:
         env:
           NODE_ENV: test
           PORT: 5000
-          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
-          DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/assetvault_test_db?schema=public
-          JWT_SECRET: test_jwt_access_secret_32_characters_minimum_entropy_1234
-          JWT_ACCESS_SECRET: test_jwt_access_secret_32_characters_minimum_entropy_1234
-          JWT_REFRESH_SECRET: test_jwt_refresh_secret_32_characters_minimum_entropy_5678
-          COOKIE_SECRET: test_cookie_secret_32_characters_minimum_entropy_9012
+          DATABASE_URL: postgresql://postgres:${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/assetvault_test_db?schema=public
+          DIRECT_URL: postgresql://postgres:${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/assetvault_test_db?schema=public
           CLIENT_URL: http://localhost:5173
           CORS_ORIGIN: http://localhost:5173
         run: npm run test -- --coverage

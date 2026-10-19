@@ -1,5 +1,5 @@
 # ==============================================================================
-# AssetVault: Production API Dockerfile (Multi-Stage Node.js 20 Alpine)
+# AssetVault: Production API Dockerfile (Multi-Stage Node.js 22 Alpine)
 # Targets minimal footprint, non-root security, and automated Prisma migrations
 # ==============================================================================
 
@@ -36,7 +36,7 @@ ENV NODE_ENV=production
 ENV PORT=5000
 
 # Install runtime utilities (curl/wget for healthcheck) and refresh npm's bundled dependency tree.
-RUN apk upgrade --no-cache && apk add --no-cache openssl curl wget libc6-compat && npm install --global npm@11 && npm cache clean --force
+RUN apk upgrade --no-cache && apk add --no-cache openssl curl wget libc6-compat postgresql-client && npm install --global npm@11 && npm cache clean --force
 
 # Create node workspace layout
 COPY package*.json /app/
@@ -44,6 +44,7 @@ COPY backend/package*.json ./
 COPY frontend/package*.json /app/frontend/
 COPY backend/prisma ./prisma
 COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY database/sql/08_production_bootstrap.sql /app/database/sql/08_production_bootstrap.sql
 
 # Install production-only dependencies
 WORKDIR /app

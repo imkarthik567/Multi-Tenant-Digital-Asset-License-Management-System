@@ -54,16 +54,11 @@ export class AccessService {
         },
       });
 
-      // Update asset status
-      const updatedAsset = await tx.asset.update({
-        where: { id: assetId },
-        data: { status: 'ACTIVE', updatedAt: new Date() },
-      });
-
+      // Checkout is an access event, not an asset lifecycle transition.
       return {
         success: true,
         message: 'Asset successfully checked out',
-        asset: updatedAsset,
+        asset,
       };
     });
   }
@@ -101,15 +96,11 @@ export class AccessService {
         },
       });
 
-      const updatedAsset = await tx.asset.update({
-        where: { id: assetId },
-        data: { status: 'ACTIVE', updatedAt: new Date() },
-      });
-
+      // Check-in is an access event, not an asset lifecycle transition.
       return {
         success: true,
         message: 'Asset successfully checked in',
-        asset: updatedAsset,
+        asset,
       };
     });
   }

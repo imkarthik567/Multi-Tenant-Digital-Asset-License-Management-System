@@ -64,17 +64,21 @@ export class UserService {
 
   public async updateUserStatus(prismaClient: any, id: string, isActive: boolean) {
     await this.getUserById(prismaClient, id);
-    const updated = await userRepository.update(prismaClient, id, { isActive });
 
-    // If deactivated, revoke all active sessions immediately
-    if (!isActive) {
-      await prismaClient.refreshToken.updateMany({
-        where: { userId: id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-    }
+    // Commit the account state and session revocation together. Otherwise a
+    // token-store failure can leave the account changed but its sessions live.
+    return prismaClient.$transaction(async (tx: any) => {
+      const updated = await userRepository.update(tx, id, { isActive });
 
-    return updated;
+      if (!isActive) {
+        await tx.refreshToken.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+
+      return updated;
+    });
   }
 
   /**
@@ -140,15 +144,17 @@ export class UserService {
     await this.getUserById(prismaClient, id);
     const passwordHash = await hashPassword(newPassword);
 
-    const updated = await userRepository.update(prismaClient, id, { passwordHash });
-
-    // Revoke all refresh tokens on password reset
-    await prismaClient.refreshToken.updateMany({
-      where: { userId: id, revokedAt: null },
-      data: { revokedAt: new Date() },
+    // The password change and refresh-token invalidation must succeed or fail
+    // together so a partial reset cannot preserve sessions authenticated with
+    // the previous credential.
+    return prismaClient.$transaction(async (tx: any) => {
+      const updated = await userRepository.update(tx, id, { passwordHash });
+      await tx.refreshToken.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return updated;
     });
-
-    return updated;
   }
 
   public async deleteUser(prismaClient: any, id: string) {

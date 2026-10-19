@@ -76,6 +76,14 @@ BEGIN
         IF v_new_data IS NOT NULL THEN
             v_new_data := v_new_data - 'password_hash';
         END IF;
+    ELSIF TG_TABLE_NAME = 'licenses' THEN
+        -- Software license keys are secrets; never persist them in immutable audit snapshots.
+        IF v_old_data IS NOT NULL THEN
+            v_old_data := v_old_data - 'license_key';
+        END IF;
+        IF v_new_data IS NOT NULL THEN
+            v_new_data := v_new_data - 'license_key';
+        END IF;
     END IF;
 
     -- 3. Determine record ID
@@ -392,18 +400,18 @@ DECLARE
     v_max_assets INT;
     v_current_assets INT;
 BEGIN
-    -- Query max allowed assets for tenant's plan
+    -- Serialize per-tenant asset creation before checking the plan quota.
     SELECT p.max_assets INTO v_max_assets
     FROM tenants t
     JOIN plans p ON p.id = t.plan_id
-    WHERE t.id = NEW.tenant_id;
+    WHERE t.id = NEW.tenant_id
+    FOR UPDATE OF t;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Tenant % does not exist', NEW.tenant_id
             USING ERRCODE = 'foreign_key_violation';
     END IF;
 
-    -- Count existing active assets
     SELECT COUNT(*) INTO v_current_assets
     FROM assets
     WHERE tenant_id = NEW.tenant_id
@@ -432,12 +440,13 @@ DECLARE
     v_max_users INT;
     v_current_users INT;
 BEGIN
-    -- Only evaluate if tenant_id is provided (non super-admins)
     IF NEW.tenant_id IS NOT NULL THEN
+        -- Serialize per-tenant user creation before checking the plan quota.
         SELECT p.max_users INTO v_max_users
         FROM tenants t
         JOIN plans p ON p.id = t.plan_id
-        WHERE t.id = NEW.tenant_id;
+        WHERE t.id = NEW.tenant_id
+        FOR UPDATE OF t;
 
         IF NOT FOUND THEN
             RAISE EXCEPTION 'Tenant % does not exist', NEW.tenant_id

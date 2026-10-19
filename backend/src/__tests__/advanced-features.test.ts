@@ -22,6 +22,11 @@ import { emailService } from '../services/email.service';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
+const testPassword = process.env.DEFAULT_SEED_PASSWORD;
+if (!testPassword) {
+  throw new Error('Set DEFAULT_SEED_PASSWORD before running seeded-user integration tests.');
+}
+
 describe('AssetVault Advanced Enterprise Features Suite', () => {
   let adminToken: string;
   let memberToken: string;
@@ -32,7 +37,7 @@ describe('AssetVault Advanced Enterprise Features Suite', () => {
     // 1. Authenticate TechCorp Tenant Admin
     const adminLoginRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'techcorp.admin@techcorp.io', password: 'Password123!' });
+      .send({ email: 'techcorp.admin@techcorp.io', password: testPassword });
     expect(adminLoginRes.status).toBe(200);
     adminToken = adminLoginRes.body.data.accessToken;
     tenantId = adminLoginRes.body.data.user.tenantId;
@@ -40,7 +45,7 @@ describe('AssetVault Advanced Enterprise Features Suite', () => {
     // 2. Authenticate TechCorp Member
     const memberLoginRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'techcorp.dev1@techcorp.io', password: 'Password123!' });
+      .send({ email: 'techcorp.dev1@techcorp.io', password: testPassword });
     expect(memberLoginRes.status).toBe(200);
     memberToken = memberLoginRes.body.data.accessToken;
 
@@ -189,7 +194,7 @@ describe('AssetVault Advanced Enterprise Features Suite', () => {
       expect(res.headers['content-disposition']).toContain('attachment; filename=');
 
       const csvContent = res.text;
-      expect(csvContent).toContain('ID,Timestamp,Action,Table Name,Record ID');
+      expect(csvContent).toContain('"ID","Timestamp","Action","Table Name","Record ID"');
     });
 
     it('supports action filtering on CSV audit log export', async () => {
@@ -198,7 +203,7 @@ describe('AssetVault Advanced Enterprise Features Suite', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.text).toContain('ID,Timestamp,Action');
+      expect(res.text).toContain('"ID","Timestamp","Action"');
     });
   });
 

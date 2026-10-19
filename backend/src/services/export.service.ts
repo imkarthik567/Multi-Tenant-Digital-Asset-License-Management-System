@@ -7,6 +7,7 @@
 import PDFDocument from 'pdfkit';
 import { prismaForRequest } from '../config/prisma';
 import { NotFoundError } from '../errors/AppError';
+import { toCsv } from '../utils/csv.util';
 
 export class ExportService {
   /**
@@ -247,25 +248,6 @@ export class ExportService {
       take: 1000,
     });
 
-    const rows = auditLogs.map((al) => ({
-      id: al.id.toString(),
-      performed_at: al.performedAt.toISOString(),
-      action: al.action,
-      table_name: al.tableName,
-      record_id: al.recordId,
-      user_name: al.user?.fullName || null,
-      user_email: al.user?.email || null,
-      ip_address: 'N/A',
-      old_data: al.oldData,
-      new_data: al.newData,
-    }));
-
-    const escapeCsv = (str: any): string => {
-      if (str === null || str === undefined) return '""';
-      const s = typeof str === 'object' ? JSON.stringify(str) : String(str);
-      return `"${s.replace(/"/g, '""')}"`;
-    };
-
     const headers = [
       'ID',
       'Timestamp',
@@ -279,25 +261,20 @@ export class ExportService {
       'New Data',
     ];
 
-    const csvLines = [headers.join(',')];
+    const rows = auditLogs.map((al) => ({
+      ID: al.id.toString(),
+      Timestamp: al.performedAt.toISOString(),
+      Action: al.action,
+      'Table Name': al.tableName,
+      'Record ID': al.recordId,
+      'Performed By Name': al.user?.fullName || 'System/Worker',
+      'Performed By Email': al.user?.email || 'N/A',
+      'IP Address': 'N/A',
+      'Old Data': al.oldData,
+      'New Data': al.newData,
+    }));
 
-    for (const r of rows) {
-      const line = [
-        escapeCsv(r.id),
-        escapeCsv(new Date(r.performed_at).toISOString()),
-        escapeCsv(r.action),
-        escapeCsv(r.table_name),
-        escapeCsv(r.record_id),
-        escapeCsv(r.user_name || 'System/Worker'),
-        escapeCsv(r.user_email || 'N/A'),
-        escapeCsv(r.ip_address || 'N/A'),
-        escapeCsv(r.old_data),
-        escapeCsv(r.new_data),
-      ];
-      csvLines.push(line.join(','));
-    }
-
-    return csvLines.join('\r\n');
+    return toCsv(rows, headers);
   }
 }
 

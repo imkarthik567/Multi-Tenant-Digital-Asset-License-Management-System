@@ -9,6 +9,8 @@ import { authenticate } from '../middleware/auth.middleware';
 import { loadUser } from '../middleware/loadUser.middleware';
 import { authorize } from '../middleware/authorize.middleware';
 import { tenantContext } from '../middleware/tenantScope.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { tenantIdQuerySchema } from '../validators/tenant.validator';
 
 const router = Router();
 
@@ -39,9 +41,9 @@ router.get('/unlicensed-assets', authorize('assets:read'), reportController.getU
 router.get('/access-trend', authorize('assets:read'), reportController.getAccessTrend);
 
 // 9. Compliance Engine (Score 0-100 & Drill-down remediation)
-router.get('/compliance', authorize('tenants:read_own'), reportController.getComplianceReport);
+router.get('/compliance', authorize('tenants:read_own'), validate({ query: tenantIdQuerySchema }), reportController.getComplianceReport);
 
 // 10. Cost Optimization (Dormant Seats & Vendor Spend)
-router.get('/unused-seats', authorize('allocations:manage_all'), reportController.getUnusedSeatsReport);
+router.get('/unused-seats', authorize('allocations:manage_all'), validate({ query: tenantIdQuerySchema }), reportController.getUnusedSeatsReport);
 
 export default router;

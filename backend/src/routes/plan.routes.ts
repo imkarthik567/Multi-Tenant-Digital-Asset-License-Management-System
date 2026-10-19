@@ -10,7 +10,7 @@ import { loadUser } from '../middleware/loadUser.middleware';
 import { authorize } from '../middleware/authorize.middleware';
 import { tenantContext } from '../middleware/tenantScope.middleware';
 import { validate } from '../middleware/validate.middleware';
-import { createPlanSchema, updatePlanSchema } from '../validators/plan.validator';
+import { createPlanSchema, updatePlanSchema, planIdParamsSchema } from '../validators/plan.validator';
 
 const router = Router();
 
@@ -19,11 +19,11 @@ router.use(authenticate, loadUser);
 
 // Read plans (accessible to all authenticated users)
 router.get('/', authorize('plans:read'), tenantContext, planController.listPlans);
-router.get('/:id', authorize('plans:read'), tenantContext, planController.getPlanById);
+router.get('/:id', authorize('plans:read'), tenantContext, validate({ params: planIdParamsSchema }), planController.getPlanById);
 
 // Plan management (Super Admin only)
 router.post('/', authorize('plans:manage'), tenantContext, validate(createPlanSchema), planController.createPlan);
-router.patch('/:id', authorize('plans:manage'), tenantContext, validate(updatePlanSchema), planController.updatePlan);
-router.delete('/:id', authorize('plans:manage'), tenantContext, planController.deletePlan);
+router.patch('/:id', authorize('plans:manage'), tenantContext, validate({ params: planIdParamsSchema }), validate(updatePlanSchema), planController.updatePlan);
+router.delete('/:id', authorize('plans:manage'), tenantContext, validate({ params: planIdParamsSchema }), planController.deletePlan);
 
 export default router;

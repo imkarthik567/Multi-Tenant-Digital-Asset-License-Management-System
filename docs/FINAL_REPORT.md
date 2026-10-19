@@ -188,11 +188,16 @@ To guarantee sub-second execution over millions of records, AssetVault implement
 ## 6. Advanced Database Programmability
 
 ### 6.1 Database Views & Materialized Views
-- **Standard View `v_asset_catalog`:** Encapsulates multi-table joins across assets, categories, users, versions, tags, and licenses into a unified virtual catalog. Used by repository layer to fetch asset listings without repetitive complex SQL joins.
-- **Materialized View `mv_monthly_access_stats`:** Aggregates download counts, checkout volumes, and unique active users per asset grouped by calendar month. To maintain high performance without blocking read queries, background cron workers refresh this view non-blockingly using:
+- **Tenant-facing analytical views:** `v_license_utilization`, `v_expiring_licenses`, `v_asset_catalog`, and `v_vendor_spend` provide usage, expiry, catalog-compliance, and spend summaries. They are configured with PostgreSQL's `security_invoker` option so base-table row-level security is evaluated with the caller's privileges.
+- **Window-function views:** `v_monthly_spend` computes month-by-month spend and the tenant-local running total; `v_top_downloaded_assets` ranks assets by downloads within each tenant.
+- **Platform overview:** `v_tenant_summary` aggregates tenant sizes and license spend; access to it should be restricted to the Super Admin route and executed with an explicit trusted platform context.
+- **Monthly access materialization:** `mv_monthly_access_stats` aggregates tenant-level download, checkout, view/check-in and active-user metrics by month. It is not directly selectable by the runtime role. A security-barrier wrapper view, `v_monthly_access_stats_tenant`, filters by the transaction-local tenant ID or the explicit Super Admin context.
+- **Concurrent refresh:** background maintenance refreshes the materialized view without blocking ordinary readers:
   ```sql
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;
   ```
+
+> **Verification status:** The view definitions, permissions and regression tests have been added on the rubric-fix branch. The latest CI run must pass the privilege and cross-tenant tests before these controls should be described as verified on a running system.
 
 ### 6.2 Stored Procedures & Concurrency Control
 AssetVault implements three stored procedures in PL/pgSQL:
@@ -268,7 +273,7 @@ In accordance with production enterprise standards, AssetVault utilizes native d
   - Automatically compares table row counts between production and restored scratch databases, outputting a verification PASS/FAIL matrix.
 
 ### 9.2 Containerization & Orchestration
-- **API Container (`backend/Dockerfile`):** Multi-stage Node 20 Alpine container running as a non-privileged `node` user with production dependencies only and built-in Docker healthcheck (`GET /api/health`).
+- **API Container (`backend/Dockerfile`):** Multi-stage Node 22 Alpine container running as a non-privileged `node` user with production dependencies only and built-in Docker healthcheck (`GET /api/health`).
 - **Web Container (`frontend/Dockerfile`):** Multi-stage build producing static production bundles served via NGINX Alpine with HTTP/2 and gzip compression.
 - **Docker Compose (`docker-compose.yml`):** Orchestrates PostgreSQL, API, Web, Prometheus, and Grafana with volume persistence and health dependencies.
 
@@ -278,27 +283,31 @@ Five automated workflows ensure continuous integration and deployment:
 2. `docker-publish.yml`: Builds and verifies container images and publishes to Docker Hub with Trivy vulnerability scanning.
 3. `deploy.yml`: Deploys API to Render Blueprint and Web SPA to Vercel.
 4. `keepalive.yml`: Healthcheck pings preventing free-tier dormancy.
-5. `db-backup.yml`: Automated database backup artifact generation and verification.
+5. `db-backup.yml`: Automated database backup artifact generation and checksum upload; restore validation is a separate drill using `database/backup/verify-restore.sh`.
 
 ---
 
 ## 10. Test Verification Results
 
-The automated test suite (`npm test`) executes across six distinct suites:
+> **Verification note (October 18, 2026):** GitHub Actions run [39135857240](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39135857240) passed on the rubric-fix branch. It completed secret scanning, SQL-injection static analysis, shell syntax checks, TypeScript/lint, migrations, custom SQL, seeding, Vitest, production seed compilation and production monorepo build. The Docker Build & Publish run [39135857203](https://github.com/imkarthik567/Multi-Tenant-Digital-Asset-License-Management-System/actions/runs/39135857203) also succeeded. This verifies the checked branch in CI, not the live cloud deployment or backup restore drill.
+
+The automated test suite (`npm test`) currently executes across eight test files:
 
 ```
 Test Suite Execution Results:
 ✓ backend/src/__tests__/break-it-security.test.ts (22 tests) - 100% PASS
 ✓ backend/src/__tests__/rest-api.test.ts (24 tests) - 100% PASS
-✓ backend/src/__tests__/services-coverage.test.ts (34 tests) - 100% PASS
-✓ backend/src/__tests__/auth-rbac-isolation.test.ts (10 tests) - 100% PASS
+✓ backend/src/__tests__/services-coverage.test.ts (35 tests) - PASS
+✓ backend/src/__tests__/auth-rbac-isolation.test.ts (11 tests) - PASS
 ✓ backend/src/__tests__/advanced-features.test.ts (19 tests) - 100% PASS
-✓ backend/src/__tests__/database-functions.test.ts (17 tests) - 100% PASS
+✓ backend/src/__tests__/database-functions.test.ts (23 tests) - PASS
+✓ backend/src/__tests__/response.util.test.ts (2 tests) - PASS
+✓ backend/src/__tests__/csv.util.test.ts (3 tests) - PASS
 
-Total: 6 Test Files, 126 Tests Passed, 0 Failed (100% Pass Rate)
+Latest CI snapshot: 8 Test Files, 139 Tests Passed, 0 Failed. Coverage report: 69.60% statements, 50.25% branches, 80.26% functions, and 71.68% lines. Statement coverage is below 70%, so do not claim the statement-coverage metric meets a 70% threshold.
 Static SQL Injection Check (check:sqli): 0 Violations
-Secret Scanner (check:secrets): 0 Leaks Found
-TypeScript Compilation (lint): 0 Errors (API & Web)
+Secret Scanner (check:secrets): passed on the latest reviewed CI revision
+TypeScript Compilation (lint): passed on the latest reviewed CI revision
 ```
 
 ---

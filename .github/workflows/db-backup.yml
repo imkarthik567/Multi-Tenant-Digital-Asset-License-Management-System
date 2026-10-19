@@ -24,8 +24,8 @@ jobs:
           TARGET_URL="${DATABASE_DIRECT_URL:-$DATABASE_URL}"
           if [ -z "$TARGET_URL" ]; then
             echo "⚠️ Neither DATABASE_DIRECT_URL nor DATABASE_URL secret is configured in GitHub repository settings."
-            echo "ℹ️ Skipping automated cloud backup gracefully."
-            exit 0
+            echo "::error::Configure DATABASE_DIRECT_URL or DATABASE_URL; a skipped backup must not report success."
+            exit 1
           fi
 
           mkdir -p backups
@@ -52,4 +52,4 @@ jobs:
           name: assetvault-nightly-backup-${{ github.run_id }}
           path: backups/
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: error
