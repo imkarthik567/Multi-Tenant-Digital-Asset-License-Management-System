@@ -92,7 +92,7 @@ try {
     }
     $RestoreSucceeded = $true
 
-    $tableQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT LIKE '_prisma%' ORDER BY table_name;"
+    $tableQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> '_prisma_migrations' ORDER BY table_name;"
     $tableList = Invoke-VerificationSql $ConnectionDetails.database $tableQuery
     $tables = @($tableList -split "\r?\n" | Where-Object { $_ })
     if ($tables.Count -eq 0) {

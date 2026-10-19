@@ -140,7 +140,7 @@ run_sql() {
 echo ""
 echo "[STEP 2/3] Querying table catalog and calculating row counts..."
 
-TABLE_QUERY="SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT LIKE '_prisma%' ORDER BY table_name;"
+TABLE_QUERY="SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> '_prisma_migrations' ORDER BY table_name;"
 TABLES=$(run_sql "${SOURCE_DB}" "${TABLE_QUERY}")
 if [[ -z "${TABLES//[[:space:]]/}" ]]; then
   echo "[ERROR] No base tables found in source database '${SOURCE_DB}'."
