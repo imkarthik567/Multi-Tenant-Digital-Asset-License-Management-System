@@ -11,6 +11,7 @@ import { authorize } from '../middleware/authorize.middleware';
 import { tenantContext } from '../middleware/tenantScope.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { createCategorySchema, updateCategorySchema } from '../validators/category.validator';
+import { uuidIdParamsSchema } from '../validators/id.validator';
 
 const router = Router();
 
@@ -19,11 +20,11 @@ router.use(authenticate, loadUser);
 // Read categories & nested tree
 router.get('/tree', authorize('categories:read'), tenantContext, categoryController.getCategoryTree);
 router.get('/', authorize('categories:read'), tenantContext, categoryController.listCategories);
-router.get('/:id', authorize('categories:read'), tenantContext, categoryController.getCategoryById);
+router.get('/:id', authorize('categories:read'), tenantContext, validate({ params: uuidIdParamsSchema }), categoryController.getCategoryById);
 
 // Manage categories
 router.post('/', authorize('categories:manage'), tenantContext, validate(createCategorySchema), categoryController.createCategory);
-router.patch('/:id', authorize('categories:manage'), tenantContext, validate(updateCategorySchema), categoryController.updateCategory);
-router.delete('/:id', authorize('categories:manage'), tenantContext, categoryController.deleteCategory);
+router.patch('/:id', authorize('categories:manage'), tenantContext, validate({ params: uuidIdParamsSchema }), validate(updateCategorySchema), categoryController.updateCategory);
+router.delete('/:id', authorize('categories:manage'), tenantContext, validate({ params: uuidIdParamsSchema }), categoryController.deleteCategory);
 
 export default router;

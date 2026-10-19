@@ -6,6 +6,7 @@ import { assetIdParamsSchema, assetTagParamsSchema, createAssetSchema, queryAsse
 import { queryLicenseSchema } from '../validators/license.validator';
 import { queryTenantSchema, tenantIdQuerySchema } from '../validators/tenant.validator';
 import { planIdParamsSchema } from '../validators/plan.validator';
+import { licenseAssetLinkParamsSchema, uuidIdParamsSchema } from '../validators/id.validator';
 import { compareVersionsQuerySchema, createVersionSchema, versionNoParamsSchema } from '../validators/version.validator';
 import { runExpiryCheckSchema } from '../validators/notification.validator';
 import {
@@ -13,6 +14,19 @@ import {
   exportAuditLogQuerySchema,
   queryAuditLogSchema,
 } from '../validators/audit.validator';
+
+describe('UUID route parameters', () => {
+  it('accepts standard UUID IDs and rejects malformed IDs before database calls', () => {
+    expect(uuidIdParamsSchema.safeParse({ id: '00000000-0000-4000-8000-000000000001' }).success).toBe(true);
+    expect(uuidIdParamsSchema.safeParse({ id: 'abc' }).success).toBe(false);
+  });
+
+  it('validates both sides of a license-to-asset route', () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    expect(licenseAssetLinkParamsSchema.safeParse({ id, assetId: id }).success).toBe(true);
+    expect(licenseAssetLinkParamsSchema.safeParse({ id, assetId: 'bad' }).success).toBe(false);
+  });
+});
 
 describe('asset path parameters', () => {
   it('rejects malformed asset and tag UUIDs before database queries', () => {

@@ -11,6 +11,7 @@ import { authorize } from '../middleware/authorize.middleware';
 import { tenantContext } from '../middleware/tenantScope.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { createTagSchema, updateTagSchema } from '../validators/tag.validator';
+import { uuidIdParamsSchema } from '../validators/id.validator';
 
 const router = Router();
 
@@ -18,11 +19,11 @@ router.use(authenticate, loadUser);
 
 // Read tags
 router.get('/', authorize('tags:read'), tenantContext, tagController.listTags);
-router.get('/:id', authorize('tags:read'), tenantContext, tagController.getTagById);
+router.get('/:id', authorize('tags:read'), tenantContext, validate({ params: uuidIdParamsSchema }), tagController.getTagById);
 
 // Manage tags
 router.post('/', authorize('tags:manage'), tenantContext, validate(createTagSchema), tagController.createTag);
-router.patch('/:id', authorize('tags:manage'), tenantContext, validate(updateTagSchema), tagController.updateTag);
-router.delete('/:id', authorize('tags:manage'), tenantContext, tagController.deleteTag);
+router.patch('/:id', authorize('tags:manage'), tenantContext, validate({ params: uuidIdParamsSchema }), validate(updateTagSchema), tagController.updateTag);
+router.delete('/:id', authorize('tags:manage'), tenantContext, validate({ params: uuidIdParamsSchema }), tagController.deleteTag);
 
 export default router;

@@ -11,6 +11,7 @@ import { authorize } from '../middleware/authorize.middleware';
 import { tenantContext } from '../middleware/tenantScope.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { queryNotificationSchema, runExpiryCheckSchema } from '../validators/notification.validator';
+import { uuidIdParamsSchema } from '../validators/id.validator';
 
 import { notificationStreamService } from '../services/notificationStream.service';
 
@@ -30,7 +31,7 @@ router.patch('/read-all', authorize('notifications:read'), notificationControlle
 router.get('/', authorize('notifications:read'), validate({ query: queryNotificationSchema }), notificationController.listNotifications);
 
 // Mark specific notification as read
-router.patch('/:id/read', authorize('notifications:read'), notificationController.markAsRead);
+router.patch('/:id/read', authorize('notifications:read'), validate({ params: uuidIdParamsSchema }), notificationController.markAsRead);
 
 // Run automated license expiry check (Generates notifications via fn_generate_expiry_notifications)
 router.post('/run-expiry-check', authorize('notifications:manage'), validate(runExpiryCheckSchema), notificationController.runExpiryCheck);

@@ -3,6 +3,7 @@
 // Course: BCSE307L Database Systems (Fall 2026-27)
 // ==============================================================================
 
+import { uuidIdParamsSchema } from '../validators/id.validator';
 import { Router } from 'express';
 import { tenantController } from '../controllers/tenant.controller';
 import { authenticate } from '../middleware/auth.middleware';
@@ -29,13 +30,13 @@ router.get('/', authorize('tenants:read_platform'), tenantContext, validate({ qu
 router.get('/export', authorize('tenants:update_own'), tenantContext, tenantController.exportTenantData);
 
 // 2. Get tenant details (Super Admin or own tenant)
-router.get('/:id', authorize('tenants:read_own'), tenantContext, tenantController.getTenantById);
+router.get('/:id', authorize('tenants:read_own'), tenantContext, validate({ params: uuidIdParamsSchema }), tenantController.getTenantById);
 
 // Platform tenant management (Super Admin)
 router.post('/', authorize('tenants:manage_platform'), tenantContext, validate(createTenantSchema), tenantController.createTenant);
-router.patch('/:id', authorize('tenants:manage_platform'), tenantContext, validate(updateTenantSchema), tenantController.updateTenant);
-router.patch('/:id/status', authorize('tenants:manage_platform'), tenantContext, validate(updateTenantStatusSchema), tenantController.updateStatus);
-router.patch('/:id/plan', authorize('tenants:manage_platform'), tenantContext, validate(updateTenantPlanSchema), tenantController.changePlan);
-router.delete('/:id', authorize('tenants:manage_platform'), tenantContext, tenantController.deleteTenant);
+router.patch('/:id', authorize('tenants:manage_platform'), tenantContext, validate({ params: uuidIdParamsSchema }), validate(updateTenantSchema), tenantController.updateTenant);
+router.patch('/:id/status', authorize('tenants:manage_platform'), tenantContext, validate({ params: uuidIdParamsSchema }), validate(updateTenantStatusSchema), tenantController.updateStatus);
+router.patch('/:id/plan', authorize('tenants:manage_platform'), tenantContext, validate({ params: uuidIdParamsSchema }), validate(updateTenantPlanSchema), tenantController.changePlan);
+router.delete('/:id', authorize('tenants:manage_platform'), tenantContext, validate({ params: uuidIdParamsSchema }), tenantController.deleteTenant);
 
 export default router;
