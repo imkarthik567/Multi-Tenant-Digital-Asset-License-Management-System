@@ -146,6 +146,10 @@ export class TenantService {
       await tx.asset.deleteMany({ where: { tenantId: id } });
       await tx.license.deleteMany({ where: { tenantId: id } });
 
+      // Tenant deletion is the only path allowed to purge immutable audit rows.
+      // The transaction-local flag above authorizes this GDPR-style tenant erasure.
+      await tx.auditLog.deleteMany({ where: { tenantId: id } });
+
       // Delete tenant
       const deleted = await tx.tenant.delete({ where: { id } });
 
