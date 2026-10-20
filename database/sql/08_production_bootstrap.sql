@@ -77,3 +77,13 @@ FROM information_schema.schema_privileges
 WHERE grantee = 'assetvault_app';
 
 SELECT 'Production bootstrap role configuration completed successfully.' AS status;
+
+-- 7. Ensure materialized view ownership and specialized indexes
+ALTER MATERIALIZED VIEW IF EXISTS mv_monthly_access_stats OWNER TO assetvault_app;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_assets_name_trgm ON assets USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_licenses_name_trgm ON licenses USING gin (software_product gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_license_alloc_active ON license_allocations (license_id, user_id) WHERE status = 'ACTIVE';
+CREATE INDEX IF NOT EXISTS idx_assets_deleted_at ON assets (tenant_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_licenses_deleted_at ON licenses (tenant_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications (user_id, created_at) WHERE is_read = false;
