@@ -249,10 +249,21 @@ GROUP BY a.tenant_id, TO_CHAR(aal.accessed_at, 'YYYY-MM');
 
 CREATE UNIQUE INDEX idx_mv_monthly_access_unique ON mv_monthly_access_stats (tenant_id, month_year);
 
--- Routine to refresh the materialized view
-CREATE OR REPLACE FUNCTION fn_refresh_monthly_access_stats()
-RETURNS VOID AS $$
+-- Refresh using the view owner's privileges without granting view ownership to the app role.
+-- Return a scalar so Prisma can deserialize the result when called through $queryRaw.
+DROP FUNCTION IF EXISTS public.fn_refresh_monthly_access_stats();
+
+CREATE FUNCTION public.fn_refresh_monthly_access_stats()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $function$
 BEGIN
-    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_monthly_access_stats;
+    RETURN TRUE;
 END;
-$$ LANGUAGE plpgsql;
+$function$;
+
+REVOKE ALL ON FUNCTION public.fn_refresh_monthly_access_stats() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fn_refresh_monthly_access_stats() TO assetvault_app;
