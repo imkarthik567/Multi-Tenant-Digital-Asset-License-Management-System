@@ -159,7 +159,7 @@ export class JobScheduler {
   public async runRefreshMaterializedViewJob(): Promise<boolean> {
     const result = await this.withAdvisoryLock(LOCK_REFRESH_MV, 'RefreshMaterializedView', async (tx) => {
       logger.info('Refreshing materialized view mv_monthly_access_stats...');
-      await tx.$queryRaw(Prisma.sql`SELECT public.fn_refresh_monthly_access_stats();`);
+      await tx.$queryRaw(Prisma.sql`SELECT public.fn_refresh_monthly_access_stats() AS refreshed;`);
       logger.info('Successfully refreshed materialized view mv_monthly_access_stats');
       return true;
     });

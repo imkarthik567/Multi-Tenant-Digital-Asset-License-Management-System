@@ -2,14 +2,17 @@
 -- The function runs as its owner (who owns the materialized view) rather than
 -- granting ownership of the view to the application role.
 
-CREATE OR REPLACE FUNCTION public.fn_refresh_monthly_access_stats()
-RETURNS VOID
+DROP FUNCTION IF EXISTS public.fn_refresh_monthly_access_stats();
+
+CREATE FUNCTION public.fn_refresh_monthly_access_stats()
+RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $function$
 BEGIN
     REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_monthly_access_stats;
+    RETURN TRUE;
 END;
 $function$;
 
