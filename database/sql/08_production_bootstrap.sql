@@ -63,12 +63,6 @@ GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO assetvault_app;
 GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA public TO assetvault_app;
 
-<<<<<<< HEAD
-=======
--- 8b. Grant ownership of materialized views so application/scheduler can refresh them
-ALTER MATERIALIZED VIEW IF EXISTS mv_monthly_access_stats OWNER TO assetvault_app;
-
->>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165
 -- 9. Configure default privileges for future objects created by migrations/admin
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO assetvault_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO assetvault_app;
@@ -83,7 +77,6 @@ FROM information_schema.schema_privileges
 WHERE grantee = 'assetvault_app';
 
 SELECT 'Production bootstrap role configuration completed successfully.' AS status;
-<<<<<<< HEAD
 
 -- 7. Ensure materialized view ownership and specialized indexes
 ALTER MATERIALIZED VIEW IF EXISTS mv_monthly_access_stats OWNER TO assetvault_app;
@@ -94,5 +87,3 @@ CREATE INDEX IF NOT EXISTS idx_license_alloc_active ON license_allocations (lice
 CREATE INDEX IF NOT EXISTS idx_assets_deleted_at ON assets (tenant_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_licenses_deleted_at ON licenses (tenant_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications (user_id, created_at) WHERE is_read = false;
-=======
->>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165

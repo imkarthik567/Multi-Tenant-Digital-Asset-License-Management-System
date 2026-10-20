@@ -28,16 +28,7 @@ RUN npx prisma generate
 RUN node ../node_modules/typescript/bin/tsc -p tsconfig.build.json
 RUN node ../node_modules/typescript/bin/tsc -p tsconfig.seed.json
 
-<<<<<<< HEAD
 # Stage 3: Production Runtime (Non-root user, slim footprint)
-=======
-# Stage 3: Production Dependencies Pruning
-FROM deps AS prod-deps
-WORKDIR /app
-RUN npm prune --omit=dev --workspace=@assetvault/api
-
-# Stage 4: Production Runtime (Non-root user, slim footprint)
->>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165
 FROM node:22-alpine AS runner
 WORKDIR /app/backend
 
@@ -54,14 +45,9 @@ COPY frontend/package*.json /app/frontend/
 COPY backend/prisma /app/backend/prisma/
 COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-<<<<<<< HEAD
 # Install production-only dependencies
 WORKDIR /app
 RUN npm ci --workspace=@assetvault/api --omit=dev --ignore-scripts && npm cache clean --force
-=======
-# Copy pruned production dependencies from prod-deps stage
-COPY --from=prod-deps /app/node_modules /app/node_modules
->>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165
 
 WORKDIR /app/backend
 # Copy built artifacts from builder

@@ -30,13 +30,8 @@
     "@commitlint/config-conventional": "^21.2.3",
     "@faker-js/faker": "^10.6.0",
     "@playwright/test": "^1.64.0",
-<<<<<<< HEAD
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
-=======
-    "@typescript-eslint/eslint-plugin": "^7.10.0",
-    "@typescript-eslint/parser": "^7.10.0",
->>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165
     "concurrently": "^8.2.2",
     "eslint": "^8.57.0",
     "husky": "^9.1.7",
@@ -47,7 +42,6 @@
   "license": "UNLICENSED",
   "prisma": {
     "seed": "node node_modules/ts-node/dist/bin.js backend/prisma/seed.ts"
-<<<<<<< HEAD
   },
   "overrides": {
     "chokidar": "^4.0.3",
@@ -59,7 +53,5 @@
     },
     "react-router": "^7.18.0",
     "react-router-dom": "^7.18.0"
-=======
->>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165
   }
 }
