@@ -10,7 +10,7 @@ import { hashPassword, comparePassword, hashToken } from '../utils/hash.util';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 // Pre-computed BCrypt cost factor 12 hash for constant-time comparison when user or passwordHash is missing
-const DUMMY_BCRYPT_HASH = '$2a$12$e8fT5/jGz18N.f0V.1P0O.oTj8U1yE4/Q0/J1J1J1J1J1J1J1J1J1';
+const DUMMY_BCRYPT_HASH = '$2a$12$D021KNk/cBAisMwChHfu/.oyT8l/ILtBOJFzVmoY9Vqi4TaICrXPa';
 
 import {
   generateAccessToken,
