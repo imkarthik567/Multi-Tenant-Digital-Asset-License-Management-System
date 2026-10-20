@@ -100,7 +100,13 @@ export const tenantContext = (req: Request, res: Response, next: NextFunction): 
         };
 
         res.once('finish', () => onDone(res.statusCode));
-        res.once('close', () => onDone(res.statusCode));
+        res.once('close', () => {
+          if (settled) return;
+          if (!res.writableFinished) {
+            settled = true;
+            reject(new Error('Response closed before it could finish'));
+          }
+        });
         res.once('error', (err) => {
           if (!settled) {
             settled = true;
