@@ -82,7 +82,7 @@ export const allowedOrigins = parseAllowedOrigins([env.CLIENT_URL, env.CORS_ORIG
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Allow server-to-server, healthchecks, or tests where origin is undefined
       if (!origin) {
         return callback(null, true);

@@ -25,9 +25,9 @@ export const configurePassport = (): void => {
         callbackURL: env.GOOGLE_CALLBACK_URL,
         proxy: true,
       },
-      async (_accessToken, _refreshToken, profile, done) => {
+      async (_accessToken: string, _refreshToken: string, profile: any, done: (err: any, user?: any, info?: any) => void) => {
         try {
-          const verifiedEmail = profile.emails?.find((entry) => entry.verified === true)?.value;
+          const verifiedEmail = profile.emails?.find((entry: { value: string; verified?: boolean }) => entry.verified === true)?.value;
           const email = verifiedEmail?.toLowerCase().trim();
           if (!email) {
             return done(new Error('Google profile did not provide a verified email address'), undefined);
