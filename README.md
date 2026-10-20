@@ -385,20 +385,3 @@ Screenshots captured across Desktop ($1280\text{px}$), Tablet ($768\text{px}$), 
 * **Lead Architect & Developer:** Karthikeyan S (Department of Computer Applications, VIT Vellore).
 * **Course Faculty:** Course Coordinator & Lab Faculty for BCSE307L (Database Systems).
 * **Academic License:** Vellore Institute of Technology (Fall 2026-27). Distributed for educational and academic assessment purposes.
-
-## Project Timeline
-
-```mermaid
-gantt
-  title AssetVault Development Timeline
-  dateFormat YYYY-MM-DD
-  section Phase 1 - Design
-  ER Diagram and Schema Design     :2026-07-01, 14d
-  section Phase 2 - Backend
-  Database Implementation          :2026-07-15, 21d
-  REST API and Authentication      :2026-08-01, 21d
-  section Phase 3 - Frontend
-  React UI Development             :2026-08-22, 21d
-  section Phase 4 - Testing
-  Integration Tests and Deployment :2026-09-12, 14d
-```
