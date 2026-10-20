@@ -14,8 +14,13 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const SECRET_PATTERNS = [
   { name: 'Private Key', regex: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/ },
   { name: 'AWS Access Key ID', regex: /\b(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\b/ },
+<<<<<<< HEAD
   { name: 'Generic Secret Token (Heuristic)', regex: /(?:api[_-]?key|secret[_-]?key|jwt[_-]?secret)\s*[:=]\s*['"][a-zA-Z0-9_\-.]{32,}['"]/i },
   { name: 'Hardcoded Password in String Literal', regex: /(?:password|passwd|pwd)\s*[:=]\s*['"](?!Password123!|\$2[aby]\$|\$\{)[a-zA-Z0-9!@#$%^&*()_+\-=[\]{}]{12,}['"]/i }
+=======
+  { name: 'Generic Secret Token (Heuristic)', regex: /(?:api[_-]?key|secret[_-]?key|jwt[_-]?secret)\s*[:=]\s*['"][a-zA-Z0-9_\-\.]{32,}['"]/i },
+  { name: 'Hardcoded Password in String Literal', regex: /(?:password|passwd|pwd)\s*[:=]\s*['"](?!Password123!|\$2[aby]\$|\$\{)[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}]{12,}['"]/i }
+>>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165
 ];
 
 const IGNORED_DIRS = new Set([

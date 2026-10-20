@@ -255,4 +255,9 @@ RETURNS VOID AS $$
 BEGIN
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;
 END;
+<<<<<<< HEAD
 $$ LANGUAGE plpgsql;
+=======
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+>>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165

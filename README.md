@@ -16,7 +16,11 @@
 ## Course Information
 * **Institution:** Vellore Institute of Technology (VIT), Vellore
 * **Course:** BCSE307L — Database Systems (Fall 2026-27)
+<<<<<<< HEAD
 * **Author / Lead Architect:** Karthikeyan S (Registration No. 24BCT0332)
+=======
+* **Author / Lead Architect:** Karthikeyan S (Registration No. 24MCA0000)
+>>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165
 * **Project Repository:** `AssetVault`
 
 ---

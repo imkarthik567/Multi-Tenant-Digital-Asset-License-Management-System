@@ -15,6 +15,7 @@
     "no-unused-vars": "off",
     "@typescript-eslint/no-unused-vars": "off"
   },
+<<<<<<< HEAD
   "overrides": [
     {
       "files": ["scripts/capture_screenshots.js"],
@@ -23,5 +24,7 @@
       }
     }
   ],
+=======
+>>>>>>> a93169186c206c0abe9aafb308ca5f4f71614165
   "ignorePatterns": ["dist", "node_modules", "build", "coverage"]
 }
