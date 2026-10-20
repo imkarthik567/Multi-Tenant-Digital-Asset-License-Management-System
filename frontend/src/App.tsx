@@ -12,6 +12,7 @@ import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Global Navigation Bridge for seamless client-side SPA transitions
 const NavigationBridge: React.FC = () => {
@@ -78,9 +79,10 @@ export const App: React.FC = () => {
         <ToastProvider>
           <BrowserRouter>
             <NavigationBridge />
-            <AuthProvider>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
+            <ErrorBoundary>
+              <AuthProvider>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
                   {/* Public Authentication Routes */}
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
@@ -215,9 +217,10 @@ export const App: React.FC = () => {
                 </Routes>
               </Suspense>
             </AuthProvider>
-          </BrowserRouter>
-        </ToastProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+          </ErrorBoundary>
+        </BrowserRouter>
+      </ToastProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
   );
 };

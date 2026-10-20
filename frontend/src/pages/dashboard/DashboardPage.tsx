@@ -60,7 +60,13 @@ export const DashboardPage: React.FC = () => {
   }
 
   // 1. Fetch Tenant Operational Dashboard KPIs
-  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
+  const {
+    data: dashboardData,
+    isLoading: isDashboardLoading,
+    isError: isDashboardError,
+    error: dashboardError,
+    refetch: refetchDashboard,
+  } = useQuery({
     queryKey: ['reports', 'dashboard'],
     queryFn: async () => {
       const res = await api.get<{
@@ -124,7 +130,13 @@ export const DashboardPage: React.FC = () => {
   });
 
   // 6. Super Admin Platform Overview Data
-  const { data: platformData, isLoading: isPlatformLoading } = useQuery({
+  const {
+    data: platformData,
+    isLoading: isPlatformLoading,
+    isError: isPlatformError,
+    error: platformError,
+    refetch: refetchPlatform,
+  } = useQuery({
     queryKey: ['platform', 'overview'],
     queryFn: async () => {
       const res = await api.get<{ data: any }>('/platform/overview');
@@ -168,6 +180,21 @@ export const DashboardPage: React.FC = () => {
             Global governance of multi-tenant subscriptions, quota caps, and platform telemetry
           </p>
         </div>
+
+        {isPlatformError && (
+          <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+            <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+              {(platformError as any)?.message || 'Failed to load platform overview metrics.'}
+            </span>
+            <button
+              type="button"
+              onClick={() => refetchPlatform()}
+              className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Super Admin Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -336,6 +363,21 @@ export const DashboardPage: React.FC = () => {
         </p>
       </div>
 
+      {isDashboardError && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+            {(dashboardError as any)?.message || 'Failed to load executive dashboard metrics.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => refetchDashboard()}
+            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Metric Cards (6 KPI Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
         <StatCard
@@ -355,7 +397,7 @@ export const DashboardPage: React.FC = () => {
         <StatCard
           title="Seats Allocated"
           value={`${stats.active_allocated_seats} / ${stats.total_contracted_seats}`}
-          subtitle={`${Math.round((stats.active_allocated_seats / (stats.total_contracted_seats || 1)) * 100)}% capacity`}
+          subtitle={`${stats.total_contracted_seats > 0 ? Math.min(100, Math.round((stats.active_allocated_seats / stats.total_contracted_seats) * 100)) : 0}% capacity`}
           icon={<Layers className="w-4 h-4" />}
           color="cyan"
         />

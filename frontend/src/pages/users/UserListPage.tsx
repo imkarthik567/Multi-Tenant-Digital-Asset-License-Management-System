@@ -64,12 +64,20 @@ export const UserListPage: React.FC = () => {
     password: '',
     roleName: 'MEMBER',
   });
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
 
   const [newRole, setNewRole] = useState<RoleName>('MEMBER');
   const [newPassword, setNewPassword] = useState('');
+  const [resetError, setResetError] = useState<string>('');
 
   // Fetch Users
-  const { data: usersData, isLoading } = useQuery<{
+  const {
+    data: usersData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<{
     data: User[];
     meta: {
       page: number;
@@ -242,6 +250,21 @@ export const UserListPage: React.FC = () => {
           </select>
         </div>
       </div>
+
+      {isError && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+            {(error as any)?.message || 'Failed to load organization users.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Users Table / Mobile Cards */}
       {isLoading ? (
@@ -426,10 +449,34 @@ export const UserListPage: React.FC = () => {
       )}
 
       {/* CREATE USER MODAL */}
-      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Provision New Organization User">
+      <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); setCreateErrors({}); }} title="Provision New Organization User">
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const errors: Record<string, string> = {};
+            if (!createForm.fullName.trim() || createForm.fullName.trim().length < 2) {
+              errors.fullName = 'Full name must be at least 2 characters.';
+            }
+            if (!createForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(createForm.email.trim())) {
+              errors.email = 'Please provide a valid work email address.';
+            }
+            if (createForm.password.length < 10) {
+              errors.password = 'Password must be at least 10 characters long.';
+            } else if (!/[A-Z]/.test(createForm.password)) {
+              errors.password = 'Password must contain at least one uppercase letter (A-Z).';
+            } else if (!/[a-z]/.test(createForm.password)) {
+              errors.password = 'Password must contain at least one lowercase letter (a-z).';
+            } else if (!/[0-9]/.test(createForm.password)) {
+              errors.password = 'Password must contain at least one numeric digit (0-9).';
+            } else if (!/[^A-Za-z0-9]/.test(createForm.password)) {
+              errors.password = 'Password must contain at least one special symbol (!@#$...).';
+            }
+
+            if (Object.keys(errors).length > 0) {
+              setCreateErrors(errors);
+              return;
+            }
+            setCreateErrors({});
             createMutation.mutate(createForm);
           }}
           className="space-y-4 text-xs"
@@ -441,9 +488,15 @@ export const UserListPage: React.FC = () => {
               required
               placeholder="e.g. Jane Doe"
               value={createForm.fullName}
-              onChange={(e) => setCreateForm({ ...createForm, fullName: e.target.value })}
+              onChange={(e) => {
+                setCreateForm({ ...createForm, fullName: e.target.value });
+                if (createErrors.fullName) setCreateErrors((prev) => ({ ...prev, fullName: '' }));
+              }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
+            {createErrors.fullName && (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.fullName}</p>
+            )}
           </div>
 
           <div>
@@ -453,9 +506,15 @@ export const UserListPage: React.FC = () => {
               required
               placeholder="jane@company.com"
               value={createForm.email}
-              onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+              onChange={(e) => {
+                setCreateForm({ ...createForm, email: e.target.value });
+                if (createErrors.email) setCreateErrors((prev) => ({ ...prev, email: '' }));
+              }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
+            {createErrors.email && (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.email}</p>
+            )}
           </div>
 
           <div>
@@ -463,12 +522,22 @@ export const UserListPage: React.FC = () => {
             <input
               type="password"
               required
-              minLength={8}
-              placeholder="Min. 8 characters"
+              minLength={10}
+              placeholder="Min. 10 chars with uppercase, number & symbol"
               value={createForm.password}
-              onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+              onChange={(e) => {
+                setCreateForm({ ...createForm, password: e.target.value });
+                if (createErrors.password) setCreateErrors((prev) => ({ ...prev, password: '' }));
+              }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
+            {createErrors.password ? (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.password}</p>
+            ) : (
+              <p className="mt-1 text-[10px] text-slate-400">
+                Complexity: &ge;10 chars, uppercase, lowercase, digit, and special symbol.
+              </p>
+            )}
           </div>
 
           <div>
@@ -487,7 +556,7 @@ export const UserListPage: React.FC = () => {
           <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
             <button
               type="button"
-              onClick={() => setIsCreateOpen(false)}
+              onClick={() => { setIsCreateOpen(false); setCreateErrors({}); }}
               className="px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
             >
               Cancel
@@ -549,7 +618,7 @@ export const UserListPage: React.FC = () => {
       </Modal>
 
       {/* RESET PASSWORD MODAL */}
-      <Modal isOpen={!!resetPasswordUser} onClose={() => setResetPasswordUser(null)} title="Administrative Password Reset">
+      <Modal isOpen={!!resetPasswordUser} onClose={() => { setResetPasswordUser(null); setResetError(''); setNewPassword(''); }} title="Administrative Password Reset">
         <div className="space-y-4 text-xs">
           <p className="text-slate-600 dark:text-slate-300">
             Set a new temporary password for <span className="font-bold">{resetPasswordUser?.fullName}</span>.
@@ -559,32 +628,63 @@ export const UserListPage: React.FC = () => {
             <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">New Password</label>
             <input
               type="password"
-              minLength={8}
+              minLength={10}
               required
-              placeholder="Min. 8 characters"
+              placeholder="Min. 10 chars with uppercase, number & symbol"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                if (resetError) setResetError('');
+              }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
+            {resetError ? (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">{resetError}</p>
+            ) : (
+              <p className="mt-1 text-[10px] text-slate-400">
+                Must be at least 10 characters with uppercase, lowercase, number, and special symbol.
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
             <button
               type="button"
-              onClick={() => setResetPasswordUser(null)}
+              onClick={() => { setResetPasswordUser(null); setResetError(''); setNewPassword(''); }}
               className="px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
             >
               Cancel
             </button>
             <button
               type="button"
-              disabled={newPassword.length < 8 || resetPasswordMutation.isPending}
-              onClick={() =>
+              disabled={resetPasswordMutation.isPending}
+              onClick={() => {
+                if (newPassword.length < 10) {
+                  setResetError('Password must be at least 10 characters long.');
+                  return;
+                }
+                if (!/[A-Z]/.test(newPassword)) {
+                  setResetError('Password must contain at least one uppercase letter (A-Z).');
+                  return;
+                }
+                if (!/[a-z]/.test(newPassword)) {
+                  setResetError('Password must contain at least one lowercase letter (a-z).');
+                  return;
+                }
+                if (!/[0-9]/.test(newPassword)) {
+                  setResetError('Password must contain at least one numeric digit (0-9).');
+                  return;
+                }
+                if (!/[^A-Za-z0-9]/.test(newPassword)) {
+                  setResetError('Password must contain at least one special symbol (!@#$...).');
+                  return;
+                }
+                setResetError('');
                 resetPasswordMutation.mutate({
                   userId: resetPasswordUser!.id,
                   newPassword,
-                })
-              }
+                });
+              }}
               className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg shadow-sm disabled:opacity-50"
             >
               {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}

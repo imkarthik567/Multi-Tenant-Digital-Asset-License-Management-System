@@ -1,30 +1,37 @@
 # ==============================================================================
 # AssetVault: Render Blueprint Specification
-# Service: Docker Web Service (backend)
+# Service: Native Node.js Web Service (backend)
 # Docs: https://render.com/docs/blueprint-spec
 # ==============================================================================
 
 services:
   - type: web
     name: assetvault-api
-    runtime: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: .
+    runtime: node
+    rootDir: backend
     plan: free
     region: oregon
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy && npm run build
+    startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
 
     envVars:
-      # --- Core Runtime Configuration ---
+      # --- Node Environment ---
+      - key: NODE_VERSION
+        value: 20.12.2
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 5000
+
+      # --- Background Worker & Job Execution ---
       - key: ENABLE_IN_PROCESS_WORKER
         value: "true"
       - key: RUN_WORKER_IN_API
         value: "true"
+
+      # --- Cookie & Session Security ---
       - key: COOKIE_SAMESITE
         value: "lax"
       - key: RATE_LIMIT_WINDOW_MS
@@ -38,6 +45,8 @@ services:
         sync: false
       # Set DIRECT_URL to Direct Connection URL (port 5432) for Prisma Migrations
       - key: DIRECT_URL
+        sync: false
+      - key: MIGRATE_DATABASE_URL
         sync: false
 
       # --- Client & CORS Allowed Origins ---
@@ -83,14 +92,14 @@ services:
       - key: SMTP_SECURE
         value: "false"
 
-      # --- Initial Super Admin Account ---
+      # --- Initial Super Admin Account & Baseline Seeding ---
       - key: SUPER_ADMIN_EMAIL
         sync: false
       - key: SUPER_ADMIN_PASSWORD
         sync: false
       - key: SUPER_ADMIN_NAME
         value: "Global Super Administrator"
-      # Run the idempotent baseline seed on startup; demo tenants remain disabled.
+      # Run idempotent baseline seed on startup; demo tenants remain disabled.
       - key: RUN_SEED
         value: "true"
       - key: SEED_DEMO

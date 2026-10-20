@@ -88,7 +88,7 @@ ALTER TABLE refresh_tokens FORCE ROW LEVEL SECURITY;
 -- Tenants Table
 DROP POLICY IF EXISTS rls_tenants_isolation ON tenants;
 CREATE POLICY rls_tenants_isolation ON tenants
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -99,7 +99,7 @@ WITH CHECK (
 -- Users Table
 DROP POLICY IF EXISTS rls_users_isolation ON users;
 CREATE POLICY rls_users_isolation ON users
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     tenant_id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -110,7 +110,7 @@ WITH CHECK (
 -- Vendors Table
 DROP POLICY IF EXISTS rls_vendors_isolation ON vendors;
 CREATE POLICY rls_vendors_isolation ON vendors
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     tenant_id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -121,7 +121,7 @@ WITH CHECK (
 -- Categories Table
 DROP POLICY IF EXISTS rls_categories_isolation ON categories;
 CREATE POLICY rls_categories_isolation ON categories
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     tenant_id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -132,7 +132,7 @@ WITH CHECK (
 -- Assets Table
 DROP POLICY IF EXISTS rls_assets_isolation ON assets;
 CREATE POLICY rls_assets_isolation ON assets
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     tenant_id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -143,7 +143,7 @@ WITH CHECK (
 -- Licenses Table
 DROP POLICY IF EXISTS rls_licenses_isolation ON licenses;
 CREATE POLICY rls_licenses_isolation ON licenses
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     tenant_id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -154,7 +154,7 @@ WITH CHECK (
 -- Tags Table
 DROP POLICY IF EXISTS rls_tags_isolation ON tags;
 CREATE POLICY rls_tags_isolation ON tags
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     tenant_id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -165,7 +165,7 @@ WITH CHECK (
 -- Notifications Table
 DROP POLICY IF EXISTS rls_notifications_isolation ON notifications;
 CREATE POLICY rls_notifications_isolation ON notifications
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     tenant_id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -176,7 +176,7 @@ WITH CHECK (
 -- Audit Logs Table
 DROP POLICY IF EXISTS rls_audit_logs_isolation ON audit_logs;
 CREATE POLICY rls_audit_logs_isolation ON audit_logs
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     tenant_id = fn_current_tenant_id() OR fn_is_super_admin()
 )
@@ -192,7 +192,7 @@ WITH CHECK (
 -- Asset Versions
 DROP POLICY IF EXISTS rls_asset_versions_isolation ON asset_versions;
 CREATE POLICY rls_asset_versions_isolation ON asset_versions
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     fn_is_super_admin() OR EXISTS (
         SELECT 1 FROM assets a 
@@ -211,7 +211,7 @@ WITH CHECK (
 -- Asset Tags
 DROP POLICY IF EXISTS rls_asset_tags_isolation ON asset_tags;
 CREATE POLICY rls_asset_tags_isolation ON asset_tags
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     fn_is_super_admin() OR EXISTS (
         SELECT 1 FROM assets a 
@@ -230,7 +230,7 @@ WITH CHECK (
 -- Asset Licenses
 DROP POLICY IF EXISTS rls_asset_licenses_isolation ON asset_licenses;
 CREATE POLICY rls_asset_licenses_isolation ON asset_licenses
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     fn_is_super_admin() OR EXISTS (
         SELECT 1 FROM assets a 
@@ -249,7 +249,7 @@ WITH CHECK (
 -- License Allocations
 DROP POLICY IF EXISTS rls_license_allocations_isolation ON license_allocations;
 CREATE POLICY rls_license_allocations_isolation ON license_allocations
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     fn_is_super_admin() OR EXISTS (
         SELECT 1 FROM licenses l 
@@ -268,7 +268,7 @@ WITH CHECK (
 -- License Renewals
 DROP POLICY IF EXISTS rls_license_renewals_isolation ON license_renewals;
 CREATE POLICY rls_license_renewals_isolation ON license_renewals
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     fn_is_super_admin() OR EXISTS (
         SELECT 1 FROM licenses l 
@@ -287,7 +287,7 @@ WITH CHECK (
 -- Asset Access Logs
 DROP POLICY IF EXISTS rls_asset_access_logs_isolation ON asset_access_logs;
 CREATE POLICY rls_asset_access_logs_isolation ON asset_access_logs
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     fn_is_super_admin() OR EXISTS (
         SELECT 1 FROM assets a 
@@ -306,7 +306,7 @@ WITH CHECK (
 -- Refresh Tokens
 DROP POLICY IF EXISTS rls_refresh_tokens_isolation ON refresh_tokens;
 CREATE POLICY rls_refresh_tokens_isolation ON refresh_tokens
-AS PERMISSIVE FOR ALL TO assetvault_app, PUBLIC
+AS PERMISSIVE FOR ALL TO PUBLIC
 USING (
     fn_is_super_admin() OR EXISTS (
         SELECT 1 FROM users u 

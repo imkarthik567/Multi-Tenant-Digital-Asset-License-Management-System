@@ -6,7 +6,8 @@
   "description": "AssetVault Frontend - React 18 + Vite + TypeScript + Tailwind CSS",
   "scripts": {
     "dev": "node ../node_modules/vite/bin/vite.js",
-    "build": "node ../node_modules/typescript/bin/tsc && node ../node_modules/vite/bin/vite.js build",
+    "build": "node scripts/build.cjs",
+    "test": "node scripts/test.cjs",
     "preview": "node ../node_modules/vite/bin/vite.js preview",
     "lint": "node ../node_modules/typescript/bin/tsc --noEmit"
   },

@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { API_BASE_URL } from '../../services/api';
 import { ShieldCheck, Lock, Mail, AlertCircle, Sparkles } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -68,7 +69,7 @@ export const LoginPage: React.FC = () => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = '/api/auth/google';
+    window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
   return (

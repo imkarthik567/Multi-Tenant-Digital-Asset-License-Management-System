@@ -30,9 +30,16 @@ export const PlanListPage: React.FC = () => {
     maxAssets: 100,
     isActive: true,
   });
+  const [planErrors, setPlanErrors] = useState<Record<string, string>>({});
 
   // Fetch Plans
-  const { data: plansData, isLoading } = useQuery<{ data: Plan[] }>({
+  const {
+    data: plansData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<{ data: Plan[] }>({
     queryKey: ['plans-all'],
     queryFn: async () => {
       const res = await api.get<{ data: Plan[] }>('/plans');
@@ -105,6 +112,7 @@ export const PlanListPage: React.FC = () => {
         <button
           onClick={() => {
             setForm({ name: '', monthlyPrice: 0, maxUsers: 10, maxAssets: 100, isActive: true });
+            setPlanErrors({});
             setIsCreateOpen(true);
           }}
           className="inline-flex items-center px-3.5 py-2 text-xs font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 shadow-sm transition-colors"
@@ -113,6 +121,21 @@ export const PlanListPage: React.FC = () => {
           Add Plan Tier
         </button>
       </div>
+
+      {isError && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+            {(error as any)?.message || 'Failed to load subscription plan tiers.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Plans Grid */}
       {isLoading ? (
@@ -200,12 +223,33 @@ export const PlanListPage: React.FC = () => {
         onClose={() => {
           setIsCreateOpen(false);
           setEditPlan(null);
+          setPlanErrors({});
         }}
         title={editPlan ? `Edit Plan Tier: ${editPlan.name}` : 'Create Subscription Plan Tier'}
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const errors: Record<string, string> = {};
+            if (!form.name.trim() || form.name.trim().length < 2) {
+              errors.name = 'Plan name must be at least 2 characters.';
+            }
+            if (!form.maxUsers || form.maxUsers < 1) {
+              errors.maxUsers = 'Max users must be greater than 0.';
+            }
+            if (!form.maxAssets || form.maxAssets < 1) {
+              errors.maxAssets = 'Max assets must be greater than 0.';
+            }
+            if (form.monthlyPrice < 0 || isNaN(form.monthlyPrice)) {
+              errors.monthlyPrice = 'Monthly price cannot be negative.';
+            }
+
+            if (Object.keys(errors).length > 0) {
+              setPlanErrors(errors);
+              return;
+            }
+            setPlanErrors({});
+
             if (editPlan) {
               editMutation.mutate({ id: editPlan.id, data: form });
             } else {
@@ -220,9 +264,15 @@ export const PlanListPage: React.FC = () => {
               type="text"
               required
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value });
+                if (planErrors.name) setPlanErrors((prev) => ({ ...prev, name: '' }));
+              }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
+            {planErrors.name && (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">{planErrors.name}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -234,9 +284,15 @@ export const PlanListPage: React.FC = () => {
                 min="0"
                 required
                 value={form.monthlyPrice}
-                onChange={(e) => setForm({ ...form, monthlyPrice: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => {
+                  setForm({ ...form, monthlyPrice: parseFloat(e.target.value) || 0 });
+                  if (planErrors.monthlyPrice) setPlanErrors((prev) => ({ ...prev, monthlyPrice: '' }));
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
               />
+              {planErrors.monthlyPrice && (
+                <p className="mt-1 text-[11px] text-rose-500 font-medium">{planErrors.monthlyPrice}</p>
+              )}
             </div>
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Max Users</label>
@@ -245,9 +301,15 @@ export const PlanListPage: React.FC = () => {
                 min="1"
                 required
                 value={form.maxUsers}
-                onChange={(e) => setForm({ ...form, maxUsers: parseInt(e.target.value) || 1 })}
+                onChange={(e) => {
+                  setForm({ ...form, maxUsers: parseInt(e.target.value) || 1 });
+                  if (planErrors.maxUsers) setPlanErrors((prev) => ({ ...prev, maxUsers: '' }));
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
               />
+              {planErrors.maxUsers && (
+                <p className="mt-1 text-[11px] text-rose-500 font-medium">{planErrors.maxUsers}</p>
+              )}
             </div>
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Max Assets</label>
@@ -256,9 +318,15 @@ export const PlanListPage: React.FC = () => {
                 min="1"
                 required
                 value={form.maxAssets}
-                onChange={(e) => setForm({ ...form, maxAssets: parseInt(e.target.value) || 1 })}
+                onChange={(e) => {
+                  setForm({ ...form, maxAssets: parseInt(e.target.value) || 1 });
+                  if (planErrors.maxAssets) setPlanErrors((prev) => ({ ...prev, maxAssets: '' }));
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
               />
+              {planErrors.maxAssets && (
+                <p className="mt-1 text-[11px] text-rose-500 font-medium">{planErrors.maxAssets}</p>
+              )}
             </div>
           </div>
 
