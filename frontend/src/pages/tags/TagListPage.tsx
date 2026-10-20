@@ -47,9 +47,16 @@ export const TagListPage: React.FC = () => {
     name: '',
     color: '#6366f1',
   });
+  const [tagErrors, setTagErrors] = useState<Record<string, string>>({});
 
   // Fetch Tags
-  const { data: tagsData, isLoading } = useQuery<{ data: Tag[]; meta?: any }>({
+  const {
+    data: tagsData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<{ data: Tag[]; meta?: any }>({
     queryKey: ['tags', search],
     queryFn: async () => {
       const res = await api.get<{ data: Tag[]; meta: any }>('/tags', {
@@ -139,6 +146,21 @@ export const TagListPage: React.FC = () => {
         <SearchInput value={search} onChange={setSearch} placeholder="Search tags..." />
       </div>
 
+      {isError && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+            {(error as any)?.message || 'Failed to load metadata tags.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Tags Grid */}
       {isLoading ? (
         <LoadingSkeleton variant="card" count={3} />
@@ -207,12 +229,22 @@ export const TagListPage: React.FC = () => {
       {/* CREATE / EDIT TAG MODAL */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); setTagErrors({}); }}
         title={editingTag ? 'Edit Metadata Tag' : 'Create Metadata Tag'}
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const errors: Record<string, string> = {};
+            if (!form.name.trim()) {
+              errors.name = 'Tag name is required.';
+            }
+
+            if (Object.keys(errors).length > 0) {
+              setTagErrors(errors);
+              return;
+            }
+            setTagErrors({});
             saveMutation.mutate(form);
           }}
           className="space-y-4 text-xs"
@@ -224,9 +256,15 @@ export const TagListPage: React.FC = () => {
               required
               placeholder="e.g. production, 3d-model, licensed"
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value });
+                if (tagErrors.name) setTagErrors((prev) => ({ ...prev, name: '' }));
+              }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
+            {tagErrors.name && (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">{tagErrors.name}</p>
+            )}
           </div>
 
           <div>

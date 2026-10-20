@@ -37,7 +37,13 @@ export const AllocationListPage: React.FC = () => {
   const [releaseReason, setReleaseReason] = useState('Administrative seat release');
 
   // Fetch Allocations
-  const { data: allocationsData, isLoading } = useQuery<{
+  const {
+    data: allocationsData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<{
     data: LicenseAllocation[];
     meta: {
       page: number;
@@ -121,7 +127,10 @@ export const AllocationListPage: React.FC = () => {
         <div className="w-full sm:w-72">
           <SearchInput
             value={search}
-            onChange={setSearch}
+            onChange={(val) => {
+              setSearch(val);
+              setPage(1);
+            }}
             placeholder="Search by user or license..."
           />
         </div>
@@ -139,6 +148,21 @@ export const AllocationListPage: React.FC = () => {
           <option value="REVOKED">Released / Revoked Seats</option>
         </select>
       </div>
+
+      {isError && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+            {(error as any)?.message || 'Failed to load license allocations.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Table / Content */}
       {isLoading ? (

@@ -44,9 +44,16 @@ export const CategoryListPage: React.FC = () => {
     description: '',
     parentId: '',
   });
+  const [categoryErrors, setCategoryErrors] = useState<Record<string, string>>({});
 
   // 1. Fetch Flat Categories List
-  const { data: flatCategories = [], isLoading: isFlatLoading } = useQuery<Category[]>({
+  const {
+    data: flatCategories = [],
+    isLoading: isFlatLoading,
+    isError: isFlatError,
+    error: flatError,
+    refetch: refetchFlat,
+  } = useQuery<Category[]>({
     queryKey: ['categories', 'flat'],
     queryFn: async () => {
       const res = await api.get<{ data: Category[] }>('/categories');
@@ -55,7 +62,13 @@ export const CategoryListPage: React.FC = () => {
   });
 
   // 2. Fetch Nested Categories Tree (/api/categories/tree)
-  const { data: categoryTree = [], isLoading: isTreeLoading } = useQuery<Category[]>({
+  const {
+    data: categoryTree = [],
+    isLoading: isTreeLoading,
+    isError: isTreeError,
+    error: treeError,
+    refetch: refetchTree,
+  } = useQuery<Category[]>({
     queryKey: ['categories', 'tree'],
     queryFn: async () => {
       const res = await api.get<Category[] | { data: Category[] }>('/categories/tree');
@@ -254,6 +267,7 @@ export const CategoryListPage: React.FC = () => {
               onClick={() => {
                 setEditingCategory(null);
                 setForm({ name: '', description: '', parentId: '' });
+                setCategoryErrors({});
                 setIsModalOpen(true);
               }}
               className="inline-flex items-center px-3.5 py-2 text-xs font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 shadow-sm transition-colors"
@@ -264,6 +278,21 @@ export const CategoryListPage: React.FC = () => {
           </RoleGate>
         </div>
       </div>
+
+      {(isFlatError || isTreeError) && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+            {(flatError as any)?.message || (treeError as any)?.message || 'Failed to load category taxonomy.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => { refetchFlat(); refetchTree(); }}
+            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Main Content */}
       {isLoading ? (
@@ -343,12 +372,25 @@ export const CategoryListPage: React.FC = () => {
       {/* CREATE / EDIT CATEGORY MODAL */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); setCategoryErrors({}); }}
         title={editingCategory ? 'Edit Taxonomy Category' : 'Create Taxonomy Category'}
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const errors: Record<string, string> = {};
+            if (!form.name.trim() || form.name.trim().length < 2) {
+              errors.name = 'Category name must be at least 2 characters.';
+            }
+            if (editingCategory && form.parentId === editingCategory.id) {
+              errors.parentId = 'A category cannot be its own parent.';
+            }
+
+            if (Object.keys(errors).length > 0) {
+              setCategoryErrors(errors);
+              return;
+            }
+            setCategoryErrors({});
             saveMutation.mutate(form);
           }}
           className="space-y-4 text-xs"
@@ -360,9 +402,15 @@ export const CategoryListPage: React.FC = () => {
               required
               placeholder="e.g. Computer Vision Datasets"
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value });
+                if (categoryErrors.name) setCategoryErrors((prev) => ({ ...prev, name: '' }));
+              }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
+            {categoryErrors.name && (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">{categoryErrors.name}</p>
+            )}
           </div>
 
           <div>
@@ -371,7 +419,10 @@ export const CategoryListPage: React.FC = () => {
             </label>
             <select
               value={form.parentId}
-              onChange={(e) => setForm({ ...form, parentId: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, parentId: e.target.value });
+                if (categoryErrors.parentId) setCategoryErrors((prev) => ({ ...prev, parentId: '' }));
+              }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             >
               <option value="">None (Top-Level Category)</option>
@@ -383,6 +434,9 @@ export const CategoryListPage: React.FC = () => {
                   </option>
                 ))}
             </select>
+            {categoryErrors.parentId && (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">{categoryErrors.parentId}</p>
+            )}
           </div>
 
           <div>

@@ -378,6 +378,7 @@ model License {
   @@unique([tenantId, licenseKey])
   @@index([tenantId, status])
   @@index([vendorId])
+  @@index([licenseTypeId])
   @@index([endDate])
   @@map("licenses")
 }
@@ -417,6 +418,7 @@ model LicenseAllocation {
   user      User    @relation("UserAllocations", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   allocator User?   @relation("AllocationGranter", fields: [allocatedBy], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
+  @@index([licenseId])
   @@index([userId])
   @@map("license_allocations")
 }
@@ -438,6 +440,7 @@ model AssetAccessLog {
   license License? @relation(fields: [licenseId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([assetId, accessedAt(sort: Desc)])
+  @@index([userId])
   @@map("asset_access_logs")
 }
 
@@ -500,6 +503,7 @@ model Notification {
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   license License? @relation(fields: [licenseId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
+  @@index([tenantId])
   @@index([userId, isRead])
   @@map("notifications")
 }

@@ -82,11 +82,11 @@ function Load-EnvFile([string]$path) {
     }
 }
 
-if (-not $env:DATABASE_URL) {
+if (-not $env:DATABASE_URL -and -not $env:DIRECT_URL) {
     Load-EnvFile (Join-Path $ProjectRoot ".env")
-    if (-not $env:DATABASE_URL) {
+    if (-not $env:DATABASE_URL -and -not $env:DIRECT_URL) {
         Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
-        if (-not $env:DATABASE_URL) {
+        if (-not $env:DATABASE_URL -and -not $env:DIRECT_URL) {
             Load-EnvFile (Join-Path $ProjectRoot "apps\api\.env")
         }
     }
@@ -99,14 +99,19 @@ $DbUser = if ($env:PGUSER) { $env:PGUSER } elseif ($env:POSTGRES_USER) { $env:PO
 $DbPass = if ($env:PGPASSWORD) { $env:PGPASSWORD } elseif ($env:POSTGRES_PASSWORD) { $env:POSTGRES_PASSWORD } else { "" }
 $DbName = if ($TargetDb) { $TargetDb } elseif ($Scratch) { "assetvault_restore_test" } elseif ($env:PGDATABASE) { $env:PGDATABASE } elseif ($env:POSTGRES_DB) { $env:POSTGRES_DB } else { "assetvault_db" }
 
-if ($env:DATABASE_URL -and -not $TargetDb -and -not $Scratch) {
-    if ($env:DATABASE_URL -match "^postgresql://([^:]+):([^@]+)@([^:/]+):?(\d+)?/(.+)$") {
+# Extract parameters prioritizing DIRECT_URL or MIGRATE_DATABASE_URL over DATABASE_URL for administrative/bypass-RLS restoration
+$ConnUrl = if ($env:MIGRATE_DATABASE_URL) { $env:MIGRATE_DATABASE_URL } elseif ($env:DIRECT_URL) { $env:DIRECT_URL } else { $env:DATABASE_URL }
+
+if ($ConnUrl) {
+    if ($ConnUrl -match "^postgresql://([^:]+):([^@]+)@([^:/]+):?(\d+)?/(.+)$") {
         $DbUser = $matches[1]
         $DbPass = $matches[2]
         $DbHost = $matches[3]
         if ($matches[4]) { $DbPort = $matches[4] }
         $cleanDb = $matches[5].Split('?')[0]
-        $DbName = $cleanDb
+        if (-not $TargetDb -and -not $Scratch) {
+            $DbName = $cleanDb
+        }
     }
 }
 
@@ -121,7 +126,8 @@ if (-not $Docker) {
         $candidates = @(
             "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe",
             "C:\Program Files\PostgreSQL\17\bin\pg_restore.exe",
-            "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe"
+            "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe",
+            "C:\Program Files\PostgreSQL\15\bin\pg_restore.exe"
         )
         foreach ($c in $candidates) {
             if (Test-Path $c) { $PgRestoreExe = $c; break }
@@ -133,7 +139,8 @@ if (-not $Docker) {
         $candidates = @(
             "C:\Program Files\PostgreSQL\18\bin\psql.exe",
             "C:\Program Files\PostgreSQL\17\bin\psql.exe",
-            "C:\Program Files\PostgreSQL\16\bin\psql.exe"
+            "C:\Program Files\PostgreSQL\16\bin\psql.exe",
+            "C:\Program Files\PostgreSQL\15\bin\psql.exe"
         )
         foreach ($c in $candidates) {
             if (Test-Path $c) { $PsqlExe = $c; break }

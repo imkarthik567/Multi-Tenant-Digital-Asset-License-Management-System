@@ -69,11 +69,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENC
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON ROUTINES TO assetvault_app;
 
 -- 10. Verification query: output granted privileges
-SELECT 
-  grantee, 
-  table_schema, 
-  privilege_type 
-FROM information_schema.schema_privileges 
+SELECT
+  grantee,
+  table_schema,
+  privilege_type
+FROM information_schema.table_privileges
 WHERE grantee = 'assetvault_app';
 
 SELECT 'Production bootstrap role configuration completed successfully.' AS status;

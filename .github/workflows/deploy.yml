@@ -2,7 +2,7 @@ name: Continuous Deployment & Smoke Health Verification
 
 on:
   workflow_run:
-    workflows: [ "Docker Build, Scan & Publish" ]
+    workflows: [ "AssetVault Continuous Integration" ]
     types: [ completed ]
   workflow_dispatch:
 
@@ -10,7 +10,7 @@ jobs:
   deploy-and-verify:
     name: Trigger Render Deploy & Smoke Check
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'AssetVault Continuous Integration') }}
 
     env:
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

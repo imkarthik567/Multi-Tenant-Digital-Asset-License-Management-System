@@ -72,6 +72,7 @@ export const AssetListPage: React.FC = () => {
     checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     tags: [] as string[],
   });
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
 
   // CSV Import States
   const [csvContent, setCsvContent] = useState('');
@@ -91,7 +92,13 @@ export const AssetListPage: React.FC = () => {
   };
 
   // 1. Fetch Assets Query
-  const { data: assetsResponse, isLoading } = useQuery({
+  const {
+    data: assetsResponse,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['assets', q, assetType, status, categoryId, page, limit, sort, order],
     queryFn: async () => {
       return api.get<{ data: Asset[]; meta: any }>('/assets', {
@@ -469,6 +476,21 @@ export const AssetListPage: React.FC = () => {
         </div>
       </FilterBar>
 
+      {isError && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+            {(error as any)?.message || 'Failed to load digital assets repository.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Grid View Mode */}
       {viewMode === 'grid' && !isLoading && assets.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -534,7 +556,7 @@ export const AssetListPage: React.FC = () => {
       {/* Modal: Create Asset */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => { setShowCreateModal(false); setCreateErrors({}); }}
         title="Create Digital Asset"
         description="Provision a new digital asset in the repository with initial version control"
         maxWidth="lg"
@@ -542,7 +564,7 @@ export const AssetListPage: React.FC = () => {
           <>
             <button
               type="button"
-              onClick={() => setShowCreateModal(false)}
+              onClick={() => { setShowCreateModal(false); setCreateErrors({}); }}
               className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50"
             >
               Cancel
@@ -550,7 +572,27 @@ export const AssetListPage: React.FC = () => {
             <button
               type="button"
               disabled={createAssetMutation.isPending}
-              onClick={() => createAssetMutation.mutate(createForm)}
+              onClick={() => {
+                const errors: Record<string, string> = {};
+                if (!createForm.name.trim() || createForm.name.trim().length < 2) {
+                  errors.name = 'Asset name must be at least 2 characters.';
+                }
+                if (!createForm.assetCode.trim() || createForm.assetCode.trim().length < 2) {
+                  errors.assetCode = 'Asset code must be at least 2 characters.';
+                }
+                if (!createForm.fileUrl.trim()) {
+                  errors.fileUrl = 'Initial file URL is required.';
+                } else if (!/^https?:\/\/.+/.test(createForm.fileUrl.trim())) {
+                  errors.fileUrl = 'Please enter a valid HTTP/HTTPS URL.';
+                }
+
+                if (Object.keys(errors).length > 0) {
+                  setCreateErrors(errors);
+                  return;
+                }
+                setCreateErrors({});
+                createAssetMutation.mutate(createForm);
+              }}
               className="px-4 py-2 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm disabled:opacity-50"
             >
               {createAssetMutation.isPending ? 'Creating...' : 'Create Asset'}
@@ -559,22 +601,28 @@ export const AssetListPage: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <FormField label="Asset Name" required>
+          <FormField label="Asset Name" required error={createErrors.name}>
             <input
               type="text"
               value={createForm.name}
-              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+              onChange={(e) => {
+                setCreateForm({ ...createForm, name: e.target.value });
+                if (createErrors.name) setCreateErrors((prev) => ({ ...prev, name: '' }));
+              }}
               placeholder="e.g. Core Design System Tokens"
               className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
             />
           </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Asset Code (SKU)" required>
+            <FormField label="Asset Code (SKU)" required error={createErrors.assetCode}>
               <input
                 type="text"
                 value={createForm.assetCode}
-                onChange={(e) => setCreateForm({ ...createForm, assetCode: e.target.value })}
+                onChange={(e) => {
+                  setCreateForm({ ...createForm, assetCode: e.target.value });
+                  if (createErrors.assetCode) setCreateErrors((prev) => ({ ...prev, assetCode: '' }));
+                }}
                 placeholder="AST-TOKENS-01"
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono"
               />
@@ -611,14 +659,22 @@ export const AssetListPage: React.FC = () => {
             </select>
           </FormField>
 
-          <FileUrlField
-            label="Initial File URL"
-            required
-            helperText="CDN / Object Storage URL for version 1"
-            value={createForm.fileUrl}
-            onChange={(val) => setCreateForm({ ...createForm, fileUrl: val })}
-            placeholder="https://cdn.assetvault.io/tokens-v1.json"
-          />
+          <div>
+            <FileUrlField
+              label="Initial File URL"
+              required
+              helperText="CDN / Object Storage URL for version 1"
+              value={createForm.fileUrl}
+              onChange={(val) => {
+                setCreateForm({ ...createForm, fileUrl: val });
+                if (createErrors.fileUrl) setCreateErrors((prev) => ({ ...prev, fileUrl: '' }));
+              }}
+              placeholder="https://cdn.assetvault.io/tokens-v1.json"
+            />
+            {createErrors.fileUrl && (
+              <p className="mt-1 text-xs text-rose-500 font-medium">{createErrors.fileUrl}</p>
+            )}
+          </div>
 
           <FormField label="Tags">
             <TagInput

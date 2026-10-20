@@ -71,13 +71,14 @@ load_env() {
   fi
 }
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
+if [[ -z "${DATABASE_URL:-}" && -z "${DIRECT_URL:-}" ]]; then
   load_env "${PROJECT_ROOT}/.env"
-  if [[ -z "${DATABASE_URL:-}" ]]; then
+  if [[ -z "${DATABASE_URL:-}" && -z "${DIRECT_URL:-}" ]]; then
     load_env "${PROJECT_ROOT}/backend/.env"
   fi
 fi
 
+CONN_URL="${MIGRATE_DATABASE_URL:-${DIRECT_URL:-${DATABASE_URL:-}}}"
 DB_HOST="${PGHOST:-localhost}"
 DB_PORT="${PGPORT:-5432}"
 DB_USER="${PGUSER:-${POSTGRES_USER:-postgres}}"
@@ -85,9 +86,9 @@ DB_PASS="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 SOURCE_DB="${PGDATABASE:-${POSTGRES_DB:-assetvault_db}}"
 SCRATCH_DB="assetvault_restore_test"
 
-if [[ -n "${DATABASE_URL:-}" ]]; then
-  PROTO="$(echo "${DATABASE_URL}" | grep :// | sed -e's,^\(.*://\).*,\1,g')"
-  URL_NO_PROTO="${DATABASE_URL#$PROTO}"
+if [[ -n "${CONN_URL}" ]]; then
+  PROTO="$(echo "${CONN_URL}" | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+  URL_NO_PROTO="${CONN_URL#$PROTO}"
   USER_PASS="$(echo "${URL_NO_PROTO}" | grep @ | cut -d@ -f1 || true)"
   if [[ -n "${USER_PASS}" ]]; then
     DB_USER="${USER_PASS%%:*}"

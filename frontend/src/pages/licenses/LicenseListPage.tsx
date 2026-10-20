@@ -21,17 +21,24 @@ import {
   X,
   CheckCircle,
   Building,
-  Search,
   ExternalLink,
 } from 'lucide-react';
 import { DatePicker } from '../../components/common/DatePicker';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { SearchInput } from '../../components/common/SearchInput';
+import { Pagination } from '../../components/common/Pagination';
 
 export const LicenseListPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [vendorFilter, setVendorFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ACTIVE');
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [selectedLicense, setSelectedLicense] = useState<License | null>(null);
@@ -54,9 +61,24 @@ export const LicenseListPage: React.FC = () => {
     autoRenew: true,
   });
 
-  const { data: licensesData, isLoading } = useQuery<{ data: License[]; meta: any }>({
-    queryKey: ['licenses', searchTerm],
-    queryFn: () => api.get('/licenses', { params: { limit: 50, q: searchTerm || undefined } }),
+  const {
+    data: licensesData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<{ data: License[]; meta: any }>({
+    queryKey: ['licenses', searchTerm, page, limit, vendorFilter, statusFilter],
+    queryFn: () =>
+      api.get('/licenses', {
+        params: {
+          page,
+          limit,
+          q: searchTerm || undefined,
+          vendorId: vendorFilter || undefined,
+          status: statusFilter || undefined,
+        },
+      }),
   });
 
   const { data: vendorsData } = useQuery<{ data: Vendor[] }>({
@@ -146,6 +168,34 @@ export const LicenseListPage: React.FC = () => {
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+    if (!createForm.name.trim() || createForm.name.trim().length < 2) {
+      errors.name = 'License name must be at least 2 characters.';
+    }
+    if (!createForm.vendorId) {
+      errors.vendorId = 'Please select a vendor.';
+    }
+    if (!createForm.licenseKey.trim()) {
+      errors.licenseKey = 'License key / secret code is required.';
+    }
+    if (!createForm.totalSeats || createForm.totalSeats < 1) {
+      errors.totalSeats = 'Total seats must be at least 1.';
+    }
+    if (createForm.cost < 0 || isNaN(createForm.cost)) {
+      errors.cost = 'Cost cannot be negative.';
+    }
+    if (!createForm.startDate) {
+      errors.startDate = 'Start date is required.';
+    }
+    if (createForm.startDate && createForm.endDate && createForm.endDate < createForm.startDate) {
+      errors.endDate = 'End date cannot be prior to start date.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setCreateErrors(errors);
+      return;
+    }
+    setCreateErrors({});
     createLicenseMutation.mutate(createForm);
   };
 
@@ -164,29 +214,84 @@ export const LicenseListPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search licenses..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
-          </div>
+        {canManage && (
+          <button
+            onClick={() => {
+              setShowCreateModal(true);
+              setCreateErrors({});
+            }}
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-primary-600/30 transition flex items-center space-x-2 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create License</span>
+          </button>
+        )}
+      </div>
 
-          {canManage && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-primary-600/30 transition flex items-center space-x-2 shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create License</span>
-            </button>
-          )}
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="w-full sm:w-72">
+          <SearchInput
+            value={searchTerm}
+            onChange={(val) => {
+              setSearchTerm(val);
+              setPage(1);
+            }}
+            placeholder="Search licenses by name..."
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Vendor Filter */}
+          <select
+            value={vendorFilter}
+            onChange={(e) => {
+              setVendorFilter(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by vendor"
+            className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300"
+          >
+            <option value="">All Vendors</option>
+            {vendors.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by status"
+            className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300"
+          >
+            <option value="">All Statuses</option>
+            <option value="ACTIVE">Active Licenses</option>
+            <option value="EXPIRED">Expired</option>
+            <option value="ARCHIVED">Trash / Archived</option>
+          </select>
         </div>
       </div>
+
+      {isError && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+            {(error as any)?.message || 'Failed to load software licenses.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {actionMessage && (
         <div
@@ -356,6 +461,21 @@ export const LicenseListPage: React.FC = () => {
         </div>
       )}
 
+      {/* Pagination Controls */}
+      {licensesData?.meta && (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
+          <Pagination
+            meta={licensesData.meta}
+            currentPage={page}
+            onPageChange={setPage}
+            onLimitChange={(l) => {
+              setLimit(l);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
+
       {/* Allocate Seat Modal */}
       {showAllocateModal && selectedLicense && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -426,7 +546,7 @@ export const LicenseListPage: React.FC = () => {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
-              onClick={() => setShowCreateModal(false)}
+              onClick={() => { setShowCreateModal(false); setCreateErrors({}); }}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
             >
               <X className="w-5 h-5" />
@@ -440,10 +560,16 @@ export const LicenseListPage: React.FC = () => {
                 <input
                   required
                   value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  onChange={(e) => {
+                    setCreateForm({ ...createForm, name: e.target.value });
+                    if (createErrors.name) setCreateErrors((prev) => ({ ...prev, name: '' }));
+                  }}
                   placeholder="e.g. Adobe Creative Cloud Enterprise"
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                 />
+                {createErrors.name && (
+                  <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.name}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -452,7 +578,10 @@ export const LicenseListPage: React.FC = () => {
                   <select
                     required
                     value={createForm.vendorId}
-                    onChange={(e) => setCreateForm({ ...createForm, vendorId: e.target.value })}
+                    onChange={(e) => {
+                      setCreateForm({ ...createForm, vendorId: e.target.value });
+                      if (createErrors.vendorId) setCreateErrors((prev) => ({ ...prev, vendorId: '' }));
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                   >
                     <option value="">Select Vendor</option>
@@ -462,6 +591,9 @@ export const LicenseListPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
+                  {createErrors.vendorId && (
+                    <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.vendorId}</p>
+                  )}
                 </div>
 
                 <div>
@@ -487,9 +619,15 @@ export const LicenseListPage: React.FC = () => {
                     type="number"
                     min={1}
                     value={createForm.totalSeats}
-                    onChange={(e) => setCreateForm({ ...createForm, totalSeats: parseInt(e.target.value, 10) })}
+                    onChange={(e) => {
+                      setCreateForm({ ...createForm, totalSeats: parseInt(e.target.value, 10) });
+                      if (createErrors.totalSeats) setCreateErrors((prev) => ({ ...prev, totalSeats: '' }));
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                   />
+                  {createErrors.totalSeats && (
+                    <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.totalSeats}</p>
+                  )}
                 </div>
 
                 <div>
@@ -499,25 +637,47 @@ export const LicenseListPage: React.FC = () => {
                     step="0.01"
                     min={0}
                     value={createForm.cost}
-                    onChange={(e) => setCreateForm({ ...createForm, cost: parseFloat(e.target.value) })}
+                    onChange={(e) => {
+                      setCreateForm({ ...createForm, cost: parseFloat(e.target.value) });
+                      if (createErrors.cost) setCreateErrors((prev) => ({ ...prev, cost: '' }));
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none font-mono"
                   />
+                  {createErrors.cost && (
+                    <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.cost}</p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <DatePicker
-                  label="Start Date"
-                  required
-                  value={createForm.startDate}
-                  onChange={(val) => setCreateForm({ ...createForm, startDate: val })}
-                />
+                <div>
+                  <DatePicker
+                    label="Start Date"
+                    required
+                    value={createForm.startDate}
+                    onChange={(val) => {
+                      setCreateForm({ ...createForm, startDate: val });
+                      if (createErrors.startDate) setCreateErrors((prev) => ({ ...prev, startDate: '' }));
+                    }}
+                  />
+                  {createErrors.startDate && (
+                    <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.startDate}</p>
+                  )}
+                </div>
 
-                <DatePicker
-                  label="End Date"
-                  value={createForm.endDate}
-                  onChange={(val) => setCreateForm({ ...createForm, endDate: val })}
-                />
+                <div>
+                  <DatePicker
+                    label="End Date"
+                    value={createForm.endDate}
+                    onChange={(val) => {
+                      setCreateForm({ ...createForm, endDate: val });
+                      if (createErrors.endDate) setCreateErrors((prev) => ({ ...prev, endDate: '' }));
+                    }}
+                  />
+                  {createErrors.endDate && (
+                    <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.endDate}</p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -525,16 +685,22 @@ export const LicenseListPage: React.FC = () => {
                 <input
                   required
                   value={createForm.licenseKey}
-                  onChange={(e) => setCreateForm({ ...createForm, licenseKey: e.target.value })}
+                  onChange={(e) => {
+                    setCreateForm({ ...createForm, licenseKey: e.target.value });
+                    if (createErrors.licenseKey) setCreateErrors((prev) => ({ ...prev, licenseKey: '' }));
+                  }}
                   placeholder="XXXX-XXXX-XXXX-XXXX"
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none font-mono"
                 />
+                {createErrors.licenseKey && (
+                  <p className="mt-1 text-[11px] text-rose-500 font-medium">{createErrors.licenseKey}</p>
+                )}
               </div>
 
               <div className="pt-2 flex justify-end space-x-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => { setShowCreateModal(false); setCreateErrors({}); }}
                   className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
                 >
                   Cancel

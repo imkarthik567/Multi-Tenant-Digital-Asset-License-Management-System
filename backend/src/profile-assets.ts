@@ -30,7 +30,7 @@ async function runProfile() {
   // 1. Authenticate to obtain token (do not capture login queries)
   const loginRes = await request(app)
     .post('/api/auth/login')
-    .send({ email: 'techcorp.admin@techcorp.io', password: 'Password123!' });
+    .send({ email: process.env.PROFILE_EMAIL || 'techcorp.admin@techcorp.io', password: process.env.PROFILE_PASSWORD || 'Password123!' });
 
   if (loginRes.status !== 200) {
     console.error('Login failed:', loginRes.body);

@@ -49,11 +49,11 @@ function Load-EnvFile([string]$path) {
     }
 }
 
-if (-not $env:DATABASE_URL) {
+if (-not $env:DATABASE_URL -and -not $env:DIRECT_URL) {
     Load-EnvFile (Join-Path $ProjectRoot ".env")
-    if (-not $env:DATABASE_URL) {
+    if (-not $env:DATABASE_URL -and -not $env:DIRECT_URL) {
         Load-EnvFile (Join-Path $ProjectRoot "backend\.env")
-        if (-not $env:DATABASE_URL) {
+        if (-not $env:DATABASE_URL -and -not $env:DIRECT_URL) {
             Load-EnvFile (Join-Path $ProjectRoot "apps\api\.env")
         }
     }
@@ -65,8 +65,10 @@ $DbUser = if ($env:PGUSER) { $env:PGUSER } elseif ($env:POSTGRES_USER) { $env:PO
 $DbPass = if ($env:PGPASSWORD) { $env:PGPASSWORD } elseif ($env:POSTGRES_PASSWORD) { $env:POSTGRES_PASSWORD } else { "" }
 $SourceDb = if ($env:PGDATABASE) { $env:PGDATABASE } elseif ($env:POSTGRES_DB) { $env:POSTGRES_DB } else { "assetvault_db" }
 
-if ($env:DATABASE_URL) {
-    if ($env:DATABASE_URL -match "^postgresql://([^:]+):([^@]+)@([^:/]+):?(\d+)?/(.+)$") {
+$ConnUrl = if ($env:MIGRATE_DATABASE_URL) { $env:MIGRATE_DATABASE_URL } elseif ($env:DIRECT_URL) { $env:DIRECT_URL } else { $env:DATABASE_URL }
+
+if ($ConnUrl) {
+    if ($ConnUrl -match "^postgresql://([^:]+):([^@]+)@([^:/]+):?(\d+)?/(.+)$") {
         $DbUser = $matches[1]
         $DbPass = $matches[2]
         $DbHost = $matches[3]
@@ -86,7 +88,8 @@ if (-not $Docker) {
         $candidates = @(
             "C:\Program Files\PostgreSQL\18\bin\psql.exe",
             "C:\Program Files\PostgreSQL\17\bin\psql.exe",
-            "C:\Program Files\PostgreSQL\16\bin\psql.exe"
+            "C:\Program Files\PostgreSQL\16\bin\psql.exe",
+            "C:\Program Files\PostgreSQL\15\bin\psql.exe"
         )
         foreach ($c in $candidates) {
             if (Test-Path $c) { $PsqlExe = $c; break }

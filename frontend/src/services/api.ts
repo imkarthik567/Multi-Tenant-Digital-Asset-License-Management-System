@@ -66,8 +66,17 @@ export const refreshAccessToken = async (): Promise<string> => {
 // Request Interceptor: Attach Access Token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    if (inMemoryAccessToken && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
+    if (inMemoryAccessToken) {
+      if (config.headers && typeof config.headers.set === 'function') {
+        if (!config.headers.has('Authorization') && !config.headers.has('authorization')) {
+          config.headers.set('Authorization', `Bearer ${inMemoryAccessToken}`);
+        }
+      } else {
+        config.headers = config.headers || {};
+        if (!config.headers.Authorization && !config.headers.authorization) {
+          config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
+        }
+      }
     }
     return config;
   },
@@ -92,7 +101,12 @@ apiClient.interceptors.response.use(
 
       try {
         const newAccessToken = await refreshAccessToken();
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
+          originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
+        } else {
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        }
         return apiClient(originalRequest);
       } catch (refreshErr) {
         window.dispatchEvent(new CustomEvent('auth:session_expired'));
@@ -120,12 +134,34 @@ export class ApiError extends Error {
 
 // Helper to format Axios errors into standard ApiError
 export const handleApiError = (err: unknown): never => {
+  if (err instanceof ApiError) {
+    throw err;
+  }
   if (axios.isAxiosError(err)) {
     const status = err.response?.status || 500;
-    const errorData = err.response?.data?.error;
-    const message = errorData?.message || err.message || 'An unexpected error occurred';
-    const code = errorData?.code || 'NETWORK_ERROR';
-    const details = errorData?.details;
+    const data = err.response?.data;
+    const errorData = data?.error;
+
+    let message =
+      errorData?.message ||
+      (typeof data?.message === 'string' ? data.message : undefined) ||
+      (typeof data === 'string' ? data : undefined) ||
+      err.message ||
+      'An unexpected error occurred';
+
+    // Unpack Zod field errors into user-friendly message if generic "Invalid input payload"
+    const details = errorData?.details || data?.details;
+    if (details && typeof details === 'object' && (details as any).fieldErrors) {
+      const fieldErrors = (details as any).fieldErrors as Record<string, string[]>;
+      const fieldMessages = Object.entries(fieldErrors)
+        .filter(([_, msgs]) => Array.isArray(msgs) && msgs.length > 0)
+        .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`);
+      if (fieldMessages.length > 0 && (message === 'Invalid input payload' || message.includes('Validation failed'))) {
+        message = fieldMessages.join('; ');
+      }
+    }
+
+    const code = errorData?.code || data?.code || (status === 0 ? 'NETWORK_ERROR' : 'API_ERROR');
     throw new ApiError(message, code, status, details);
   }
   if (err instanceof Error) {

@@ -16,7 +16,7 @@ async function runBenchmark() {
   // 1. Authenticate to get valid Bearer token
   const loginRes = await request(app)
     .post('/api/auth/login')
-    .send({ email: 'techcorp.admin@techcorp.io', password: 'Password123!' });
+    .send({ email: process.env.BENCHMARK_EMAIL || 'techcorp.admin@techcorp.io', password: process.env.BENCHMARK_PASSWORD || 'Password123!' });
 
   if (loginRes.status !== 200) {
     console.error('Login failed for benchmark:', loginRes.body);
