@@ -466,9 +466,8 @@ describe('AssetVault Database Functions, Stored Procedures & Live Schema Verific
     });
 
     it('refreshes materialized view mv_monthly_access_stats concurrently', async () => {
-      await expect(
-        prisma.$executeRaw`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_access_stats;`
-      ).resolves.not.toThrow();
+      const result = await prisma.$queryRaw`SELECT public.fn_refresh_monthly_access_stats();`;
+      expect(result).toHaveLength(1);
     });
   });
 
