@@ -12,7 +12,7 @@ export class ExportService {
   /**
    * Generates a styled PDF license dossier
    */
-  public async generateLicensePdf(licenseId: string, tenantId: string): Promise<PDFKit.PDFDocument> {
+  public async generateLicensePdf(licenseId: string, tenantId: string): Promise<InstanceType<typeof PDFDocument>> {
     const scopedPrisma = prismaForRequest({ tenantId });
 
     // 1. Fetch license with related vendor, covered assets, allocations, and renewals
