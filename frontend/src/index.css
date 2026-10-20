@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@config "../tailwind.config.js";
+
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 @layer base {
   :root {
@@ -32,3 +36,5 @@
     @apply bg-slate-400 dark:bg-slate-600;
   }
 }
+
+
