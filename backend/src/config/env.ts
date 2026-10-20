@@ -15,6 +15,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters long'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  REFRESH_TOKEN_GRACE_WINDOW_MS: z.coerce.number().default(3000),
   COOKIE_SECRET: z.string().min(32, 'COOKIE_SECRET must be at least 32 characters long'),
 
   // Google OAuth Credentials

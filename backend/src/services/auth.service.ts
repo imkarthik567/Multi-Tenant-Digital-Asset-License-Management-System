@@ -27,6 +27,7 @@ import {
 import { RoleName, getPermissionsForRole, getMenuItemsForRole, MenuItem } from '../config/permissions';
 import { LoginInput, RegisterTenantInput } from '../validators/auth.validator';
 import { logger } from '../config/logger';
+import { env } from '../config/env';
 
 export interface AuthSuccessResult {
   accessToken: string;
@@ -290,7 +291,7 @@ export class AuthService {
 
     const tokenHash = hashToken(rawRefreshToken);
     const now = new Date();
-    const GRACE_PERIOD_MS = parseInt(process.env.REFRESH_TOKEN_GRACE_WINDOW_MS || '3000', 10);
+    const GRACE_PERIOD_MS = env.REFRESH_TOKEN_GRACE_WINDOW_MS;
 
     const storedToken = await systemPrisma.refreshToken.findUnique({
       where: { tokenHash },
