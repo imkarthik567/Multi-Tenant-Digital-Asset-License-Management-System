@@ -1,5 +1,5 @@
 # ==============================================================================
-# AssetVault: Production API Dockerfile (Multi-Stage Node.js 20 Alpine)
+# AssetVault: Production API Dockerfile (Multi-Stage Node.js 22 Alpine)
 # Targets minimal footprint, non-root security, and automated Prisma migrations
 # ==============================================================================
 
