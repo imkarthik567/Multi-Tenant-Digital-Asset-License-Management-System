@@ -8,7 +8,7 @@
     "dev:watch": "node ../node_modules/nodemon/bin/nodemon.js --watch src -e ts --exec \"node ../node_modules/ts-node/dist/bin.js src/server.ts\"",
     "worker": "node ../node_modules/ts-node/dist/bin.js src/worker.ts",
     "build": "node scripts/build.cjs",
-    "start": "node dist/server.js",
+    "start": "node scripts/start.cjs",
     "prisma:generate": "node ../node_modules/prisma/build/index.js generate",
     "prisma:migrate": "node ../node_modules/prisma/build/index.js migrate dev",
     "prisma:studio": "node ../node_modules/prisma/build/index.js studio",
