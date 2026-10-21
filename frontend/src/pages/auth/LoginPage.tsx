@@ -37,7 +37,8 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 export const isGoogleAuthEnabled = (): boolean => {
   const env = (import.meta as any).env || {};
   const win = typeof window !== 'undefined' ? (window as any) : {};
-  const proc = typeof process !== 'undefined' && process.env ? process.env : {};
+  const globalObj = typeof globalThis !== 'undefined' ? (globalThis as any) : {};
+  const proc = globalObj.process?.env || {};
   return Boolean(
     env.VITE_GOOGLE_CLIENT_ID ||
     env.GOOGLE_CLIENT_ID ||

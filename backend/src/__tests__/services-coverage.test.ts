@@ -155,6 +155,7 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
           roleId: 2,
           email: `${slug}-user@example.com`,
           fullName: 'Tenant Del User',
+          passwordHash: '$2b$10$abcdefghijklmnopqrstuvwxyz123456',
         },
       });
 
