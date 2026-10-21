@@ -48,7 +48,13 @@ export class AllocationController {
   public listAllocationsByLicense = asyncHandler(async (req: Request, res: Response) => {
     const licenseId = (req.params.id || req.params.licenseId) as string;
     const params = getPaginationParams(req, 'allocated_at', ['allocated_at', 'status']);
-    const result = await allocationService.listAllocationsByLicense(req.prisma, licenseId, params);
+    const result = await allocationService.listAllocationsByLicense(
+      req.prisma,
+      licenseId,
+      params,
+      req.user?.id,
+      req.user?.role
+    );
     sendResponse(res, 200, result.data, result.meta);
   });
 

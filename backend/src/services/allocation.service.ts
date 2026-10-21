@@ -111,8 +111,20 @@ export class AllocationService {
     });
   }
 
-  public async listAllocationsByLicense(prismaClient: any, licenseId: string, params: PaginationParams) {
-    const { data, total } = await allocationRepository.findByLicense(prismaClient, licenseId, params);
+  public async listAllocationsByLicense(
+    prismaClient: any,
+    licenseId: string,
+    params: PaginationParams,
+    callerUserId?: string,
+    callerRole?: string
+  ) {
+    const filterUserId = callerRole === 'MEMBER' ? callerUserId : undefined;
+    const { data, total } = await allocationRepository.findByLicense(
+      prismaClient,
+      licenseId,
+      params,
+      filterUserId
+    );
     return formatPaginatedResponse(data, total, params);
   }
 

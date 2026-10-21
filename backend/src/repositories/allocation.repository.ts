@@ -59,9 +59,13 @@ export class AllocationRepository {
   public async findByLicense(
     prisma: PrismaClient | any,
     licenseId: string,
-    params: PaginationParams
+    params: PaginationParams,
+    userId?: string
   ): Promise<{ data: any[]; total: number }> {
-    const where = { licenseId };
+    const where: any = { licenseId };
+    if (userId) {
+      where.userId = userId;
+    }
     const [data, total] = await Promise.all([
       prisma.licenseAllocation.findMany({
         where,

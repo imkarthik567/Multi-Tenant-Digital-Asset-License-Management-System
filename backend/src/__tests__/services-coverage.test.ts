@@ -17,6 +17,7 @@ import { notificationService } from '../services/notification.service';
 import { assetService } from '../services/asset.service';
 import { assetRepository } from '../repositories/asset.repository';
 import { licenseService } from '../services/license.service';
+import { allocationService } from '../services/allocation.service';
 import { costOptimizationService } from '../services/costOptimization.service';
 import { complianceService } from '../services/compliance.service';
 import { authService } from '../services/auth.service';
@@ -560,6 +561,62 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       // Clean up
       await systemPrisma.licenseAllocation.deleteMany({ where: { licenseId: tempLicense.id } });
       await systemPrisma.license.delete({ where: { id: tempLicense.id } });
+    });
+
+    it('listAllocationsByLicense filters results to only caller own allocation when caller is MEMBER', async () => {
+      const lic = await systemPrisma.license.create({
+        data: {
+          name: 'Member Allocation Scoping Test License',
+          licenseKey: 'KEY-TEST-MEMBER-ALLOC-1',
+          tenant: { connect: { id: tenantId } },
+          vendor: { connect: { id: vendorId } },
+          licenseType: { connect: { id: 1 } },
+          status: 'ACTIVE',
+          totalSeats: 10,
+          cost: 100,
+          currency: 'USD',
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 86400000),
+          autoRenew: false,
+        },
+      });
+
+      const memberUser = await systemPrisma.user.findFirst({
+        where: { tenantId, role: { name: 'MEMBER' } },
+      });
+
+      if (memberUser) {
+        await systemPrisma.licenseAllocation.create({
+          data: { licenseId: lic.id, userId: adminUserId, status: 'ACTIVE' },
+        });
+        await systemPrisma.licenseAllocation.create({
+          data: { licenseId: lic.id, userId: memberUser.id, status: 'ACTIVE' },
+        });
+
+        const adminRes = await allocationService.listAllocationsByLicense(
+          systemPrisma,
+          lic.id,
+          defaultPagination,
+          adminUserId,
+          'TENANT_ADMIN'
+        );
+        expect(adminRes.data.length).toBe(2);
+
+        const memberRes = await allocationService.listAllocationsByLicense(
+          systemPrisma,
+          lic.id,
+          defaultPagination,
+          memberUser.id,
+          'MEMBER'
+        );
+        expect(memberRes.data.length).toBe(1);
+        expect(memberRes.data[0].userId).toBe(memberUser.id);
+        expect(memberRes.meta.total).toBe(1);
+
+        await systemPrisma.licenseAllocation.deleteMany({ where: { licenseId: lic.id } });
+      }
+
+      await systemPrisma.license.delete({ where: { id: lic.id } });
     });
   });
 
