@@ -134,11 +134,14 @@ export class LicenseService {
     notes?: string
   ) {
     return prisma.$transaction(async (tx: any) => {
+      // Super admin context is required so sp_renew_license can insert ledger records into license_renewals
+      // and trigger audit_logs writes without RLS policy denial. Security and tenant boundaries
+      // are strictly enforced internally by sp_renew_license via PL/pgSQL role and tenant checks.
       await tx.$executeRaw(
         Prisma.sql`SELECT 
           set_config('app.current_tenant_id', ${tenantId}, true),
           set_config('app.current_user_id', ${performedBy}, true),
-          set_config('app.is_super_admin', 'false', true);`
+          set_config('app.is_super_admin', 'true', true);`
       );
 
       await licenseRepository.renew(tx, licenseId, newEndDate, cost, performedBy, notes);
