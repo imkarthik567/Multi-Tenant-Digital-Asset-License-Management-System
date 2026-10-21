@@ -12,6 +12,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   variant?: ButtonVariant;
   size?: ButtonSize;
   isLoading?: boolean;
+  loading?: boolean;
   loadingText?: string;
   iconLeft?: React.ReactNode;
   iconRight?: React.ReactNode;
@@ -41,6 +42,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       variant = 'primary',
       size = 'md',
       isLoading = false,
+      loading = false,
       loadingText,
       iconLeft,
       iconRight,
@@ -50,7 +52,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
-    const isDisabled = disabled || isLoading;
+    const isSpinning = isLoading || loading;
+    const isDisabled = disabled || isSpinning;
 
     return (
       <button
@@ -64,10 +67,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         {...props}
       >
-        {isLoading ? (
+        {isSpinning ? (
           <>
             <svg
-              className="animate-spin -ml-0.5 h-4 w-4 text-current"
+              className="animate-spin -ml-0.5 h-3.5 w-3.5 text-current shrink-0"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -91,9 +94,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           </>
         ) : (
           <>
-            {iconLeft && <span className="inline-flex shrink-0">{iconLeft}</span>}
-            {children && <span>{children}</span>}
-            {iconRight && <span className="inline-flex shrink-0">{iconRight}</span>}
+            {iconLeft && <span className="shrink-0">{iconLeft}</span>}
+            <span>{children}</span>
+            {iconRight && <span className="shrink-0">{iconRight}</span>}
           </>
         )}
       </button>
