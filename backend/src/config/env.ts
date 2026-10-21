@@ -44,6 +44,10 @@ const envSchema = z.object({
   // Observability & Metrics
   METRICS_BEARER_TOKEN: z.string().default('assetvault-metrics-token-2026'),
 
+  // Configurable default license auto-renewal extension period in days
+  DEFAULT_AUTO_RENEW_PERIOD_DAYS: z.coerce.number().default(365),
+  AUTO_RENEW_DEFAULT_DAYS: z.coerce.number().optional(),
+
   // Background Worker Execution (authoritative flag: defaults to false so API does not start duplicate cron jobs)
   ENABLE_IN_PROCESS_WORKER: z
     .string()

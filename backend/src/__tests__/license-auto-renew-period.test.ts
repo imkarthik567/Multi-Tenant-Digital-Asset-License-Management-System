@@ -435,4 +435,59 @@ describe('License Auto-Renewal Period Stability & Actor Selection Suite', () => 
 
     warnSpy.mockRestore();
   });
+
+  // --------------------------------------------------------------------------
+  // Test 4: Irregular initial duration uses fixed configurable default
+  // --------------------------------------------------------------------------
+  it('extends irregular initial contracts (e.g. 45 days) by configurable default (365 days), not original length', async () => {
+    // Setup a license with irregular 45-day initial term: 2026-11-16 to 2026-12-31
+    const irregularLic = await systemPrisma.license.create({
+      data: {
+        tenantId: tenant1Id,
+        vendorId: tenant1Vendor.id,
+        licenseTypeId: licenseType.id,
+        name: 'Mid-Period Irregular Duration License',
+        licenseKey: `KEY-IRREGULAR-${Date.now()}`,
+        totalSeats: 15,
+        startDate: new Date('2026-11-16'),
+        endDate: new Date('2026-12-31'),
+        cost: new Prisma.Decimal('1500.00'),
+        currency: 'USD',
+        autoRenew: true,
+        status: 'ACTIVE',
+      },
+    });
+
+    const initialDiffDays = Math.round(
+      (new Date('2026-12-31').getTime() - new Date('2026-11-16').getTime()) / (1000 * 60 * 60 * 24)
+    );
+    expect(initialDiffDays).toBe(45);
+
+    // Run auto-renewal job with clock set to 2026-12-30
+    const clock = new Date('2026-12-30T02:30:00Z');
+    const result = await jobScheduler.runAutoRenewLicensesJob(clock, 365);
+    expect(result.renewedCount).toBeGreaterThanOrEqual(1);
+
+    const renewed = await systemPrisma.license.findUnique({
+      where: { id: irregularLic.id },
+    });
+    expect(renewed).toBeDefined();
+
+    const renewedStart = renewed!.startDate.toISOString().split('T')[0]!;
+    const renewedEnd = renewed!.endDate!.toISOString().split('T')[0]!;
+
+    // Start date rolls to previous end date (2026-12-31)
+    expect(renewedStart).toBe('2026-12-31');
+
+    // End date must extend by 365 days (2027-12-31), NOT 45 days (2027-02-14)
+    const extendedDays = Math.round(
+      (new Date(renewedEnd).getTime() - new Date(renewedStart).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    expect(extendedDays).toBe(365);
+    expect(renewedEnd).toBe('2027-12-31');
+
+    // Clean up
+    await systemPrisma.licenseRenewal.deleteMany({ where: { licenseId: irregularLic.id } });
+    await systemPrisma.license.delete({ where: { id: irregularLic.id } });
+  });
 });

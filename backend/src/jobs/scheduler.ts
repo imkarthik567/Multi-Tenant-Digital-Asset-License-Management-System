@@ -247,7 +247,7 @@ export class JobScheduler {
               diffDays = Math.round((lastNew.getTime() - lastOld.getTime()) / (1000 * 60 * 60 * 24));
             } else {
               // Fixed period extension for first-time renewals (e.g. 365 days / billing cycle)
-            diffDays = defaultRenewalDays;
+              diffDays = defaultRenewalDays;
             }
 
             if (diffDays <= 0) diffDays = 365;
