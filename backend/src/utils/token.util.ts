@@ -71,7 +71,7 @@ export const generateRefreshTokenData = () => {
 };
 
 export const setRefreshTokenCookie = (res: Response, rawToken: string): void => {
-  const sameSite = (env.COOKIE_SAMESITE || (env.NODE_ENV === 'production' ? 'none' : 'lax')) as
+  const sameSite = (env.COOKIE_SAMESITE || (env.NODE_ENV === 'production' ? 'none' : 'strict')) as
     | 'lax'
     | 'strict'
     | 'none';
@@ -87,7 +87,7 @@ export const setRefreshTokenCookie = (res: Response, rawToken: string): void => 
 };
 
 export const clearRefreshTokenCookie = (res: Response): void => {
-  const sameSite = (env.COOKIE_SAMESITE || (env.NODE_ENV === 'production' ? 'none' : 'lax')) as
+  const sameSite = (env.COOKIE_SAMESITE || (env.NODE_ENV === 'production' ? 'none' : 'strict')) as
     | 'lax'
     | 'strict'
     | 'none';
