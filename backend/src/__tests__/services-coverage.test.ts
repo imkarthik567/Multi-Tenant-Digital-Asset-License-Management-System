@@ -774,6 +774,75 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       }).not.toThrow();
     });
 
+    it('broadcasts real-time notification across all tenants when tenantId is null and supports tenantIds list', () => {
+      let closeTenant1 = () => {};
+      let closeTenant2 = () => {};
+      let closeSuperAdmin = () => {};
+      let closeMember = () => {};
+
+      const mockResTenant1: any = {
+        writeHead: vi.fn(),
+        write: vi.fn(),
+        on: vi.fn((event, cb) => { if (event === 'close') closeTenant1 = cb; }),
+      };
+      const mockResTenant2: any = {
+        writeHead: vi.fn(),
+        write: vi.fn(),
+        on: vi.fn((event, cb) => { if (event === 'close') closeTenant2 = cb; }),
+      };
+      const mockResSuperAdmin: any = {
+        writeHead: vi.fn(),
+        write: vi.fn(),
+        on: vi.fn((event, cb) => { if (event === 'close') closeSuperAdmin = cb; }),
+      };
+      const mockResMember: any = {
+        writeHead: vi.fn(),
+        write: vi.fn(),
+        on: vi.fn((event, cb) => { if (event === 'close') closeMember = cb; }),
+      };
+
+      notificationStreamService.addClient('user-t1-admin', 't-1', mockResTenant1, 'TENANT_ADMIN');
+      notificationStreamService.addClient('user-t2-mgr', 't-2', mockResTenant2, 'ASSET_MANAGER');
+      notificationStreamService.addClient('user-super', null, mockResSuperAdmin, 'SUPER_ADMIN');
+      notificationStreamService.addClient('user-t1-member', 't-1', mockResMember, 'MEMBER');
+
+      // 1. Broadcast with tenantId: null (e.g. DAILY_EXPIRY_RUN from scheduler)
+      notificationStreamService.broadcastNotification({
+        tenantId: null,
+        notification: { type: 'DAILY_EXPIRY_RUN', message: 'Expiry check finished' },
+      });
+
+      // All admins across all tenants (and super admin) should receive it
+      expect(mockResTenant1.write).toHaveBeenCalledWith(expect.stringContaining('DAILY_EXPIRY_RUN'));
+      expect(mockResTenant2.write).toHaveBeenCalledWith(expect.stringContaining('DAILY_EXPIRY_RUN'));
+      expect(mockResSuperAdmin.write).toHaveBeenCalledWith(expect.stringContaining('DAILY_EXPIRY_RUN'));
+      // Regular members should NOT receive it
+      expect(mockResMember.write).not.toHaveBeenCalledWith(expect.stringContaining('DAILY_EXPIRY_RUN'));
+
+      // 2. Broadcast with specific tenantId
+      notificationStreamService.broadcastNotification({
+        tenantId: 't-1',
+        notification: { type: 'T1_ONLY', message: 'For T1 only' },
+      });
+      expect(mockResTenant1.write).toHaveBeenCalledWith(expect.stringContaining('T1_ONLY'));
+      expect(mockResTenant2.write).not.toHaveBeenCalledWith(expect.stringContaining('T1_ONLY'));
+      expect(mockResSuperAdmin.write).not.toHaveBeenCalledWith(expect.stringContaining('T1_ONLY'));
+
+      // 3. Broadcast with explicit list of tenantIds
+      notificationStreamService.broadcastNotification({
+        tenantIds: ['t-2'],
+        notification: { type: 'T2_ONLY', message: 'For T2 only' },
+      });
+      expect(mockResTenant2.write).toHaveBeenCalledWith(expect.stringContaining('T2_ONLY'));
+      expect(mockResTenant1.write).not.toHaveBeenCalledWith(expect.stringContaining('T2_ONLY'));
+
+      // Clean up clients
+      closeTenant1();
+      closeTenant2();
+      closeSuperAdmin();
+      closeMember();
+    });
+
     it('retrieves vendor by ID', async () => {
       if (vendorId) {
         const vendor = await vendorService.getVendorById(systemPrisma, vendorId);

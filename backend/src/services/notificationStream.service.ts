@@ -84,26 +84,31 @@ class NotificationStreamService extends EventEmitter {
   }
 
   /**
-   * Broadcasts real-time notification with strict tenant and role isolation
+   * Broadcasts real-time notification with tenant and role isolation.
+   * When tenantId is null/undefined and tenantIds is omitted, broadcasts across all tenants.
    */
   public broadcastNotification(payload: {
     tenantId?: string | null;
+    tenantIds?: string[];
     userId?: string | null;
     roles?: string[];
     notification: unknown;
   }): void {
-    const { tenantId, userId, roles, notification } = payload;
+    const { tenantId, tenantIds, userId, roles, notification } = payload;
     const ssePayload = `event: notification\ndata: ${JSON.stringify(notification)}\n\n`;
 
     let deliveredCount = 0;
     for (const client of this.clients.values()) {
-      const tenantMatch = tenantId
-        ? client.tenantId === tenantId
-        : client.tenantId === null;
+      let tenantMatch = true;
+      if (tenantIds && Array.isArray(tenantIds)) {
+        tenantMatch = client.tenantId !== null ? tenantIds.includes(client.tenantId) : false;
+      } else if (tenantId !== undefined && tenantId !== null) {
+        tenantMatch = client.tenantId === tenantId;
+      }
 
       const userMatch = userId
         ? client.userId === userId
-        : (roles ? roles.includes(client.role) : ['TENANT_ADMIN', 'ASSET_MANAGER'].includes(client.role));
+        : (roles ? roles.includes(client.role) : ['TENANT_ADMIN', 'ASSET_MANAGER', 'SUPER_ADMIN'].includes(client.role));
 
       if (tenantMatch && userMatch) {
         try {
@@ -115,7 +120,7 @@ class NotificationStreamService extends EventEmitter {
       }
     }
 
-    logger.debug({ deliveredCount, userId, tenantId }, 'Dispatched real-time SSE notification');
+    logger.debug({ deliveredCount, userId, tenantId, tenantIds }, 'Dispatched real-time SSE notification');
   }
 }
 
