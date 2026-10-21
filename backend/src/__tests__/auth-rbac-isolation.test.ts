@@ -515,6 +515,17 @@ describe('AssetVault Security, RBAC & Multi-Tenant Isolation Suite', () => {
       select: { lastLoginAt: true },
     });
     expect(createdUser?.lastLoginAt).toBeInstanceOf(Date);
+
+    const auditRecord = await systemPrisma.auditLog.findFirst({
+      where: {
+        recordId: res.body.data.user.tenantId,
+        tableName: 'tenants',
+        userId: res.body.data.user.id,
+      },
+    });
+    expect(auditRecord).toBeDefined();
+    expect(auditRecord?.userId).toBe(res.body.data.user.id);
+    expect((auditRecord?.newData as any)?.event).toBe('TENANT_ONBOARDED');
   });
 
   afterAll(async () => {

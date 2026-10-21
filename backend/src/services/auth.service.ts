@@ -235,6 +235,26 @@ export class AuthService {
         include: { role: true },
       });
 
+      // Record tenant onboarding event in audit log
+      await tx.auditLog.create({
+        data: {
+          tenantId: createdTenant.id,
+          userId: createdUser.id,
+          tableName: 'tenants',
+          recordId: createdTenant.id,
+          action: 'INSERT',
+          newData: {
+            event: 'TENANT_ONBOARDED',
+            tenantName: createdTenant.name,
+            slug: createdTenant.slug,
+            plan: 'Free Trial',
+            adminEmail: createdUser.email,
+            ipAddress: metadata.ipAddress || null,
+            userAgent: metadata.userAgent || null,
+          },
+        },
+      });
+
       return { tenant: createdTenant, user: createdUser };
     });
 
