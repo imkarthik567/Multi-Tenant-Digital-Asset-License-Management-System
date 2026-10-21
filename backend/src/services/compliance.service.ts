@@ -267,7 +267,7 @@ export class ComplianceService {
 
       let summary = `Your workspace compliance rating is Grade ${grade} (${totalScore}/100). `;
       if (totalScore >= 90) summary += 'All digital assets and seat allocations are in good standing.';
-      else if (totalScore >= 75) summary += 'Minor licensing attention required to avoid compliance gaps.';
+      else if (totalScore >= 60) summary += 'Minor licensing attention required to avoid compliance gaps.';
       else summary += 'Action required: Immediate remediation needed on unlicensed assets or expired contracts.';
 
       return {

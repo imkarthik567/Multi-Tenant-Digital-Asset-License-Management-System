@@ -773,6 +773,17 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       expect(report.factors.length).toBe(4);
     });
 
+    it('sets correct summary message aligning with Grade C threshold (>= 60)', async () => {
+      const report = await complianceService.getTenantCompliance(tenantId);
+      if (report.score >= 90) {
+        expect(report.summary).toContain('All digital assets and seat allocations are in good standing.');
+      } else if (report.score >= 60) {
+        expect(report.summary).toContain('Minor licensing attention required to avoid compliance gaps.');
+      } else {
+        expect(report.summary).toContain('Action required: Immediate remediation needed on unlicensed assets or expired contracts.');
+      }
+    });
+
     it('generates dormant seat reclamation report', async () => {
       const costReport = await costOptimizationService.getUnusedSeatsReport(tenantId);
       expect(costReport).toHaveProperty('summary');
