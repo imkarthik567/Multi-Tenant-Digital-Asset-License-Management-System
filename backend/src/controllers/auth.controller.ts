@@ -33,6 +33,7 @@ export class AuthController {
         data: {
           accessToken: result.accessToken,
           user: result.user,
+          refreshToken: result.rawRefreshToken,
         },
       });
     } catch (error) {
@@ -57,6 +58,7 @@ export class AuthController {
         data: {
           accessToken: result.accessToken,
           user: result.user,
+          refreshToken: result.rawRefreshToken,
         },
       });
     } catch (error) {
@@ -86,6 +88,7 @@ export class AuthController {
         status: 'success',
         data: {
           accessToken: result.accessToken,
+          ...(result.newRawRefreshToken ? { refreshToken: result.newRawRefreshToken } : {}),
         },
       });
     } catch (error) {

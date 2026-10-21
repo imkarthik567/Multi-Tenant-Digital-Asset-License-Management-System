@@ -25,6 +25,26 @@ export const getAccessToken = (): string | null => {
   return inMemoryAccessToken;
 };
 
+export const getStoredRefreshToken = (): string | null => {
+  try {
+    return localStorage.getItem('assetvault_refresh_token') || sessionStorage.getItem('assetvault_refresh_token');
+  } catch {
+    return null;
+  }
+};
+
+export const setStoredRefreshToken = (token: string | null): void => {
+  try {
+    if (token) {
+      localStorage.setItem('assetvault_refresh_token', token);
+      sessionStorage.setItem('assetvault_refresh_token', token);
+    } else {
+      localStorage.removeItem('assetvault_refresh_token');
+      sessionStorage.removeItem('assetvault_refresh_token');
+    }
+  } catch {}
+};
+
 // Create Axios Instance
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -44,16 +64,21 @@ export const refreshAccessToken = async (): Promise<string> => {
 
   inFlightRefreshPromise = (async () => {
     try {
-      const res = await axios.post<ApiResponse<{ accessToken: string }>>(
+      const fallbackToken = getStoredRefreshToken();
+      const res = await axios.post<ApiResponse<{ accessToken: string; refreshToken?: string }>>(
         `${API_BASE_URL}/auth/refresh`,
-        {},
+        fallbackToken ? { refreshToken: fallbackToken } : {},
         { withCredentials: true }
       );
       const newAccessToken = res.data.data.accessToken;
       setAccessToken(newAccessToken);
+      if (res.data?.data?.refreshToken) {
+        setStoredRefreshToken(res.data.data.refreshToken);
+      }
       return newAccessToken;
     } catch (err) {
       setAccessToken(null);
+      setStoredRefreshToken(null);
       throw err;
     } finally {
       inFlightRefreshPromise = null;

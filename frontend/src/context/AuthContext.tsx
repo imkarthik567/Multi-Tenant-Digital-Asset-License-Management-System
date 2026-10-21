@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { api, setAccessToken, getAccessToken, refreshAccessToken } from '../services/api';
+import { api, setAccessToken, getAccessToken, refreshAccessToken, setStoredRefreshToken } from '../services/api';
 import { User, Tenant, RoleName } from '../types';
 import { parseAuthProfile } from '../utils/auth.util';
 
@@ -49,8 +49,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           token = await refreshAccessToken();
         } catch {
-          // No active session in cookies
+          // No active session in cookies or fallback storage
           setAccessToken(null);
+          setStoredRefreshToken(null);
           setUser(null);
           setTenant(null);
           setPermissions([]);
@@ -69,6 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err) {
       console.error('[AuthContext] initAuth failed to restore session:', err);
       setAccessToken(null);
+      setStoredRefreshToken(null);
       setUser(null);
       setTenant(null);
       setPermissions([]);
@@ -103,6 +105,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const { accessToken } = res.data;
     setAccessToken(accessToken);
+    if ((res.data as any).refreshToken) {
+      setStoredRefreshToken((res.data as any).refreshToken);
+    }
     const session = parseAuthProfile(res);
     setUser(session.user);
     setTenant(session.tenant);
@@ -141,6 +146,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const { accessToken } = res.data;
     setAccessToken(accessToken);
+    if ((res.data as any).refreshToken) {
+      setStoredRefreshToken((res.data as any).refreshToken);
+    }
     const session = parseAuthProfile(res);
     setUser(session.user);
     setTenant(session.tenant);
@@ -155,6 +163,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Proceed with clearing local state even if remote call fails
     } finally {
       setAccessToken(null);
+      setStoredRefreshToken(null);
       setUser(null);
       setTenant(null);
       setPermissions([]);

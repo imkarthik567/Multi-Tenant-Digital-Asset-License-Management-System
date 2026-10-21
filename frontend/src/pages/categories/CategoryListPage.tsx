@@ -48,33 +48,51 @@ export const CategoryListPage: React.FC = () => {
 
   // 1. Fetch Flat Categories List
   const {
-    data: flatCategories = [],
+    data: rawFlatCategories,
     isLoading: isFlatLoading,
     isError: isFlatError,
     error: flatError,
     refetch: refetchFlat,
-  } = useQuery<Category[]>({
+  } = useQuery({
     queryKey: ['categories', 'flat'],
     queryFn: async () => {
-      const res = await api.get<{ data: Category[] }>('/categories');
-      return res.data || [];
+      const res: any = await api.get('/categories');
+      if (Array.isArray(res)) return res;
+      if (Array.isArray(res?.data)) return res.data;
+      if (Array.isArray(res?.data?.data)) return res.data.data;
+      return [];
     },
   });
 
   // 2. Fetch Nested Categories Tree (/api/categories/tree)
   const {
-    data: categoryTree = [],
+    data: rawCategoryTree,
     isLoading: isTreeLoading,
     isError: isTreeError,
     error: treeError,
     refetch: refetchTree,
-  } = useQuery<Category[]>({
+  } = useQuery({
     queryKey: ['categories', 'tree'],
     queryFn: async () => {
-      const res = await api.get<Category[] | { data: Category[] }>('/categories/tree');
-      return Array.isArray(res) ? res : (res as any).data || [];
+      const res: any = await api.get('/categories/tree');
+      if (Array.isArray(res)) return res;
+      if (Array.isArray(res?.data)) return res.data;
+      if (Array.isArray(res?.data?.data)) return res.data.data;
+      return [];
     },
   });
+
+  const flatCategories: Category[] = Array.isArray(rawFlatCategories)
+    ? rawFlatCategories
+    : Array.isArray((rawFlatCategories as any)?.data)
+    ? (rawFlatCategories as any).data
+    : [];
+
+  const categoryTree: Category[] = Array.isArray(rawCategoryTree)
+    ? rawCategoryTree
+    : Array.isArray((rawCategoryTree as any)?.data)
+    ? (rawCategoryTree as any).data
+    : [];
 
   // MUTATIONS
   // Create or Update Category
@@ -426,7 +444,7 @@ export const CategoryListPage: React.FC = () => {
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             >
               <option value="">None (Top-Level Category)</option>
-              {flatCategories
+              {Array.isArray(flatCategories) && flatCategories
                 .filter((c) => c.id !== editingCategory?.id)
                 .map((c) => (
                   <option key={c.id} value={c.id}>
