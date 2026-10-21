@@ -470,6 +470,15 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
 
     it('handles asset version management (create, list, get, compare)', async () => {
       if (testAssetId) {
+        // Throws BadRequestError if fileUrl is missing or empty
+        await expect(
+          assetService.createVersion(tenantId, testAssetId, { fileUrl: '' }, adminUserId)
+        ).rejects.toThrow(BadRequestError);
+
+        await expect(
+          assetService.createVersion(tenantId, testAssetId, {}, adminUserId)
+        ).rejects.toThrow(BadRequestError);
+
         const v2 = await assetService.createVersion(
           tenantId,
           testAssetId,

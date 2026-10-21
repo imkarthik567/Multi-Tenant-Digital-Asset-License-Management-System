@@ -141,6 +141,10 @@ export class AssetService {
    * Transaction 2: Safely computes next version number and inserts asset_version
    */
   public async createVersion(tenantId: string, assetId: string, data: any, userId: string) {
+    if (!data?.fileUrl || (typeof data.fileUrl === 'string' && !data.fileUrl.trim())) {
+      throw new BadRequestError('File URL is required');
+    }
+
     return prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 
