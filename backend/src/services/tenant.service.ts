@@ -142,9 +142,39 @@ export class TenantService {
         });
       }
 
-      // Delete tenant's assets and licenses first inside the transaction
+      // Explicit deleteMany calls for dependent tables before deleting assets and licenses
+      await tx.licenseAllocation.deleteMany({
+        where: { license: { tenantId: id } },
+      });
+      await tx.assetAccessLog.deleteMany({
+        where: { asset: { tenantId: id } },
+      });
+      await tx.notification.deleteMany({
+        where: { tenantId: id },
+      });
+      await tx.auditLog.deleteMany({
+        where: { tenantId: id },
+      });
+
+      // Delete tenant's assets and licenses
       await tx.asset.deleteMany({ where: { tenantId: id } });
       await tx.license.deleteMany({ where: { tenantId: id } });
+
+      // Clean up audit logs created by triggers during asset/license deletion
+      await tx.auditLog.deleteMany({
+        where: { tenantId: id },
+      });
+
+      // Delete vendors, categories, tags, and users before deleting tenant
+      await tx.vendor.deleteMany({ where: { tenantId: id } });
+      await tx.category.deleteMany({ where: { tenantId: id } });
+      await tx.tag.deleteMany({ where: { tenantId: id } });
+      await tx.user.deleteMany({ where: { tenantId: id } });
+
+      // Final audit log clean up before tenant removal
+      await tx.auditLog.deleteMany({
+        where: { tenantId: id },
+      });
 
       // Delete tenant
       const deleted = await tx.tenant.delete({ where: { id } });

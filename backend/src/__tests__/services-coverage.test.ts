@@ -126,7 +126,7 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       }
     });
 
-    it('creates, updates, suspends, activates and deletes a test tenant', async () => {
+    it('creates, updates, suspends, activates and deletes a test tenant with dependent entities', async () => {
       const slug = `cov-tenant-${Date.now()}`;
       const created = await tenantService.createTenant(systemPrisma, {
         name: 'Coverage Tenant',
@@ -147,7 +147,70 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       const activated = await tenantService.suspendOrActivateTenant(created.id, 'ACTIVE');
       expect(activated.status).toBe('ACTIVE');
 
+      // Populate dependent records (user, vendor, license, allocation, asset, access log, notification)
+      const u = await systemPrisma.user.create({
+        data: {
+          tenantId: created.id,
+          roleId: 2,
+          email: `${slug}-user@example.com`,
+          fullName: 'Tenant Del User',
+        },
+      });
+
+      const v = await systemPrisma.vendor.create({
+        data: { tenantId: created.id, name: `Vendor-${slug}` },
+      });
+
+      const lic = await systemPrisma.license.create({
+        data: {
+          tenantId: created.id,
+          vendorId: v.id,
+          licenseTypeId: 1,
+          name: `Lic-${slug}`,
+          licenseKey: `KEY-${slug}`,
+          totalSeats: 2,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 86400000),
+        },
+      });
+
+      await systemPrisma.licenseAllocation.create({
+        data: { licenseId: lic.id, userId: u.id },
+      });
+
+      const ast = await systemPrisma.asset.create({
+        data: {
+          tenantId: created.id,
+          ownerId: u.id,
+          assetCode: `AST-${slug}`,
+          name: 'Test Asset',
+          assetType: 'SOFTWARE',
+        },
+      });
+
+      await systemPrisma.assetAccessLog.create({
+        data: {
+          assetId: ast.id,
+          userId: u.id,
+          licenseId: lic.id,
+          action: 'DOWNLOAD',
+        },
+      });
+
+      await systemPrisma.notification.create({
+        data: {
+          tenantId: created.id,
+          userId: u.id,
+          licenseId: lic.id,
+          type: 'SYSTEM',
+          message: 'Deletion test notification',
+        },
+      });
+
       await tenantService.deleteTenant(created.id);
+
+      const check = await systemPrisma.tenant.findUnique({ where: { id: created.id } });
+      expect(check).toBeNull();
     });
   });
 
