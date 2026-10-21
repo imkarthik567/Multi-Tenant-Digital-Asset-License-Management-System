@@ -1,12 +1,10 @@
-@import "tailwindcss";
-@config "../tailwind.config.js";
-
+@import "./styles/tokens.css";
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
 @layer base {
   :root {
-    color-scheme: light;
+    color-scheme: dark light;
   }
 
   html.dark {
@@ -15,7 +13,7 @@
 
   body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased transition-colors duration-150;
-    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-family: var(--av-font-sans, Inter, system-ui, -apple-system, sans-serif);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
@@ -36,5 +34,3 @@
     @apply bg-slate-400 dark:bg-slate-600;
   }
 }
-
-
