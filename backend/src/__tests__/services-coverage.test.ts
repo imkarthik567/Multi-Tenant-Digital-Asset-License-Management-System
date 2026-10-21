@@ -22,6 +22,7 @@ import { costOptimizationService } from '../services/costOptimization.service';
 import { complianceService } from '../services/compliance.service';
 import { authService } from '../services/auth.service';
 import { notificationStreamService } from '../services/notificationStream.service';
+import { tenantExportService } from '../services/tenantExport.service';
 import { PaginationParams } from '../utils/pagination.util';
 import { BadRequestError, UnprocessableError } from '../errors/AppError';
 
@@ -501,6 +502,19 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
         if (versions.length >= 2) {
           const comp = await assetService.compareVersions(systemPrisma, testAssetId, 1, 2);
           expect(comp).toHaveProperty('comparison');
+        }
+      }
+    });
+
+    it('exports tenant data archive with masked license keys', async () => {
+      const data = await tenantExportService.exportTenantData(tenantId);
+      expect(data).toBeDefined();
+      expect(data.metadata.tenantId).toBe(tenantId);
+      expect(Array.isArray(data.licenses)).toBe(true);
+      expect(data.licenses.length).toBeGreaterThan(0);
+      for (const lic of data.licenses) {
+        if (lic.licenseKey) {
+          expect(lic.licenseKey).toMatch(/^•{8}-[A-Za-z0-9-]+$/);
         }
       }
     });

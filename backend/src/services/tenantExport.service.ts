@@ -132,6 +132,12 @@ export class TenantExportService {
         },
       });
 
+      // Mask license keys to protect sensitive credentials in export archive (not a key-reveal action)
+      const sanitizedLicenses = licenses.map((lic: any) => ({
+        ...lic,
+        licenseKey: lic.licenseKey ? `••••••••-${lic.licenseKey.slice(-4)}` : null,
+      }));
+
       // 7. Fetch License Allocations
       const allocations = await tx.licenseAllocation.findMany({
         where: { license: { tenantId } },
@@ -177,7 +183,7 @@ export class TenantExportService {
         categories,
         tags,
         assets: serializedAssets,
-        licenses,
+        licenses: sanitizedLicenses,
         allocations,
       };
     });
