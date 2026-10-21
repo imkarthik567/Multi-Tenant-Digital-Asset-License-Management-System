@@ -513,6 +513,54 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
         expect(Array.isArray(assets)).toBe(true);
       }
     });
+
+    it('blocks soft-deleting a license with active seat allocations and allows it once released', async () => {
+      // 1. Create a test license
+      const tempLicense = await systemPrisma.license.create({
+        data: {
+          name: 'Allocated Deletion Test License',
+          licenseKey: 'KEY-TEST-DELETE-1234',
+          tenant: { connect: { id: tenantId } },
+          vendor: { connect: { id: vendorId } },
+          licenseType: { connect: { id: 1 } },
+          status: 'ACTIVE',
+          totalSeats: 5,
+          cost: 100,
+          currency: 'USD',
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 86400000),
+          autoRenew: false,
+        },
+      });
+
+      // 2. Create an active allocation on this license
+      const allocation = await systemPrisma.licenseAllocation.create({
+        data: {
+          licenseId: tempLicense.id,
+          userId: adminUserId,
+          status: 'ACTIVE',
+        },
+      });
+
+      // 3. Attempt to soft-delete -> throws BadRequestError prompting to release seats
+      await expect(licenseService.softDeleteLicense(systemPrisma, tempLicense.id)).rejects.toThrow(
+        /active seat allocation/i
+      );
+
+      // 4. Release allocation
+      await systemPrisma.licenseAllocation.update({
+        where: { id: allocation.id },
+        data: { status: 'RELEASED', releasedAt: new Date() },
+      });
+
+      // 5. Soft-delete succeeds now that active allocations = 0
+      const deleted = await licenseService.softDeleteLicense(systemPrisma, tempLicense.id);
+      expect(deleted.deletedAt).toBeDefined();
+
+      // Clean up
+      await systemPrisma.licenseAllocation.deleteMany({ where: { licenseId: tempLicense.id } });
+      await systemPrisma.license.delete({ where: { id: tempLicense.id } });
+    });
   });
 
   // --------------------------------------------------------------------------

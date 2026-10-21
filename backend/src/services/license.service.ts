@@ -115,6 +115,19 @@ export class LicenseService {
   public async softDeleteLicense(prismaClient: any, id: string) {
     const existing = await licenseRepository.findById(prismaClient, id);
     if (!existing) throw new NotFoundError('License not found');
+    const activeAllocationsCount = await prismaClient.licenseAllocation.count({
+      where: {
+        licenseId: id,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (activeAllocationsCount > 0) {
+      throw new BadRequestError(
+        `Cannot delete license with ${activeAllocationsCount} active seat allocation(s). Please release all seats first.`
+      );
+    }
+
     return licenseRepository.softDelete(prismaClient, id);
   }
 
