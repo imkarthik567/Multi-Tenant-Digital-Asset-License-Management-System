@@ -134,8 +134,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       contactEmail: payload.email.trim(),
       adminFullName: payload.fullName.trim(),
       adminEmail: payload.email.trim(),
-      fullName: payload.fullName.trim(),
-      email: payload.email.trim(),
       password: payload.password,
     });
 
