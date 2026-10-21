@@ -443,6 +443,102 @@ describe('JobScheduler Advisory Lock & Connection Pool Isolation Suite', () => {
         where: { tenantId: suspendedTenantId, licenseId: suspendedLicenseId },
       });
       expect(suspendedNotifs.length).toBe(0);
+
+      // Verify email_sent was marked TRUE after dispatch
+      const updatedTrialNotifs = await systemPrisma.notification.findMany({
+        where: { tenantId: trialTenantId, licenseId: trialLicenseId },
+      });
+      expect(updatedTrialNotifs.length).toBeGreaterThan(0);
+      expect(updatedTrialNotifs.every((n) => n.emailSent === true)).toBe(true);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // 6. Expiry Notification Email Dispatch & email_sent Flag Idempotency
+  // --------------------------------------------------------------------------
+  describe('6. Expiry Notification Email Dispatch Idempotency (email_sent Flag)', () => {
+    it('dispatches emails only for notifications where email_sent = false and marks them true', async () => {
+      // Find an active user and license to attach a test notification
+      const testUser = await systemPrisma.user.findFirst({
+        where: { roleId: 2, isActive: true, tenantId: { not: null } }, // TENANT_ADMIN
+        include: { tenant: true },
+      });
+      expect(testUser).toBeDefined();
+      expect(testUser?.tenantId).toBeTruthy();
+
+      const tenantId = testUser!.tenantId!;
+      const userId = testUser!.id;
+
+      const testLicense = await systemPrisma.license.findFirst({
+        where: { tenantId, deletedAt: null },
+      });
+      expect(testLicense).toBeDefined();
+      const licenseId = testLicense!.id;
+
+      // Clean existing notifications for this test user & license
+      await systemPrisma.notification.deleteMany({
+        where: { userId, licenseId },
+      });
+
+      // 1. Seed a fresh notification with email_sent = false, is_read = false
+      const notif1 = await systemPrisma.notification.create({
+        data: {
+          tenantId,
+          userId,
+          licenseId,
+          type: 'EXPIRY_7',
+          message: 'Test urgent expiry alert for license ' + testLicense!.name,
+          isRead: false,
+          emailSent: false,
+        },
+      });
+      expect(notif1.emailSent).toBe(false);
+
+      // 2. Also seed an already-read notification with email_sent = false (should NOT be emailed)
+      const notifRead = await systemPrisma.notification.create({
+        data: {
+          tenantId,
+          userId,
+          licenseId,
+          type: 'EXPIRY_15',
+          message: 'Test already-read alert for license ' + testLicense!.name,
+          isRead: true,
+          emailSent: false,
+        },
+      });
+
+      // 3. Execute runExpiryNotificationsJob()
+      const run1 = await jobScheduler.runExpiryNotificationsJob();
+      expect(run1).toBeDefined();
+      expect(run1.emailsSent).toBeGreaterThanOrEqual(1);
+
+      // 4. Verify notif1 has been flipped to email_sent = true
+      const refreshedNotif1 = await systemPrisma.notification.findUnique({
+        where: { id: notif1.id },
+      });
+      expect(refreshedNotif1?.emailSent).toBe(true);
+
+      // 5. Verify notifRead remains email_sent = false because is_read was true
+      const refreshedNotifRead = await systemPrisma.notification.findUnique({
+        where: { id: notifRead.id },
+      });
+      expect(refreshedNotifRead?.emailSent).toBe(false);
+
+      // 6. Re-run runExpiryNotificationsJob() immediately (simulating job retry / MV refresh re-run)
+      // Since notif1 now has email_sent = true, it MUST NOT be re-emailed
+      const notifsBeforeRun2 = await systemPrisma.notification.findMany({
+        where: {
+          id: { in: [notif1.id, notifRead.id] },
+          emailSent: false,
+          isRead: false,
+        },
+      });
+      expect(notifsBeforeRun2.length).toBe(0);
+
+      // Clean up test notifications
+      await systemPrisma.notification.deleteMany({
+        where: { id: { in: [notif1.id, notifRead.id] } },
+      });
     });
   });
 });
