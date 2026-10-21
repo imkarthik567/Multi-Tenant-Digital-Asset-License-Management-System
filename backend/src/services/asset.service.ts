@@ -240,22 +240,28 @@ export class AssetService {
       const assetType = (row.assetType || row.asset_type)?.toUpperCase() as AssetType;
       const description = row.description || '';
 
+      const rowErrors: { row: number; field: string; error: string }[] = [];
+
       if (!name || name.trim().length < 2) {
-        errors.push({ row: rowNum, field: 'name', error: 'Asset name must be at least 2 characters long' });
+        rowErrors.push({ row: rowNum, field: 'name', error: 'Asset name must be at least 2 characters long' });
       }
       if (!assetCode || assetCode.trim().length < 2) {
-        errors.push({ row: rowNum, field: 'assetCode', error: 'Asset code is required' });
+        rowErrors.push({ row: rowNum, field: 'assetCode', error: 'Asset code is required' });
       }
       if (!assetType || !['FONT', 'IMAGE', 'VIDEO', 'AUDIO', 'SOFTWARE', 'DATASET', 'DOCUMENT', 'OTHER'].includes(assetType)) {
-        errors.push({ row: rowNum, field: 'assetType', error: 'Invalid assetType (must be FONT, IMAGE, VIDEO, AUDIO, SOFTWARE, DATASET, DOCUMENT, or OTHER)' });
+        rowErrors.push({ row: rowNum, field: 'assetType', error: 'Invalid assetType (must be FONT, IMAGE, VIDEO, AUDIO, SOFTWARE, DATASET, DOCUMENT, or OTHER)' });
       }
 
-      validRows.push({
-        name: name?.trim(),
-        assetCode: assetCode?.trim(),
-        assetType,
-        description: description?.trim() || null,
-      });
+      if (rowErrors.length > 0) {
+        errors.push(...rowErrors);
+      } else {
+        validRows.push({
+          name: name!.trim(),
+          assetCode: assetCode!.trim(),
+          assetType,
+          description: description?.trim() || null,
+        });
+      }
     });
 
     if (errors.length > 0) {

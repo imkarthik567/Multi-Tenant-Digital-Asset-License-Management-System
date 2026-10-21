@@ -23,6 +23,7 @@ import { complianceService } from '../services/compliance.service';
 import { authService } from '../services/auth.service';
 import { notificationStreamService } from '../services/notificationStream.service';
 import { PaginationParams } from '../utils/pagination.util';
+import { BadRequestError, UnprocessableError } from '../errors/AppError';
 
 const systemPrisma = prismaForRequest({ isSuperAdmin: true });
 
@@ -503,6 +504,20 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
       const licenseCsv = await licenseService.exportCsv(systemPrisma, tenantId);
       expect(typeof licenseCsv).toBe('string');
       expect(licenseCsv).toContain('license_name');
+    });
+
+    it('bulkImport validates rows and rejects invalid CSV rows without adding malformed rows', async () => {
+      // 1. Empty CSV throws BadRequestError
+      await expect(assetService.bulkImport(tenantId, adminUserId, ''))
+        .rejects.toThrow(BadRequestError);
+
+      // 2. CSV with invalid rows throws UnprocessableError
+      const badCsv = '"asset_code","name","asset_type","description"\n' +
+        '"VALID-001","Valid Name","FONT","Valid row"\n' +
+        '"","","INVALID_TYPE","Broken row"\n';
+
+      await expect(assetService.bulkImport(tenantId, adminUserId, badCsv))
+        .rejects.toThrow(UnprocessableError);
     });
 
     it('retrieves license renewals and covered assets', async () => {
