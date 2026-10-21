@@ -33,6 +33,7 @@ export interface GlobalSearchResponse {
 }
 
 export interface SearchCallerContext {
+  userId?: string;
   role?: RoleName;
   isSuperAdmin?: boolean;
 }
@@ -102,10 +103,14 @@ export class SearchService {
 
     try {
       const { assets, licenses, vendors, tags } = await prisma.$transaction(async (tx: any) => {
+        const isSuperAdminStr = isSuperAdmin ? 'true' : 'false';
+        const userId = caller?.userId || '';
+
         await tx.$executeRaw(
           Prisma.sql`SELECT 
             set_config('app.current_tenant_id', ${tenantId}, true),
-            set_config('app.is_super_admin', 'false', true);`
+            set_config('app.current_user_id', ${userId}, true),
+            set_config('app.is_super_admin', ${isSuperAdminStr}, true);`
         );
 
         // 1. Search Assets (only if caller has assets:read)
@@ -251,14 +256,24 @@ export class SearchService {
   /**
    * Search Assets specifically
    */
-  public async searchAssets(tenantId: string, q: string): Promise<SearchResultItem[]> {
+  public async searchAssets(
+    tenantId: string,
+    q: string,
+    caller?: SearchCallerContext
+  ): Promise<SearchResultItem[]> {
     const rawQuery = this.validateQuery(q);
     if (!rawQuery) return [];
 
     const likePattern = `%${escapeLikePattern(rawQuery)}%`;
+    const isSuperAdmin = caller?.isSuperAdmin ? 'true' : 'false';
+    const userId = caller?.userId || '';
+
     return await prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
-        Prisma.sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true);`
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${userId}, true),
+          set_config('app.is_super_admin', ${isSuperAdmin}, true);`
       );
 
       const rows: any = await tx.$queryRaw(Prisma.sql`
@@ -295,13 +310,18 @@ export class SearchService {
 
     const likePattern = `%${escapeLikePattern(rawQuery)}%`;
     const isSuperAdmin = caller?.isSuperAdmin || false;
+    const isSuperAdminStr = isSuperAdmin ? 'true' : 'false';
+    const userId = caller?.userId || '';
     const role = caller?.role;
     const canViewUnmaskedKeys =
       isSuperAdmin || role === 'TENANT_ADMIN' || role === 'ASSET_MANAGER';
 
     return await prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
-        Prisma.sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true);`
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${userId}, true),
+          set_config('app.is_super_admin', ${isSuperAdminStr}, true);`
       );
 
       const licenseFilter = canViewUnmaskedKeys
@@ -340,14 +360,24 @@ export class SearchService {
   /**
    * Search Vendors specifically
    */
-  public async searchVendors(tenantId: string, q: string): Promise<SearchResultItem[]> {
+  public async searchVendors(
+    tenantId: string,
+    q: string,
+    caller?: SearchCallerContext
+  ): Promise<SearchResultItem[]> {
     const rawQuery = this.validateQuery(q);
     if (!rawQuery) return [];
 
     const likePattern = `%${escapeLikePattern(rawQuery)}%`;
+    const isSuperAdmin = caller?.isSuperAdmin ? 'true' : 'false';
+    const userId = caller?.userId || '';
+
     return await prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
-        Prisma.sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true);`
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${userId}, true),
+          set_config('app.is_super_admin', ${isSuperAdmin}, true);`
       );
 
       const rows: any = await tx.$queryRaw(Prisma.sql`
@@ -372,14 +402,24 @@ export class SearchService {
   /**
    * Search Tags specifically
    */
-  public async searchTags(tenantId: string, q: string): Promise<SearchResultItem[]> {
+  public async searchTags(
+    tenantId: string,
+    q: string,
+    caller?: SearchCallerContext
+  ): Promise<SearchResultItem[]> {
     const rawQuery = this.validateQuery(q);
     if (!rawQuery) return [];
 
     const likePattern = `%${escapeLikePattern(rawQuery)}%`;
+    const isSuperAdmin = caller?.isSuperAdmin ? 'true' : 'false';
+    const userId = caller?.userId || '';
+
     return await prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
-        Prisma.sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true);`
+        Prisma.sql`SELECT 
+          set_config('app.current_tenant_id', ${tenantId}, true),
+          set_config('app.current_user_id', ${userId}, true),
+          set_config('app.is_super_admin', ${isSuperAdmin}, true);`
       );
 
       const rows: any = await tx.$queryRaw(Prisma.sql`

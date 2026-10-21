@@ -23,6 +23,7 @@ export class SearchController {
     }
 
     const callerContext = {
+      userId: req.user?.id,
       role: req.user?.role,
       isSuperAdmin: req.user?.isSuperAdmin,
     };
@@ -40,7 +41,13 @@ export class SearchController {
       return;
     }
 
-    const data = await searchService.searchAssets(tenantId, q);
+    const callerContext = {
+      userId: req.user?.id,
+      role: req.user?.role,
+      isSuperAdmin: req.user?.isSuperAdmin,
+    };
+
+    const data = await searchService.searchAssets(tenantId, q, callerContext);
     sendResponse(res, 200, data);
   });
 
@@ -54,6 +61,7 @@ export class SearchController {
     }
 
     const callerContext = {
+      userId: req.user?.id,
       role: req.user?.role,
       isSuperAdmin: req.user?.isSuperAdmin,
     };
@@ -71,7 +79,13 @@ export class SearchController {
       return;
     }
 
-    const data = await searchService.searchVendors(tenantId, q);
+    const callerContext = {
+      userId: req.user?.id,
+      role: req.user?.role,
+      isSuperAdmin: req.user?.isSuperAdmin,
+    };
+
+    const data = await searchService.searchVendors(tenantId, q, callerContext);
     sendResponse(res, 200, data);
   });
 
@@ -84,7 +98,13 @@ export class SearchController {
       return;
     }
 
-    const data = await searchService.searchTags(tenantId, q);
+    const callerContext = {
+      userId: req.user?.id,
+      role: req.user?.role,
+      isSuperAdmin: req.user?.isSuperAdmin,
+    };
+
+    const data = await searchService.searchTags(tenantId, q, callerContext);
     sendResponse(res, 200, data);
   });
 }
