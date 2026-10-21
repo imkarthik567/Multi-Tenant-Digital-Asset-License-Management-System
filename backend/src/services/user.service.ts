@@ -153,6 +153,17 @@ export class UserService {
 
   public async deleteUser(prismaClient: any, id: string) {
     await this.getUserById(prismaClient, id);
+
+    await prismaClient.refreshToken.updateMany({
+      where: { userId: id },
+      data: { revokedAt: new Date() },
+    });
+
+    await prismaClient.licenseAllocation.updateMany({
+      where: { userId: id, status: 'ACTIVE' },
+      data: { status: 'RELEASED', releasedAt: new Date() },
+    });
+
     return userRepository.delete(prismaClient, id);
   }
 }

@@ -260,6 +260,39 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
 
       await userService.deleteUser(systemPrisma, created.id);
     });
+
+    it('revokes refresh tokens and releases active license allocations prior to deleting user', async () => {
+      const mockPrisma: any = {
+        user: {
+          findFirst: vi.fn().mockResolvedValue({ id: 'u-123', email: 'test@example.com' }),
+          delete: vi.fn().mockResolvedValue({ id: 'u-123' }),
+        },
+        refreshToken: {
+          updateMany: vi.fn().mockResolvedValue({ count: 2 }),
+        },
+        licenseAllocation: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+
+      const result = await userService.deleteUser(mockPrisma, 'u-123');
+      expect(result).toEqual({ id: 'u-123' });
+
+      expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'u-123' },
+        data: { revokedAt: expect.any(Date) },
+      });
+
+      expect(mockPrisma.licenseAllocation.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'u-123', status: 'ACTIVE' },
+        data: { status: 'RELEASED', releasedAt: expect.any(Date) },
+      });
+
+      expect(mockPrisma.user.delete).toHaveBeenCalledWith({
+        where: { id: 'u-123' },
+        select: expect.anything(),
+      });
+    });
   });
 
   // --------------------------------------------------------------------------
