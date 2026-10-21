@@ -42,12 +42,35 @@ export function calculateExponentialBackoff(attemptCount: number): number {
 }
 
 // In-memory sliding window cache for fallback
-interface AttemptRecord {
+export interface AttemptRecord {
   count: number;
   firstAttemptAt: number;
   lockedUntil?: number;
 }
-const memoryFallbackMap = new Map<string, AttemptRecord>();
+export const memoryFallbackMap = new Map<string, AttemptRecord>();
+
+/**
+ * Periodic cleanup function to remove expired attempts from memoryFallbackMap.
+ * Deletes entries whose firstAttemptAt is older than WINDOW_MS and whose lockedUntil (if any) has passed.
+ */
+export function cleanupMemoryFallback(now: number = Date.now()): number {
+  let cleanedCount = 0;
+  for (const [key, record] of memoryFallbackMap.entries()) {
+    const isFirstAttemptOld = now - record.firstAttemptAt > WINDOW_MS;
+    const isLockoutPassed = !record.lockedUntil || now >= record.lockedUntil;
+    if (isFirstAttemptOld && isLockoutPassed) {
+      memoryFallbackMap.delete(key);
+      cleanedCount++;
+    }
+  }
+  return cleanedCount;
+}
+
+// Periodic cleanup timer every WINDOW_MS to prevent memory leakage
+export const memoryCleanupInterval: NodeJS.Timeout = setInterval(() => {
+  cleanupMemoryFallback();
+}, WINDOW_MS);
+memoryCleanupInterval.unref?.();
 
 /**
  * Checks if the specific (email + IP) key is currently locked out.

@@ -9,6 +9,9 @@ import {
   getLockoutKey,
   BASE_LOCKOUT_MS,
   MAX_LOCKOUT_MS,
+  WINDOW_MS,
+  memoryFallbackMap,
+  cleanupMemoryFallback,
 } from '../services/accountProtection.service';
 import { createUserSchema, resetPasswordSchema } from '../validators/user.validator';
 
@@ -223,6 +226,50 @@ describe('Authentication Hardening & Account Protection Suite', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('5. Memory Fallback Periodic Cleanup', () => {
+    it('deletes entries whose firstAttemptAt is older than WINDOW_MS and whose lockout has passed', () => {
+      const now = Date.now();
+
+      // Case 1: Expired window, no lockout -> SHOULD BE DELETED
+      memoryFallbackMap.set('user1#1.1.1.1', {
+        count: 2,
+        firstAttemptAt: now - WINDOW_MS - 1000,
+      });
+
+      // Case 2: Expired window, lockout passed -> SHOULD BE DELETED
+      memoryFallbackMap.set('user2#1.1.1.2', {
+        count: 5,
+        firstAttemptAt: now - WINDOW_MS - 5000,
+        lockedUntil: now - 1000,
+      });
+
+      // Case 3: Expired window, but lockout still active -> SHOULD BE PRESERVED
+      memoryFallbackMap.set('user3#1.1.1.3', {
+        count: 5,
+        firstAttemptAt: now - WINDOW_MS - 5000,
+        lockedUntil: now + 60000,
+      });
+
+      // Case 4: Recent attempt within WINDOW_MS -> SHOULD BE PRESERVED
+      memoryFallbackMap.set('user4#1.1.1.4', {
+        count: 1,
+        firstAttemptAt: now - 1000,
+      });
+
+      const deletedCount = cleanupMemoryFallback(now);
+      expect(deletedCount).toBeGreaterThanOrEqual(2);
+
+      expect(memoryFallbackMap.has('user1#1.1.1.1')).toBe(false);
+      expect(memoryFallbackMap.has('user2#1.1.1.2')).toBe(false);
+      expect(memoryFallbackMap.has('user3#1.1.1.3')).toBe(true);
+      expect(memoryFallbackMap.has('user4#1.1.1.4')).toBe(true);
+
+      // Cleanup
+      memoryFallbackMap.delete('user3#1.1.1.3');
+      memoryFallbackMap.delete('user4#1.1.1.4');
     });
   });
 });
