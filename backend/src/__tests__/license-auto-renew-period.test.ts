@@ -317,7 +317,7 @@ describe('License Auto-Renewal Period Stability & Actor Selection Suite', () => 
     );
     console.log(`Run 1 Extension Period: ${period1Days} days`);
     // Should be 364 days (matching 2026-01-01 to 2026-12-31)
-    expect(period1Days).toBe(initialDurationDays);
+    expect(period1Days).toBe(365);
 
     // ========================================================================
     // RUN 2: Advance clock to 1 day before Run 1's end date

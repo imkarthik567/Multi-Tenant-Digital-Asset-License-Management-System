@@ -16,6 +16,12 @@ const LOCK_EXPIRY_NOTIFICATIONS = 1001;
 const LOCK_REFRESH_MV = 1002;
 const LOCK_AUTO_RENEW = 1003;
 
+// Configurable default renewal period in days (defaults to 365 days)
+export const DEFAULT_AUTO_RENEW_PERIOD_DAYS = parseInt(
+  process.env.DEFAULT_AUTO_RENEW_PERIOD_DAYS || process.env.AUTO_RENEW_DEFAULT_DAYS || '365',
+  10
+);
+
 export class JobScheduler {
   private cronTasks: any[] = [];
 
@@ -95,7 +101,7 @@ export class JobScheduler {
           }
         }
 
-        // 2. Fetch freshly generated notifications from the last hour to dispatch emails
+        // 2. Fetch pending notifications (email_sent = false, is_read = false) to dispatch emails
         let emailsSent = 0;
         try {
           const freshAlerts: any = await tx.$queryRaw(Prisma.sql`
@@ -109,7 +115,7 @@ export class JobScheduler {
             JOIN users u ON u.id = n.user_id
             JOIN tenants t ON t.id = n.tenant_id
             JOIN licenses l ON l.id = n.license_id
-            WHERE n.created_at >= (NOW() - INTERVAL '1 hour')
+            WHERE n.email_sent = FALSE
               AND n.is_read = FALSE;
           `);
 
@@ -128,7 +134,12 @@ export class JobScheduler {
               type: alert.type as any,
             });
 
-            if (sent) emailsSent++;
+            if (sent) {
+              emailsSent++;
+              await tx.$executeRaw(
+                Prisma.sql`UPDATE notifications SET email_sent = TRUE WHERE id = ${alert.id}::uuid;`
+              );
+            }
           }
         } catch (emailErr: any) {
           logger.error({ emailErr }, 'Error querying or dispatching expiry emails');
@@ -171,7 +182,10 @@ export class JobScheduler {
    * Auto-renews licenses where auto_renew = true and end_date is within 3 days,
    * extending by previous period length via sp_renew_license.
    */
-  public async runAutoRenewLicensesJob(referenceDate?: Date): Promise<{ renewedCount: number }> {
+  public async runAutoRenewLicensesJob(
+    referenceDate?: Date,
+    defaultRenewalDays: number = DEFAULT_AUTO_RENEW_PERIOD_DAYS
+  ): Promise<{ renewedCount: number }> {
     return (
       (await this.withAdvisoryLock(LOCK_AUTO_RENEW, 'AutoRenewLicenses', async (tx) => {
         logger.info('Checking licenses eligible for automated contract renewal...');
@@ -223,7 +237,7 @@ export class JobScheduler {
           }
 
           try {
-            const startDate = new Date(lic.start_date);
+
             const endDate = new Date(lic.end_date);
             let diffDays: number;
 
@@ -232,7 +246,8 @@ export class JobScheduler {
               const lastNew = new Date(lic.last_new_end_date);
               diffDays = Math.round((lastNew.getTime() - lastOld.getTime()) / (1000 * 60 * 60 * 24));
             } else {
-              diffDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+              // Fixed period extension for first-time renewals (e.g. 365 days / billing cycle)
+            diffDays = defaultRenewalDays;
             }
 
             if (diffDays <= 0) diffDays = 365;

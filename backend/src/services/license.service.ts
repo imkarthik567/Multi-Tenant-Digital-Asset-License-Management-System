@@ -42,7 +42,8 @@ export class LicenseService {
     const canViewRawKey = callerRole === 'TENANT_ADMIN' || callerRole === 'ASSET_MANAGER' || callerRole === 'SUPER_ADMIN';
 
     if (canViewRawKey) {
-      // Record key reveal in audit trail
+      // Only record key reveal in audit trail if licenseKey is a non-empty string
+      if (typeof license.licenseKey === 'string' && license.licenseKey.trim() !== '') {
       await prismaClient.auditLog.create({
         data: {
           tenant: tenantId ? { connect: { id: tenantId } } : undefined,
@@ -57,6 +58,7 @@ export class LicenseService {
           },
         },
       });
+      }
 
       return license;
     } else {

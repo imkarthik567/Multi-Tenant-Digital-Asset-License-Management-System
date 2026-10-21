@@ -497,6 +497,7 @@ model Notification {
   type      NotificationType
   message   String           @db.Text
   isRead    Boolean          @default(false) @map("is_read")
+  emailSent Boolean          @default(false) @map("email_sent")
   createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
