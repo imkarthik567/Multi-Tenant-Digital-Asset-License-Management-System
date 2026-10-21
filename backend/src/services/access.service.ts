@@ -30,7 +30,7 @@ export class AccessService {
       );
 
       const asset = await tx.asset.findFirst({
-        where: { id: assetId, deletedAt: null },
+        where: { id: assetId, tenantId, deletedAt: null },
       });
       if (!asset) {
         throw new NotFoundError('Asset not found');
@@ -111,7 +111,7 @@ export class AccessService {
       );
 
       const asset = await tx.asset.findFirst({
-        where: { id: assetId, deletedAt: null },
+        where: { id: assetId, tenantId, deletedAt: null },
       });
       if (!asset) {
         throw new NotFoundError('Asset not found');
@@ -181,7 +181,7 @@ export class AccessService {
       );
 
       const asset = await tx.asset.findFirst({
-        where: { id: assetId, deletedAt: null },
+        where: { id: assetId, tenantId, deletedAt: null },
         include: {
           versions: { orderBy: { versionNo: 'desc' }, take: 1 },
         },
