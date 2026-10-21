@@ -335,7 +335,7 @@ export class AuthService {
       if (elapsedSinceRevocation <= GRACE_PERIOD_MS && successorToken) {
         logger.info(
           { userId: storedToken.userId, tokenId: storedToken.id, elapsedMs: elapsedSinceRevocation },
-          'Benign concurrent refresh token reuse detected within grace window. Returning access token.'
+          'Benign concurrent refresh token reuse detected within grace window. Returning access token and replacement refresh token.'
         );
         const roleName = user.role.name as RoleName;
         const accessToken = generateAccessToken({
@@ -347,7 +347,20 @@ export class AuthService {
           role: roleName,
           isSuperAdmin: roleName === 'SUPER_ADMIN',
         });
-        return { accessToken };
+        const graceRefreshData = generateRefreshTokenData();
+        await systemPrisma.refreshToken.create({
+          data: {
+            userId: user.id,
+            tokenHash: graceRefreshData.tokenHash,
+            expiresAt: graceRefreshData.expiresAt,
+            userAgent: metadata.userAgent,
+            ipAddress: metadata.ipAddress,
+          },
+        });
+        return {
+          accessToken,
+          newRawRefreshToken: graceRefreshData.rawToken,
+        };
       }
 
       // Beyond grace window OR no active successor token (e.g. logged out or security cascade):
@@ -412,9 +425,22 @@ export class AuthService {
     if (!rotationResult) {
       logger.info(
         { userId: user.id, tokenId: storedToken.id },
-        'Concurrent refresh race resolved: token was already rotated by concurrent thread. Returning access token.'
+        'Concurrent refresh race resolved: token was already rotated by concurrent thread. Generating replacement refresh token.'
       );
-      return { accessToken };
+      const raceRefreshData = generateRefreshTokenData();
+      await systemPrisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: raceRefreshData.tokenHash,
+          expiresAt: raceRefreshData.expiresAt,
+          userAgent: metadata.userAgent,
+          ipAddress: metadata.ipAddress,
+        },
+      });
+      return {
+        accessToken,
+        newRawRefreshToken: raceRefreshData.rawToken,
+      };
     }
 
     return {

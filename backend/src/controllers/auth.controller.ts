@@ -78,6 +78,8 @@ export class AuthController {
 
       if (result.newRawRefreshToken) {
         setRefreshTokenCookie(res, result.newRawRefreshToken);
+      } else {
+        clearRefreshTokenCookie(res);
       }
 
       res.status(200).json({
