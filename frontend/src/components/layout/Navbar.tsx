@@ -2,7 +2,7 @@
 // AssetVault: Modern Top Navigation Bar (56px Blurred Glass Shell)
 // Course: BCSE307L Database Systems (Fall 2026-27)
 // Features: 56px height, backdrop-blur-md glass, breadcrumb trail on the left,
-// Cmd+K global search trigger, notification bell with unread dot, and avatar dropdown.
+// Cmd+K global search trigger, notification bell with slide-over panel, and avatar dropdown.
 // ==============================================================================
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -16,7 +16,6 @@ import {
   User as UserIcon,
   Settings,
   Shield,
-  CheckCheck,
   ChevronDown,
   ChevronRight,
   Search,
@@ -27,11 +26,11 @@ import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { CommandPalette } from '../common/CommandPalette';
+import { NotificationPanel } from '../notifications/NotificationPanel';
 import { Avatar } from '../ui/Avatar';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { Notification } from '../../types';
-import { NotificationStreamClient } from '../../services/notificationStream';
 
 export interface NavbarProps {
   onMobileMenuToggle: () => void;
@@ -61,12 +60,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const userRole = typeof user?.role === 'object' && user?.role !== null ? (user.role as any).name : user?.role;
+  const userRole =
+    typeof user?.role === 'object' && user?.role !== null
+      ? (user.role as any).name
+      : user?.role;
 
   // Dynamic Breadcrumb Trail
   const breadcrumbs = useMemo(() => {
@@ -106,63 +107,33 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const toastRef = useRef(toast);
-  toastRef.current = toast;
-
-  // Real-time SSE listener
-  useEffect(() => {
-    if (!user) return;
-
-    const streamClient = new NotificationStreamClient({
-      onNotification: (payload) => {
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        toastRef.current.info(payload.message || 'New notification alert');
-      },
-    });
-
-    streamClient.start();
-    return () => streamClient.stop();
-  }, [user?.id, queryClient]);
-
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const notifMenuRef = useRef<HTMLDivElement>(null);
 
-  // Click outside listener for dropdowns
+  // Click outside listener for user dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setIsUserMenuOpen(false);
-      }
-      if (notifMenuRef.current && !notifMenuRef.current.contains(e.target as Node)) {
-        setIsNotifDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Poll notifications
+  // Poll notifications count for topbar bell badge
   const { data: notifData } = useQuery<Notification[]>({
-    queryKey: ['notifications', 'navbar'],
+    queryKey: ['notifications'],
     queryFn: async () => {
-      const res = await api.get<{ data: Notification[] }>('/notifications', { limit: 5 });
-      return res.data;
+      const res = await api.get<{ data: Notification[] }>('/notifications', { limit: 20 });
+      return (res as any)?.data || (res as any) || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: 30000,
     enabled: !!user,
   });
 
-  const unreadCount = notifData?.filter((n: Notification) => !n.isRead).length || 0;
-
-  const markAllReadMutation = useMutation({
-    mutationFn: async () => {
-      await api.patch('/notifications/read-all');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      toast.success('All notifications marked as read');
-    },
-  });
+  const unreadCount = Array.isArray(notifData)
+    ? notifData.filter((n: Notification) => !n.isRead).length
+    : 0;
 
   const handleLogout = async () => {
     try {
@@ -249,79 +220,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        {/* Notification Bell with Dropdown */}
-        <div className="relative" ref={notifMenuRef}>
-          <button
-            type="button"
-            onClick={() => setIsNotifDropdownOpen((prev) => !prev)}
-            aria-label="Notifications"
-            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg transition-colors relative cursor-pointer"
-          >
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-950 animate-pulse" />
-            )}
-          </button>
-
-          {isNotifDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl py-2 z-50 animate-fade-in divide-y divide-slate-100 dark:divide-slate-800">
-              <div className="p-3 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                  Notifications ({unreadCount} unread)
-                </span>
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => markAllReadMutation.mutate()}
-                    className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                    Mark all read
-                  </button>
-                )}
-              </div>
-
-              <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800/60">
-                {notifData && notifData.length > 0 ? (
-                  notifData.map((n: Notification) => (
-                    <div
-                      key={n.id}
-                      className={`p-3 text-xs transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
-                        !n.isRead ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                          {n.title}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(n.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-slate-500 dark:text-slate-400 line-clamp-2">
-                        {n.message}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-6 text-center text-xs text-slate-400">
-                    No notifications yet.
-                  </div>
-                )}
-              </div>
-
-              <div className="p-2 text-center bg-slate-50/50 dark:bg-slate-950/40">
-                <Link
-                  to="/notifications"
-                  onClick={() => setIsNotifDropdownOpen(false)}
-                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline block py-1"
-                >
-                  View all notifications &rarr;
-                </Link>
-              </div>
-            </div>
+        {/* Notification Bell Trigger (Opens Slide-Over Panel) */}
+        <button
+          type="button"
+          onClick={() => setIsNotifPanelOpen(true)}
+          aria-label="Notifications"
+          className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg transition-colors relative cursor-pointer"
+        >
+          <Bell className="w-4 h-4" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-950 animate-pulse" />
           )}
-        </div>
+        </button>
 
         {/* User Avatar Dropdown */}
         <div className="relative" ref={userMenuRef}>
@@ -408,6 +318,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
 
       {/* Global Multi-Entity Command Palette Modal */}
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      {/* Slide-over Notification Panel */}
+      <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
     </header>
   );
 };
