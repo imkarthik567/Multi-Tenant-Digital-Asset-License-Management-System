@@ -22,6 +22,7 @@ interface AuthContextType {
     fullName: string;
     email: string;
     password: string;
+    contactEmail?: string;
   }) => Promise<User>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -115,6 +116,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fullName: string;
     email: string;
     password: string;
+    contactEmail?: string;
   }): Promise<User> => {
     const generatedSlug = (payload.tenantSlug || payload.tenantName)
       .toLowerCase()
@@ -131,7 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }>('/auth/register-tenant', {
       tenantName: payload.tenantName.trim(),
       slug: generatedSlug.length >= 2 ? generatedSlug : `org-${Date.now()}`,
-      contactEmail: payload.email.trim(),
+      contactEmail: (payload.contactEmail || payload.email).trim(),
       adminFullName: payload.fullName.trim(),
       adminEmail: payload.email.trim(),
       password: payload.password,
