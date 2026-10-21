@@ -49,6 +49,7 @@ export class AccessService {
           assetId,
           userId,
           action: { in: ['CHECKOUT', 'CHECKIN'] },
+          asset: { tenantId },
         },
         orderBy: { id: 'desc' },
       });
@@ -129,6 +130,7 @@ export class AccessService {
           assetId,
           userId,
           action: { in: ['CHECKOUT', 'CHECKIN'] },
+          asset: { tenantId },
         },
         orderBy: { id: 'desc' },
       });
