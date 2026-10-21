@@ -98,7 +98,7 @@ export class ExportService {
     doc.fontSize(9).font('Helvetica-Bold').fillColor(grayColor);
     doc.text('MASKED KEY', 55, startY + 88);
     doc.fontSize(10).font('Helvetica').fillColor(accentColor);
-    doc.text(`••••-••••-••••-${license.licenseKey.slice(-4)}`, 140, startY + 88);
+    doc.text(license.licenseKey ? '••••-••••-••••-' + license.licenseKey.slice(-4) : 'N/A', 140, startY + 88);
 
     doc.y = startY + 125;
 

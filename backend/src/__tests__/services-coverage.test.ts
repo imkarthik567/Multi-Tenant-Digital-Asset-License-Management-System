@@ -23,6 +23,7 @@ import { complianceService } from '../services/compliance.service';
 import { authService } from '../services/auth.service';
 import { notificationStreamService } from '../services/notificationStream.service';
 import { tenantExportService } from '../services/tenantExport.service';
+import { exportService } from '../services/export.service';
 import { PaginationParams } from '../utils/pagination.util';
 import { BadRequestError, UnprocessableError } from '../errors/AppError';
 
@@ -566,6 +567,13 @@ describe('AssetVault Domain Services Comprehensive Coverage Suite', () => {
           const comp = await assetService.compareVersions(systemPrisma, testAssetId, 1, 2);
           expect(comp).toHaveProperty('comparison');
         }
+      }
+    });
+
+    it('generates license PDF even when licenseKey is null or undefined without throwing TypeError', async () => {
+      if (testLicenseId) {
+        const doc = await exportService.generateLicensePdf(testLicenseId, tenantId);
+        expect(doc).toBeDefined();
       }
     });
 
