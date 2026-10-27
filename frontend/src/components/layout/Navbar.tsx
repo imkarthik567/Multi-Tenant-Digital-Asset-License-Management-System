@@ -210,6 +210,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           </kbd>
         </button>
 
+        {/* Gemini AI Chat Toggle Button */}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('assetvault:toggle-ai-chat'))}
+          aria-label="Toggle Gemini AI Chatbot"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800/70 rounded-lg transition-colors cursor-pointer"
+        >
+          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+          <span className="hidden sm:inline text-[11px]">AI Chat</span>
+        </button>
+
         {/* Theme Toggle */}
         <button
           type="button"

@@ -9,6 +9,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { ErrorBoundary } from '../common/ErrorBoundary';
+import { GeminiChatWidget } from '../ai/GeminiChatWidget';
+import { SendGmailModal } from '../notifications/SendGmailModal';
 
 const LOCAL_STORAGE_COLLAPSE_KEY = 'assetvault_sidebar_collapsed';
 
@@ -59,6 +61,12 @@ export const AppLayout: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* Floating Multi-Turn Gemini Chatbot */}
+      <GeminiChatWidget />
+
+      {/* Direct Gmail Notification & License Email Modal */}
+      <SendGmailModal />
     </div>
   );
 };

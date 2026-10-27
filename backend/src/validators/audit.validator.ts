@@ -12,7 +12,7 @@ export const queryAuditLogSchema = z
     limit: z.string().optional(),
     tableName: z.string().optional(),
     action: z.nativeEnum(AuditAction).optional(),
-    userId: z.string().uuid().optional(),
+    userId: z.string().min(1).optional(),
     dateFrom: z.string().optional(),
     dateTo: z.string().optional(),
   })

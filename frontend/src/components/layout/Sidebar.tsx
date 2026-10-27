@@ -137,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ];
     }
 
-    // Tenant / Organization Organization Structure
+    // Tenant / Organization Structure
     const mainItems: NavItem[] = [
       {
         id: 'dashboard',

@@ -8,21 +8,45 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiResponse } from '../types';
 
 const rawBase = (import.meta as any).env?.VITE_API_URL;
-export const API_BASE_URL = rawBase
-  ? rawBase.endsWith('/api')
-    ? rawBase
-    : `${rawBase.replace(/\/+$/, '')}/api`
-  : '/api';
+const isLocalhostOverride =
+  typeof rawBase === 'string' &&
+  (rawBase.includes('localhost:') || rawBase.includes('127.0.0.1:'));
 
-// In-Memory Token Storage (Strictly NOT stored in localStorage)
+export const API_BASE_URL =
+  rawBase && !isLocalhostOverride
+    ? rawBase.endsWith('/api')
+      ? rawBase
+      : `${rawBase.replace(/\/+$/, '')}/api`
+    : '/api';
+
+// Token & Session Persistence (in-memory + localStorage/sessionStorage fallback for page refresh resilience)
 let inMemoryAccessToken: string | null = null;
 
 export const setAccessToken = (token: string | null) => {
   inMemoryAccessToken = token;
+  try {
+    if (token) {
+      localStorage.setItem('assetvault_access_token', token);
+      sessionStorage.setItem('assetvault_access_token', token);
+    } else {
+      localStorage.removeItem('assetvault_access_token');
+      sessionStorage.removeItem('assetvault_access_token');
+    }
+  } catch {}
 };
 
 export const getAccessToken = (): string | null => {
-  return inMemoryAccessToken;
+  if (inMemoryAccessToken) return inMemoryAccessToken;
+  try {
+    const stored =
+      localStorage.getItem('assetvault_access_token') ||
+      sessionStorage.getItem('assetvault_access_token');
+    if (stored) {
+      inMemoryAccessToken = stored;
+      return stored;
+    }
+  } catch {}
+  return null;
 };
 
 export const getStoredRefreshToken = (): string | null => {
@@ -41,6 +65,33 @@ export const setStoredRefreshToken = (token: string | null): void => {
     } else {
       localStorage.removeItem('assetvault_refresh_token');
       sessionStorage.removeItem('assetvault_refresh_token');
+    }
+  } catch {}
+};
+
+export const getStoredSession = (): { user: any; tenant: any; permissions: string[] } | null => {
+  try {
+    const raw =
+      localStorage.getItem('assetvault_session_cache') ||
+      sessionStorage.getItem('assetvault_session_cache');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.user && parsed.user.id) {
+      return parsed;
+    }
+  } catch {}
+  return null;
+};
+
+export const setStoredSession = (session: { user: any; tenant: any; permissions: string[] } | null): void => {
+  try {
+    if (session && session.user) {
+      const serialized = JSON.stringify(session);
+      localStorage.setItem('assetvault_session_cache', serialized);
+      sessionStorage.setItem('assetvault_session_cache', serialized);
+    } else {
+      localStorage.removeItem('assetvault_session_cache');
+      sessionStorage.removeItem('assetvault_session_cache');
     }
   } catch {}
 };
@@ -76,9 +127,13 @@ export const refreshAccessToken = async (): Promise<string> => {
         setStoredRefreshToken(res.data.data.refreshToken);
       }
       return newAccessToken;
-    } catch (err) {
-      setAccessToken(null);
-      setStoredRefreshToken(null);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        setAccessToken(null);
+        setStoredRefreshToken(null);
+        setStoredSession(null);
+      }
       throw err;
     } finally {
       inFlightRefreshPromise = null;
@@ -91,15 +146,16 @@ export const refreshAccessToken = async (): Promise<string> => {
 // Request Interceptor: Attach Access Token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    if (inMemoryAccessToken) {
+    const token = getAccessToken();
+    if (token) {
       if (config.headers && typeof config.headers.set === 'function') {
         if (!config.headers.has('Authorization') && !config.headers.has('authorization')) {
-          config.headers.set('Authorization', `Bearer ${inMemoryAccessToken}`);
+          config.headers.set('Authorization', `Bearer ${token}`);
         }
       } else {
         config.headers = config.headers || {};
         if (!config.headers.Authorization && !config.headers.authorization) {
-          config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
+          config.headers.Authorization = `Bearer ${token}`;
         }
       }
     }

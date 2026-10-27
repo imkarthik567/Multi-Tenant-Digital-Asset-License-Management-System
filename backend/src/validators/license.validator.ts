@@ -10,7 +10,7 @@ import { LicenseStatus } from '@prisma/client';
 export const createLicenseSchema = z
   .object({
     name: z.string().min(2).max(100).trim(),
-    vendorId: z.string().uuid(),
+    vendorId: z.string().min(1, 'Vendor is required').trim(),
     licenseTypeId: z.number().int().positive(),
     licenseKey: z.string().min(4).max(255).trim(),
     totalSeats: z.number().int().positive('totalSeats must be at least 1'),
@@ -34,7 +34,7 @@ export const createLicenseSchema = z
 export const updateLicenseSchema = z
   .object({
     name: z.string().min(2).max(100).trim().optional(),
-    vendorId: z.string().uuid().optional(),
+    vendorId: z.string().min(1).trim().optional(),
     licenseTypeId: z.number().int().positive().optional(),
     licenseKey: z.string().min(4).max(255).trim().optional(),
     totalSeats: z.number().int().positive().optional(),
@@ -67,7 +67,7 @@ export const queryLicenseSchema = z
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).optional(),
     status: z.nativeEnum(LicenseStatus).optional(),
-    vendorId: z.string().uuid().optional(),
+    vendorId: z.string().min(1).optional(),
     licenseTypeId: z.string().optional(),
     expiringWithinDays: z.string().optional(),
     minCost: z.string().optional(),

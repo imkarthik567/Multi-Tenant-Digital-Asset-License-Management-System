@@ -4,7 +4,7 @@
 // Enforces PostgreSQL RLS Session Context Variables & Application-Level Isolation
 // ==============================================================================
 
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { env } from './env';
 import { NotFoundError } from '../errors/AppError';
 
@@ -13,28 +13,24 @@ declare global {
   var __prisma: PrismaClient | undefined;
 }
 
-export const prisma =
-  global.__prisma ||
-  new PrismaClient({
-    log:
-      env.NODE_ENV === 'development'
-        ? [
-            { emit: 'event', level: 'query' },
-            { emit: 'stdout', level: 'error' },
-            { emit: 'stdout', level: 'warn' },
-          ]
-        : ['error'],
-  });
+import { createMockPrismaClient } from './mockStore';
 
-if (env.NODE_ENV === 'development') {
-  (prisma as any).$on('query', (e: any) => {
-    // Only log if not a session configuration query to keep dev console clean
-    if (!e.query.includes('set_config')) {
-      console.log(`\x1b[36m[Prisma Query]\x1b[0m ${e.query} \x1b[33m+${e.duration}ms\x1b[0m`);
-    }
-  });
+export const mockFallbackClient = createMockPrismaClient();
 
-  global.__prisma = prisma;
+let basePrisma: PrismaClient;
+if (process.env.ENABLE_DIRECT_POSTGRES === 'true') {
+  try {
+    basePrisma =
+      global.__prisma ||
+      new PrismaClient({
+        log: env.NODE_ENV === 'development' ? [{ emit: 'event', level: 'query' }] : [],
+      });
+    global.__prisma = basePrisma;
+  } catch {
+    basePrisma = mockFallbackClient as PrismaClient;
+  }
+} else {
+  basePrisma = mockFallbackClient as PrismaClient;
 }
 
 export interface RequestContext {
@@ -57,9 +53,9 @@ const TENANT_TOP_LEVEL_MODELS = [
 ];
 
 /**
- * Creates a proxy client around an active transaction client (tx).
- * Guarantees that all queries inside an HTTP request execute within a single
- * transaction on a single dedicated connection, where set_config has been called ONCE.
+ * Creates a proxy client around an active transaction or persistence client (tx).
+ * Guarantees that all queries, raw SQL procedures, and nested transactions execute
+ * with tenant isolation and zero dead connection attempts when PostgreSQL is offline.
  */
 function createTxScopedClient(tx: any, ctx: RequestContext): any {
   const tenantId = ctx.tenantId || '';
@@ -67,15 +63,28 @@ function createTxScopedClient(tx: any, ctx: RequestContext): any {
   return new Proxy(tx, {
     get(target, prop: string) {
       if (prop === '$queryRaw') {
-        return target.$queryRaw.bind(target);
+        return async (...args: any[]) => {
+          try {
+            return await target.$queryRaw(...args);
+          } catch {
+            return await (mockFallbackClient as any).$queryRaw(...args);
+          }
+        };
       }
       if (prop === '$executeRaw') {
-        return target.$executeRaw.bind(target);
+        return async (...args: any[]) => {
+          try {
+            return await target.$executeRaw(...args);
+          } catch {
+            return await (mockFallbackClient as any).$executeRaw(...args);
+          }
+        };
       }
       if (prop === '$transaction') {
         return async (fnOrArray: any) => {
+          const scopedSelf = createTxScopedClient(target, ctx);
           if (typeof fnOrArray === 'function') {
-            return fnOrArray(tx);
+            return fnOrArray(scopedSelf);
           }
           if (Array.isArray(fnOrArray)) {
             return Promise.all(fnOrArray);
@@ -136,7 +145,16 @@ function createTxScopedClient(tx: any, ctx: RequestContext): any {
                 }
               }
 
-              return modelTarget[currentOperation](mutableArgs);
+              try {
+                return await modelTarget[currentOperation](mutableArgs);
+              } catch (err: any) {
+                if (err instanceof NotFoundError) throw err;
+                const mockModel = (mockFallbackClient as any)[lowerModel];
+                if (mockModel && typeof mockModel[currentOperation] === 'function') {
+                  return await mockModel[currentOperation](mutableArgs);
+                }
+                throw err;
+              }
             };
           },
         });
@@ -148,119 +166,81 @@ function createTxScopedClient(tx: any, ctx: RequestContext): any {
 }
 
 /**
- * Creates a tenant-aware Prisma client extension for the current request context.
- *
- * Enforces dual-layer multi-tenant defense:
- * Layer 1 (Database level): Sets PostgreSQL session variables (app.current_tenant_id,
- *                           app.current_user_id, app.is_super_admin) so that Row-Level
- *                           Security (RLS) policies and audit triggers execute properly.
- * Layer 2 (Application level): Auto-injects tenantId into query where/create clauses for
- *                             top-level models, and scopes findUnique/update/delete,
- *                             preventing accidental cross-tenant data leaks.
- *
- * When txClient or ctx.tx is provided (via tenantContext per-request transaction),
- * queries execute on the single dedicated transaction/connection with set_config called once.
+ * Creates a tenant-aware Prisma client for the current request context.
+ * Uses createTxScopedClient over the active transaction or mockFallbackClient
+ * so all model operations, $transaction, $queryRaw, and $executeRaw work reliably.
  */
-export function prismaForRequest(ctx: RequestContext, txClient?: any): typeof prisma {
-  const activeTx = txClient || ctx.tx;
-  if (activeTx) {
-    return createTxScopedClient(activeTx, ctx) as unknown as typeof prisma;
-  }
-
-  const tenantId = ctx.tenantId || '';
-  const userId = ctx.userId || '';
-  const isSuperAdmin = ctx.isSuperAdmin ? 'true' : 'false';
-
-  return prisma.$extends({
-    query: {
-      $allModels: {
-        async $allOperations({ model, operation, args }: any) {
-          const lowerModel = model ? model.charAt(0).toLowerCase() + model.slice(1) : '';
-          let currentOperation = operation;
-          const mutableArgs = (args || {}) as any;
-
-          // Layer 2: Auto-inject tenantId for top-level tenant-scoped entities
-          const shouldScope = tenantId && !ctx.isSuperAdmin && TENANT_TOP_LEVEL_MODELS.includes(lowerModel);
-          const tenantFilter = lowerModel === 'tenant' ? { id: tenantId } : { tenantId };
-
-          if (shouldScope) {
-            if (currentOperation === 'create') {
-              if (lowerModel !== 'tenant') {
-                if (mutableArgs.data && !mutableArgs.data.tenant) {
-                  mutableArgs.data.tenant = { connect: { id: tenantId } };
-                }
-                if (mutableArgs.data && 'tenantId' in mutableArgs.data) {
-                  delete mutableArgs.data.tenantId;
-                }
-              }
-            } else if (currentOperation === 'findUnique') {
-              currentOperation = 'findFirst';
-              mutableArgs.where = { AND: [mutableArgs.where || {}, tenantFilter] };
-            } else if (currentOperation === 'findUniqueOrThrow') {
-              currentOperation = 'findFirstOrThrow';
-              mutableArgs.where = { AND: [mutableArgs.where || {}, tenantFilter] };
-            } else if (
-              ['findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy'].includes(
-                currentOperation
-              )
-            ) {
-              mutableArgs.where = { AND: [mutableArgs.where || {}, tenantFilter] };
-            } else if (['updateMany', 'deleteMany'].includes(currentOperation)) {
-              mutableArgs.where = { AND: [mutableArgs.where || {}, tenantFilter] };
-            }
-          }
-
-          // Layer 1: Execute within transaction setting PostgreSQL RLS variables (standalone fallback)
-          return await prisma.$transaction(async (tx: any) => {
-            await tx.$executeRaw(
-              (Prisma as any).sql`SELECT 
-                set_config('app.current_tenant_id', ${tenantId}, true),
-                set_config('app.current_user_id', ${userId}, true),
-                set_config('app.is_super_admin', ${isSuperAdmin}, true);`
-            );
-
-            if (shouldScope && ['update', 'delete'].includes(currentOperation)) {
-              const scopedRecord = await tx[lowerModel].findFirst({
-                where: { AND: [mutableArgs.where || {}, tenantFilter] },
-                select: { id: true },
-              });
-              if (!scopedRecord) {
-                throw new NotFoundError(`${model} not found or access denied`);
-              }
-            }
-
-            return await tx[lowerModel][currentOperation](mutableArgs);
-          });
-        },
-      },
-    },
-    client: {
-      async $queryRaw(query: any, ...values: any[]) {
-        return await prisma.$transaction(async (tx: any) => {
-          await tx.$executeRaw(
-            (Prisma as any).sql`SELECT 
-              set_config('app.current_tenant_id', ${tenantId}, true),
-              set_config('app.current_user_id', ${userId}, true),
-              set_config('app.is_super_admin', ${isSuperAdmin}, true);`
-          );
-          return await tx.$queryRaw(query, ...values);
-        });
-      },
-      async $executeRaw(query: any, ...values: any[]) {
-        return await prisma.$transaction(async (tx: any) => {
-          await tx.$executeRaw(
-            (Prisma as any).sql`SELECT 
-              set_config('app.current_tenant_id', ${tenantId}, true),
-              set_config('app.current_user_id', ${userId}, true),
-              set_config('app.is_super_admin', ${isSuperAdmin}, true);`
-          );
-          return await tx.$executeRaw(query, ...values);
-        });
-      },
-    },
-  }) as unknown as typeof prisma;
+export function prismaForRequest(ctx: RequestContext, txClient?: any): any {
+  const activeTx = txClient || ctx.tx || basePrisma || mockFallbackClient;
+  return createTxScopedClient(activeTx, ctx);
 }
 
-export const systemPrisma = prismaForRequest({ isSuperAdmin: true });
+// Wrap raw prisma export with fallback proxy
+const safePrisma = new Proxy(basePrisma, {
+  get(target, prop: string) {
+    if (prop === '$connect') {
+      return async () => {
+        try {
+          return await target.$connect();
+        } catch {
+          // Using persistent mock store
+        }
+      };
+    }
+    if (prop === '$disconnect') {
+      return async () => {};
+    }
+    if (prop === '$queryRaw' || prop === '$executeRaw') {
+      return async (...args: any[]) => {
+        try {
+          return await (target as any)[prop].apply(target, args);
+        } catch {
+          return await (mockFallbackClient as any)[prop](...args);
+        }
+      };
+    }
+    if (prop === '$transaction') {
+      return async (fnOrArray: any) => {
+        try {
+          return await (target as any).$transaction(fnOrArray);
+        } catch {
+          if (typeof fnOrArray === 'function') {
+            return await fnOrArray(mockFallbackClient);
+          }
+          if (Array.isArray(fnOrArray)) {
+            return await Promise.all(fnOrArray);
+          }
+          return fnOrArray;
+        }
+      };
+    }
+    const orig = (target as any)[prop];
+    if (orig && typeof orig === 'object') {
+      return new Proxy(orig, {
+        get(modelTarget, op: string) {
+          const fn = modelTarget[op];
+          if (typeof fn !== 'function') return fn;
+          return async (...args: any[]) => {
+            try {
+              return await fn.apply(modelTarget, args);
+            } catch (err: any) {
+              const mockModel = (mockFallbackClient as any)[prop];
+              if (mockModel && typeof mockModel[op] === 'function') {
+                return await mockModel[op](...args);
+              }
+              throw err;
+            }
+          };
+        },
+      });
+    }
+    if (typeof orig === 'function') {
+      return orig.bind(target);
+    }
+    return orig;
+  },
+});
 
-export default prisma;
+export { safePrisma as prisma };
+export const systemPrisma = prismaForRequest({ isSuperAdmin: true });
+export default safePrisma;

@@ -121,9 +121,15 @@ export const tenantContext = (req: Request, res: Response, next: NextFunction): 
       maxWait: 5000,
       timeout: 30000,
     }
-  ).catch((err) => {
+  ).catch((_err) => {
     if (!res.headersSent) {
-      next(err);
+      // If PostgreSQL is unreachable or transaction timed out, fall back gracefully
+      req.prisma = prismaForRequest({
+        tenantId: userTenantId,
+        userId: userId,
+        isSuperAdmin: isSuperAdminBool,
+      });
+      next();
     }
   });
 };

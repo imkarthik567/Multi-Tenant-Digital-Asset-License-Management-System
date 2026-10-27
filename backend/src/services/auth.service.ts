@@ -325,7 +325,7 @@ export class AuthService {
       },
     });
 
-    if (!storedToken) {
+    if (!storedToken || !storedToken.user) {
       throw new UnauthorizedError('Invalid refresh token');
     }
 
@@ -339,15 +339,16 @@ export class AuthService {
     }
 
     // 1. Reuse Detection with Grace Window for the immediately previous token
-    if (storedToken.revokedAt !== null) {
-      const elapsedSinceRevocation = now.getTime() - storedToken.revokedAt.getTime();
+    if (storedToken.revokedAt !== null && storedToken.revokedAt !== undefined) {
+      const revokedAtDate = new Date(storedToken.revokedAt);
+      const elapsedSinceRevocation = now.getTime() - revokedAtDate.getTime();
 
       // Check if this token was recently rotated and replaced by an active successor token
       const successorToken = await systemPrisma.refreshToken.findFirst({
         where: {
           userId: storedToken.userId,
           id: { not: storedToken.id },
-          createdAt: { gte: new Date(storedToken.revokedAt.getTime() - 1000) },
+          createdAt: { gte: new Date(revokedAtDate.getTime() - 1000) },
           revokedAt: null,
         },
       });
@@ -401,7 +402,7 @@ export class AuthService {
     }
 
     // 2. Expiry check
-    if (now > storedToken.expiresAt) {
+    if (now > new Date(storedToken.expiresAt)) {
       throw new UnauthorizedError('Refresh token has expired. Please log in again.');
     }
 

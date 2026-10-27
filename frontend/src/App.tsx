@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
@@ -14,12 +14,47 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
-// Global Navigation Bridge for seamless client-side SPA transitions
+const PUBLIC_PATHS = ['/login', '/register', '/oauth-callback', '/403', '/404'];
+const LAST_ROUTE_STORAGE_KEY = 'assetvault_last_route';
+
+// Global Navigation Bridge for seamless client-side SPA transitions & page refresh route preservation
 const NavigationBridge: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const hasRestoredRef = React.useRef(false);
+
   React.useEffect(() => {
     (window as any).__navigate = navigate;
   }, [navigate]);
+
+  React.useEffect(() => {
+    if (!hasRestoredRef.current) {
+      hasRestoredRef.current = true;
+      try {
+        const savedRoute =
+          sessionStorage.getItem(LAST_ROUTE_STORAGE_KEY) ||
+          localStorage.getItem(LAST_ROUTE_STORAGE_KEY);
+        if (
+          savedRoute &&
+          savedRoute !== '/' &&
+          !PUBLIC_PATHS.some((p) => savedRoute.startsWith(p)) &&
+          location.pathname === '/'
+        ) {
+          navigate(savedRoute, { replace: true });
+          return;
+        }
+      } catch {}
+    }
+
+    const currentPath = `${location.pathname}${location.search}${location.hash}`;
+    if (!PUBLIC_PATHS.some((p) => location.pathname.startsWith(p))) {
+      try {
+        sessionStorage.setItem(LAST_ROUTE_STORAGE_KEY, currentPath);
+        localStorage.setItem(LAST_ROUTE_STORAGE_KEY, currentPath);
+      } catch {}
+    }
+  }, [location.pathname, location.search, location.hash, navigate]);
+
   return null;
 };
 
@@ -61,6 +96,7 @@ const TenantSettingsPage = lazy(() => import('./pages/settings/TenantSettingsPag
 
 const TenantListPage = lazy(() => import('./pages/platform/TenantListPage').then((m) => ({ default: m.TenantListPage })));
 const PlanListPage = lazy(() => import('./pages/platform/PlanListPage').then((m) => ({ default: m.PlanListPage })));
+const AiAssistantPage = lazy(() => import('./pages/ai/AiAssistantPage').then((m) => ({ default: m.AiAssistantPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -104,6 +140,7 @@ export const App: React.FC = () => {
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/assets" element={<AssetListPage />} />
                     <Route path="/assets/:id" element={<AssetDetailPage />} />
+                    <Route path="/ai-assistant" element={<AiAssistantPage />} />
                     <Route path="/notifications" element={<NotificationListPage />} />
                     <Route path="/settings" element={<TenantSettingsPage />} />
 

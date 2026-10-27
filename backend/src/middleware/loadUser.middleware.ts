@@ -25,7 +25,7 @@ export const loadUser = async (req: Request, _res: Response, next: NextFunction)
         isSuperAdmin,
       });
 
-    const user = await userPrisma.user.findUnique({
+    let user = await userPrisma.user.findUnique({
       where: { id: req.jwtUser.sub },
       include: {
         role: true,
@@ -34,6 +34,49 @@ export const loadUser = async (req: Request, _res: Response, next: NextFunction)
         },
       },
     });
+
+    if (!user && req.jwtUser.email) {
+      // Auto-recover signed-in user session if in-memory store was reset by dev server restart
+      const { mockStore } = await import('../config/mockStore');
+      const tenantId = req.jwtUser.tenantId || 'tenant-recovered';
+      let existingTenant = mockStore.state.tenants.find((t) => t.id === tenantId);
+      if (!existingTenant && req.jwtUser.tenantId) {
+        existingTenant = {
+          id: tenantId,
+          name: 'Future Group',
+          slug: 'future-group',
+          contactEmail: req.jwtUser.email,
+          planId: 1,
+          status: 'TRIAL',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        mockStore.state.tenants.push(existingTenant);
+      }
+
+      const jwtAny = req.jwtUser as any;
+      const roleObj =
+        mockStore.state.roles.find((r) => r.name === jwtAny?.role) ||
+        mockStore.state.roles.find((r) => r.id === jwtAny?.roleId) ||
+        mockStore.state.roles.find((r) => r.name === 'TENANT_ADMIN') ||
+        mockStore.state.roles[1];
+
+      const recoveredUser = {
+        id: req.jwtUser.sub,
+        tenantId: req.jwtUser.tenantId || null,
+        roleId: roleObj?.id || 2,
+        email: req.jwtUser.email,
+        fullName: jwtAny?.fullName || 'Administrator',
+        passwordHash: '$2a$12$D021KNk/cBAisMwChHfu/.oyT8l/ILtBOJFzVmoY9Vqi4TaICrXPa',
+        isActive: true,
+        lastLoginAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockStore.state.users.push(recoveredUser);
+      mockStore.saveState();
+      user = mockStore.populateRelations('user', recoveredUser, { role: true, tenant: { include: { plan: true } } });
+    }
 
     if (!user) {
       throw new UnauthorizedError('User account not found or removed');

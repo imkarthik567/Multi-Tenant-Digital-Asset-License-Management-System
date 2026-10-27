@@ -9,7 +9,7 @@ export const createCategorySchema = z
   .object({
     name: z.string().min(2).max(100).trim(),
     description: z.string().max(500).optional().nullable(),
-    parentId: z.string().uuid().optional().nullable(),
+    parentId: z.string().min(1).optional().nullable(),
   })
   .strip();
 
@@ -17,7 +17,7 @@ export const updateCategorySchema = z
   .object({
     name: z.string().min(2).max(100).trim().optional(),
     description: z.string().max(500).optional().nullable(),
-    parentId: z.string().uuid().optional().nullable(),
+    parentId: z.string().min(1).optional().nullable(),
   })
   .strip();
 

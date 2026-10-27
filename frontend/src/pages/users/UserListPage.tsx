@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Sparkles,
   AlertCircle,
+  Edit3,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { User, RoleName } from '../../types';
@@ -38,6 +39,7 @@ import {
 import { Pagination } from '../../components/common/Pagination';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { openGmailModal } from '../../components/notifications/SendGmailModal';
 
 // ==============================================================================
 // 1. Role Configuration & Styling Tokens
@@ -155,7 +157,7 @@ export function generateSecurePassword(): string {
 // ==============================================================================
 
 export const UserListPage: React.FC = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
   const toastContext = useToast();
   const toast = (toastContext as any).toast || toastContext;
@@ -175,6 +177,9 @@ export const UserListPage: React.FC = () => {
   const [isInviteDrawerOpen, setIsInviteDrawerOpen] = useState(false);
   const [roleDropdownUserId, setRoleDropdownUserId] = useState<string | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const [editEmailUser, setEditEmailUser] = useState<User | null>(null);
+  const [editEmailForm, setEditEmailForm] = useState({ fullName: '', email: '' });
+  const [editEmailError, setEditEmailError] = useState('');
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [showBulkDeactivateConfirm, setShowBulkDeactivateConfirm] = useState(false);
 
@@ -479,6 +484,34 @@ export const UserListPage: React.FC = () => {
     },
   });
 
+  // 7. Update User Email & Full Name Mutation
+  const updateEmailMutation = useMutation({
+    mutationFn: ({
+      userId,
+      email,
+      fullName,
+    }: {
+      userId: string;
+      email: string;
+      fullName: string;
+    }) => api.patch(`/users/${userId}`, { email, fullName }),
+    onSuccess: async (_, vars) => {
+      toast.success(`Updated email to ${vars.email}`);
+      setEditEmailUser(null);
+      setEditEmailError('');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      if (vars.userId === currentUser?.id) {
+        try {
+          await refreshProfile();
+        } catch {}
+      }
+    },
+    onError: (err: any) => {
+      setEditEmailError(err.message || 'Failed to update user email');
+    },
+  });
+
   // ============================================================================
   // Form Submission Handlers
   // ============================================================================
@@ -495,8 +528,8 @@ export const UserListPage: React.FC = () => {
       errors.email = 'Valid email address is required';
     }
 
-    if (!inviteForm.password || inviteForm.password.length < 10) {
-      errors.password = 'Initial password must be at least 10 characters long';
+    if (!inviteForm.password || inviteForm.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -511,8 +544,8 @@ export const UserListPage: React.FC = () => {
     e.preventDefault();
     if (!resetPasswordUser) return;
 
-    if (!newPassword || newPassword.length < 10) {
-      setResetError('Password must be at least 10 characters long');
+    if (!newPassword || newPassword.length < 6) {
+      setResetError('Password must be at least 6 characters long');
       return;
     }
 
@@ -522,10 +555,34 @@ export const UserListPage: React.FC = () => {
     });
   };
 
+  const handleEditEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editEmailUser) return;
+
+    const trimmedEmail = editEmailForm.email.trim().toLowerCase();
+    const trimmedName = editEmailForm.fullName.trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      setEditEmailError('Full name must be at least 2 characters');
+      return;
+    }
+
+    if (!trimmedEmail || !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+      setEditEmailError('Please enter a valid email address');
+      return;
+    }
+
+    updateEmailMutation.mutate({
+      userId: editEmailUser.id,
+      email: trimmedEmail,
+      fullName: trimmedName,
+    });
+  };
+
   return (
     <div className="space-y-6 pb-24">
       {/* ====================================================================== */}
-      {/* 1. Header: Title, Description, and Invite Team Member CTA               */}
+      {/* 1. Header: Title, Description, and Create New User CTA                  */}
       {/* ====================================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
@@ -538,7 +595,7 @@ export const UserListPage: React.FC = () => {
             </h1>
           </div>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            Invite colleagues, reassign role permissions inline, manage active sessions, and oversee team credentials.
+            Create new users, assign role permissions inline, manage active sessions, and oversee team credentials.
           </p>
         </div>
 
@@ -557,8 +614,128 @@ export const UserListPage: React.FC = () => {
             setIsInviteDrawerOpen(true);
           }}
         >
-          Invite Team Member
+          Create / Invite User
         </Button>
+      </div>
+
+      {/* ====================================================================== */}
+      {/* 1B. Inline Create New User Bar (Direct Multi-Column User Creation)      */}
+      {/* ====================================================================== */}
+      <div className="p-4 sm:p-5 bg-slate-900/90 border border-indigo-500/30 rounded-xl shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-indigo-400" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+              Create a New User
+            </h2>
+          </div>
+          <span className="text-[11px] text-slate-400 hidden sm:inline">
+            Add a team member directly to your organization
+          </span>
+        </div>
+
+        <form
+          onSubmit={handleInviteSubmit}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-start"
+        >
+          {/* Column 1: Full Name */}
+          <div>
+            <Input
+              label="Full Name *"
+              placeholder="e.g. Rahul Sharma"
+              value={inviteForm.fullName}
+              onChange={(e) => {
+                setInviteForm({ ...inviteForm, fullName: e.target.value });
+                if (inviteErrors.fullName) {
+                  setInviteErrors((prev) => ({ ...prev, fullName: '' }));
+                }
+              }}
+              error={inviteErrors.fullName}
+            />
+          </div>
+
+          {/* Column 2: Work Email */}
+          <div>
+            <Input
+              label="Work Email *"
+              type="email"
+              placeholder="rahul@organization.com"
+              value={inviteForm.email}
+              onChange={(e) => {
+                setInviteForm({ ...inviteForm, email: e.target.value });
+                if (inviteErrors.email) {
+                  setInviteErrors((prev) => ({ ...prev, email: '' }));
+                }
+              }}
+              error={inviteErrors.email}
+            />
+          </div>
+
+          {/* Column 3: Role Assignment */}
+          <div>
+            <Select
+              label="Role *"
+              value={inviteForm.roleName}
+              onChange={(e) =>
+                setInviteForm({
+                  ...inviteForm,
+                  roleName: e.target.value as RoleName,
+                })
+              }
+            >
+              <option value="MEMBER">Member</option>
+              <option value="ASSET_MANAGER">Asset Manager</option>
+              <option value="TENANT_ADMIN">Tenant Admin</option>
+            </Select>
+          </div>
+
+          {/* Column 4: Initial Password */}
+          <div>
+            <Input
+              label="Password *"
+              type="text"
+              placeholder="Min 6 characters"
+              value={inviteForm.password}
+              onChange={(e) => {
+                setInviteForm({ ...inviteForm, password: e.target.value });
+                if (inviteErrors.password) {
+                  setInviteErrors((prev) => ({ ...prev, password: '' }));
+                }
+              }}
+              error={inviteErrors.password}
+              className="font-mono text-xs"
+              rightAction={
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInviteForm({
+                      ...inviteForm,
+                      password: generateSecurePassword(),
+                    })
+                  }
+                  className="p-1 text-slate-400 hover:text-indigo-400 transition-colors"
+                  title="Generate secure password"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              }
+            />
+          </div>
+
+          {/* Column 5: Submit Action */}
+          <div className="pt-0 sm:pt-6">
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              className="w-full"
+              iconLeft={<UserPlus className="w-4 h-4" />}
+              isLoading={inviteMutation.isPending}
+            >
+              Create User
+            </Button>
+          </div>
+        </form>
       </div>
 
       {/* ====================================================================== */}
@@ -799,10 +976,28 @@ export const UserListPage: React.FC = () => {
 
                       {/* Column 2: Email */}
                       <td className="py-3.5 px-4">
-                        <span className="font-mono text-slate-300 select-all flex items-center gap-1.5">
-                          <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                          <span>{u.email}</span>
-                        </span>
+                        <div className="flex items-center gap-2 group">
+                          <span className="font-mono text-slate-300 select-all flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span>{u.email}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditEmailUser(u);
+                              setEditEmailForm({
+                                fullName: u.fullName || '',
+                                email: u.email || '',
+                              });
+                              setEditEmailError('');
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800 hover:bg-indigo-600/30 text-indigo-300 border border-slate-700 hover:border-indigo-500/50 transition-colors cursor-pointer"
+                            title="Edit email address"
+                          >
+                            <Edit3 className="w-2.5 h-2.5" />
+                            <span>Edit Email</span>
+                          </button>
+                        </div>
                       </td>
 
                       {/* Column 3: Role badge (Interactive Inline Role Change) */}
@@ -939,6 +1134,39 @@ export const UserListPage: React.FC = () => {
                       {/* Column 6: Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {/* Send Gmail Notification Button */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openGmailModal({
+                                recipientName: u.fullName,
+                                recipientEmail: u.email,
+                                notificationTitle: 'Workspace Notification & License Update',
+                              })
+                            }
+                            className="p-1.5 text-indigo-400 hover:text-indigo-200 hover:bg-indigo-950/50 rounded-lg transition-colors cursor-pointer"
+                            title="Send email via Gmail"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Edit Email & Name Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditEmailUser(u);
+                              setEditEmailForm({
+                                fullName: u.fullName || '',
+                                email: u.email || '',
+                              });
+                              setEditEmailError('');
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            title="Edit email & name"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Reset Password Button */}
                           <button
                             type="button"
@@ -947,7 +1175,7 @@ export const UserListPage: React.FC = () => {
                               setNewPassword(generateSecurePassword());
                               setResetError('');
                             }}
-                            className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                             title="Reset password"
                           >
                             <KeyRound className="w-3.5 h-3.5" />
@@ -958,7 +1186,7 @@ export const UserListPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setDeleteUser(u)}
-                              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
                               title="Remove user"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1228,6 +1456,63 @@ export const UserListPage: React.FC = () => {
             Must contain at least 10 characters with upper/lowercase letters, a number, and a symbol.
           </p>
         </div>
+      </Modal>
+
+      {/* ====================================================================== */}
+      {/* 6B. Modal: Edit User Email & Full Name Dialog                          */}
+      {/* ====================================================================== */}
+      <Modal
+        isOpen={Boolean(editEmailUser)}
+        onClose={() => setEditEmailUser(null)}
+        title="Edit Member Email & Profile"
+        description={`Update email address and display name for ${editEmailUser?.fullName}`}
+        maxWidth="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setEditEmailUser(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              isLoading={updateEmailMutation.isPending}
+              onClick={handleEditEmailSubmit}
+            >
+              Save Email
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleEditEmailSubmit} className="space-y-4">
+          <Input
+            label="Full Name *"
+            type="text"
+            value={editEmailForm.fullName}
+            onChange={(e) => {
+              setEditEmailForm({ ...editEmailForm, fullName: e.target.value });
+              setEditEmailError('');
+            }}
+          />
+          <Input
+            label="Email Address *"
+            type="email"
+            value={editEmailForm.email}
+            onChange={(e) => {
+              setEditEmailForm({ ...editEmailForm, email: e.target.value });
+              setEditEmailError('');
+            }}
+            error={editEmailError}
+            className="font-mono text-xs"
+            placeholder="e.g. sudirniranjsnn07@gmail.com"
+          />
+          <p className="text-[11px] text-slate-400">
+            Updating a member&apos;s email immediately updates their recipient address for Gmail notifications and license seat allocations.
+          </p>
+        </form>
       </Modal>
 
       {/* ====================================================================== */}

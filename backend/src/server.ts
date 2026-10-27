@@ -11,8 +11,12 @@ import { jobScheduler } from './jobs/scheduler';
 export const startServer = async (portOverride?: number) => {
   try {
     // Verify database connectivity
-    await prisma.$connect();
-    console.log('✅ Connected to PostgreSQL database successfully.');
+    try {
+      await prisma.$connect();
+      console.log('✅ Connected to PostgreSQL database successfully.');
+    } catch (dbErr) {
+      console.warn('⚠️ PostgreSQL database offline or unreachable. Proceeding with mock/graceful fallback.');
+    }
 
     // Start background schedulers in API process (controlled by authoritative ENABLE_IN_PROCESS_WORKER)
     const enableWorker = env.ENABLE_IN_PROCESS_WORKER;

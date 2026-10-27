@@ -23,6 +23,7 @@ import auditRoutes from './audit.routes';
 import reportRoutes from './report.routes';
 import platformRoutes from './platform.routes';
 import searchRoutes from './search.routes';
+import aiRoutes from './ai.routes';
 import { tenantController } from '../controllers/tenant.controller';
 
 import { authenticate } from '../middleware/auth.middleware';
@@ -97,7 +98,10 @@ router.use('/platform', platformRoutes);
 // 15. Global Trigram Search (Assets, Licenses, Vendors, Tags)
 router.use('/search', searchRoutes);
 
-// 16. Tenant Data Lifecycle Export Archive
+// 16. Gemini AI Assistant & Optimization Advisor
+router.use('/ai', aiRoutes);
+
+// 17. Tenant Data Lifecycle Export Archive
 router.get(
   '/tenant/export',
   authenticate,

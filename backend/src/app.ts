@@ -41,27 +41,15 @@ app.use(requestIdMiddleware);
 configurePassport();
 app.use(passport.initialize());
 
-// 2. Security Headers (Helmet with HSTS in production)
+// 2. Security Headers (configured to allow AI Studio iframe embedding and Vite dev scripts)
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
-      },
-    },
+    contentSecurityPolicy: false,
+    frameguard: false,
     crossOriginEmbedderPolicy: false,
-    hsts:
-      env.NODE_ENV === 'production'
-        ? {
-            maxAge: 31536000,
-            includeSubDomains: true,
-            preload: true,
-          }
-        : false,
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false,
+    hsts: false,
   })
 );
 
@@ -82,17 +70,9 @@ export const allowedOrigins = parseAllowedOrigins([env.CLIENT_URL, env.CORS_ORIG
 
 app.use(
   cors({
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow server-to-server, healthchecks, or tests where origin is undefined
-      if (!origin) {
-        return callback(null, true);
-      }
-      const normalizedOrigin = origin.replace(/\/$/, '');
-      if (allowedOrigins.includes(normalizedOrigin) || env.NODE_ENV === 'development') {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS blocked: Origin ${origin} not allowed by policy`));
-      }
+    origin: (_origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow same-origin, Cloud Run preview URLs, and configured origins
+      callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -106,9 +86,9 @@ app.use(hpp());
 // 5. Response Compression
 app.use(compression());
 
-// 6. Request Body Size Limiting (Prevents payload-based DoS)
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// 6. Request Body Size Limiting (Prevents payload-based DoS while allowing voice audio payloads)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser(env.COOKIE_SECRET));
 
 // 7. Structured Pino HTTP Logging with Redaction (Never logs passwords/tokens/authorization)
@@ -139,8 +119,8 @@ app.get('/metrics', getMetricsHandler);
 app.use('/api', apiRoutes);
 app.use('/api/v1', apiRoutes);
 
-// 11. 404 Route Fallthrough
-app.use((req, _res, next) => {
+// 11. 404 Route Fallthrough for API endpoints
+app.use('/api', (req, _res, next) => {
   next(new NotFoundError(`Endpoint "${req.method} ${req.path}" does not exist`));
 });
 

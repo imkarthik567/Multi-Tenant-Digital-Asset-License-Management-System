@@ -5,7 +5,16 @@
 // ==============================================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { api, setAccessToken, getAccessToken, refreshAccessToken, setStoredRefreshToken } from '../services/api';
+import {
+  api,
+  setAccessToken,
+  getAccessToken,
+  refreshAccessToken,
+  setStoredRefreshToken,
+  getStoredRefreshToken,
+  getStoredSession,
+  setStoredSession,
+} from '../services/api';
 import { User, Tenant, RoleName } from '../types';
 import { parseAuthProfile } from '../utils/auth.util';
 
@@ -33,28 +42,36 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const initialSession = (getAccessToken() || getStoredRefreshToken()) ? getStoredSession() : null;
 
-  // Initialize Session: Check for existing in-memory token or perform silent cookie refresh
+  const [user, setUser] = useState<User | null>(() => initialSession?.user ?? null);
+  const [tenant, setTenant] = useState<Tenant | null>(() => initialSession?.tenant ?? null);
+  const [permissions, setPermissions] = useState<string[]>(() => initialSession?.permissions ?? []);
+  const [isLoading, setIsLoading] = useState<boolean>(() => !initialSession?.user);
+
+  // Initialize Session: Restore persisted token or perform silent refresh
   const initAuth = useCallback(async () => {
-    setIsLoading(true);
+    const cached = getStoredSession();
+    if (!cached?.user) {
+      setIsLoading(true);
+    }
+
     try {
       let token = getAccessToken();
 
-      // If no token in memory, attempt silent refresh via httpOnly cookie
+      // If no access token, attempt silent refresh via refresh token
       if (!token) {
         try {
           token = await refreshAccessToken();
         } catch {
-          // No active session in cookies or fallback storage
-          setAccessToken(null);
-          setStoredRefreshToken(null);
-          setUser(null);
-          setTenant(null);
-          setPermissions([]);
+          if (!cached?.user) {
+            setAccessToken(null);
+            setStoredRefreshToken(null);
+            setStoredSession(null);
+            setUser(null);
+            setTenant(null);
+            setPermissions([]);
+          }
           return;
         }
       }
@@ -66,14 +83,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(session.user);
         setTenant(session.tenant);
         setPermissions(session.permissions);
+        setStoredSession(session);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('[AuthContext] initAuth failed to restore session:', err);
-      setAccessToken(null);
-      setStoredRefreshToken(null);
-      setUser(null);
-      setTenant(null);
-      setPermissions([]);
+      const status = err?.status || err?.response?.status;
+      if (status === 401 || status === 403) {
+        setAccessToken(null);
+        setStoredRefreshToken(null);
+        setStoredSession(null);
+        setUser(null);
+        setTenant(null);
+        setPermissions([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -84,6 +106,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const handleSessionExpired = () => {
       setAccessToken(null);
+      setStoredRefreshToken(null);
+      setStoredSession(null);
       setUser(null);
       setTenant(null);
       setPermissions([]);
@@ -112,6 +136,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(session.user);
     setTenant(session.tenant);
     setPermissions(session.permissions);
+    setStoredSession(session);
     return session.user;
   };
 
@@ -153,17 +178,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(session.user);
     setTenant(session.tenant);
     setPermissions(session.permissions);
+    setStoredSession(session);
     return session.user;
   };
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout');
+      await api.post('/auth/logout', { refreshToken: getStoredRefreshToken() });
     } catch {
       // Proceed with clearing local state even if remote call fails
     } finally {
       setAccessToken(null);
       setStoredRefreshToken(null);
+      setStoredSession(null);
+      try {
+        sessionStorage.removeItem('assetvault_last_route');
+        localStorage.removeItem('assetvault_last_route');
+      } catch {}
       setUser(null);
       setTenant(null);
       setPermissions([]);
@@ -177,6 +208,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(session.user);
       setTenant(session.tenant);
       setPermissions(session.permissions);
+      setStoredSession(session);
     } catch (err: any) {
       console.error('[AuthContext] refreshProfile failed to refresh profile:', err);
       throw err;
