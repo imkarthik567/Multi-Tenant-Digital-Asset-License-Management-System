@@ -70,13 +70,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     queryKey: ['notifications', 'sidebar-badge'],
     queryFn: async () => {
       const res = await api.get<{ data: Notification[] }>('/notifications', { limit: 10 });
-      return res.data;
+      return (res as any)?.data || (Array.isArray(res) ? res : []);
     },
     refetchInterval: 60000,
     enabled: !!user,
   });
 
-  const unreadCount = notifData?.filter((n: Notification) => !n.isRead).length || 0;
+  const notifList = Array.isArray(notifData)
+    ? notifData
+    : Array.isArray((notifData as any)?.data)
+    ? (notifData as any).data
+    : [];
+  const unreadCount = notifList.filter((n: Notification) => !n.isRead).length;
 
   // Grouped Navigation Schema: Main, Manage, Platform, Settings
   const sections: NavSection[] = useMemo(() => {

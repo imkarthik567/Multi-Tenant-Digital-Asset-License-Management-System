@@ -636,7 +636,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                 const licenseName =
                   (n as any).license?.name ||
                   n.title ||
-                  n.message.match(/license\s+['"]?([^'"]+)['"]?/i)?.[1] ||
+                  (n.message || '').match(/license\s+['"]?([^'"]+)['"]?/i)?.[1] ||
                   'Enterprise License';
 
                 return (

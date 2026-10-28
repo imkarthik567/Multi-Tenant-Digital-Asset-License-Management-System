@@ -83,8 +83,21 @@ app.use(
 // 4. HTTP Parameter Pollution Defense
 app.use(hpp());
 
-// 5. Response Compression
-app.use(compression());
+// 5. Response Compression (skip Vite dev module & HMR streams so module loads aren't altered)
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (
+        req.url.startsWith('/src/') ||
+        req.url.startsWith('/@') ||
+        req.url.startsWith('/node_modules/')
+      ) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  })
+);
 
 // 6. Request Body Size Limiting (Prevents payload-based DoS while allowing voice audio payloads)
 app.use(express.json({ limit: '10mb' }));
@@ -97,7 +110,13 @@ if (env.NODE_ENV !== 'test') {
     pinoHttp({
       logger,
       autoLogging: {
-        ignore: (req) => req.url === '/health' || req.url === '/api/health',
+        ignore: (req) =>
+          req.url === '/health' ||
+          req.url === '/api/health' ||
+          req.url.startsWith('/src/') ||
+          req.url.startsWith('/@') ||
+          req.url.startsWith('/node_modules/') ||
+          req.url.startsWith('/assets/'),
       },
     })
   );

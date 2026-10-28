@@ -1235,7 +1235,9 @@ export function createMockModelClient(modelName: string): any {
 
 export function createMockPrismaClient(): any {
   const handler: ProxyHandler<any> = {
-    get(_target, prop: string) {
+    get(_target, prop: string | symbol) {
+      if (typeof prop !== 'string') return undefined;
+      if (prop === 'then') return undefined;
       if (prop === '$connect') return async () => {};
       if (prop === '$disconnect') return async () => {};
       if (prop === '$transaction') {
@@ -1288,7 +1290,17 @@ export function createMockPrismaClient(): any {
 
           if (sqlText.includes('v_asset_catalog')) {
             if (sqlText.toLowerCase().includes('count(')) {
-              return [{ total: mockStore.state.assets.length, count: mockStore.state.assets.length }];
+              const total = mockStore.state.assets.length;
+              return [
+                {
+                  total,
+                  count: total,
+                  total_assets: total,
+                  compliant_assets: total,
+                  expired_license_assets: 0,
+                  unlicensed_assets: 0,
+                },
+              ];
             }
             if (sqlText.includes('UNLICENSED')) {
               return [];
@@ -1405,10 +1417,7 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('v_license_utilization')) {
-            if (sqlText.toLowerCase().includes('count(')) {
-              return [{ total: mockStore.state.licenses.length, count: mockStore.state.licenses.length }];
-            }
-            return mockStore.state.licenses.map((l) => {
+            const mapped = mockStore.state.licenses.map((l) => {
               const vendor = mockStore.state.vendors.find((v) => v.id === l.vendorId);
               const licType = mockStore.state.licenseTypes.find((lt) => lt.id === l.licenseTypeId);
               const totalSeats = Number(l.totalSeats || 1);
@@ -1441,13 +1450,36 @@ export function createMockPrismaClient(): any {
                 currency: l.currency || 'USD',
               };
             });
+
+            if (sqlText.toLowerCase().includes('count(')) {
+              const total = mapped.length;
+              const exhausted = mapped.filter((m) => m.available_seats <= 0).length;
+              const overAllocated = mapped.filter((m) => m.used_seats > m.total_seats).length;
+              return [
+                {
+                  total,
+                  count: total,
+                  total_licenses: total,
+                  exhausted_licenses: exhausted,
+                  over_allocated_licenses: overAllocated,
+                },
+              ];
+            }
+            if (sqlText.includes('available_seats <= 0')) {
+              return mapped.filter((m) => m.available_seats <= 0);
+            }
+            return mapped;
           }
 
           if (sqlText.includes('v_expiring_licenses')) {
-            return mockStore.state.licenses
+            const mapped = mockStore.state.licenses
               .filter((l) => l.expiresAt || l.endDate)
               .map((l) => {
                 const expDate = l.endDate || l.expiresAt;
+                const daysLeft = Math.max(
+                  1,
+                  Math.round((new Date(expDate as any).getTime() - Date.now()) / (24 * 3600 * 1000))
+                );
                 return {
                   license_id: l.id,
                   tenant_id: l.tenantId,
@@ -1457,13 +1489,80 @@ export function createMockPrismaClient(): any {
                   active_allocations: l.allocatedSeats ?? 0,
                   start_date: l.startDate || l.createdAt,
                   end_date: expDate,
-                  days_left: Math.max(1, Math.round(((new Date(expDate as any).getTime() - Date.now()) / (24 * 3600 * 1000)))),
-                  urgency_bucket: '60_DAYS',
+                  days_left: daysLeft,
+                  urgency_bucket: daysLeft <= 7 ? 'CRITICAL' : daysLeft <= 15 ? 'WARNING' : 'NOTICE',
                   cost: l.cost,
                   currency: l.currency || 'USD',
                   auto_renew: l.autoRenew,
                 };
               });
+
+            if (sqlText.toLowerCase().includes('count(')) {
+              return [
+                {
+                  total: mapped.length,
+                  count: mapped.length,
+                  total_expiring: mapped.length,
+                  critical_expiring: mapped.filter((m) => m.urgency_bucket === 'CRITICAL').length,
+                  warning_expiring: mapped.filter((m) => m.urgency_bucket === 'WARNING').length,
+                  notice_expiring: mapped.filter((m) => m.urgency_bucket === 'NOTICE').length,
+                },
+              ];
+            }
+            return mapped;
+          }
+
+          if (sqlText.includes('monthly_costs')) {
+            return [
+              { month_year: '2026-08', monthly_spend: 1200, running_total_spend: 1200 },
+              { month_year: '2026-09', monthly_spend: 1150, running_total_spend: 2350 },
+              { month_year: '2026-10', monthly_spend: 1248, running_total_spend: 3598 },
+            ];
+          }
+
+          if (sqlText.includes('asset_downloads')) {
+            return mockStore.state.assets.slice(0, 10).map((a, idx) => ({
+              asset_id: a.id,
+              asset_name: a.name,
+              asset_code: a.assetCode || `AST-${100 + idx}`,
+              download_count: Math.max(1, 15 - idx * 2),
+              rank: idx + 1,
+            }));
+          }
+
+          if (sqlText.includes('mv_monthly_access_stats')) {
+            return [
+              {
+                month_year: '2026-08',
+                download_count: 14,
+                checkout_count: 8,
+                view_count: 42,
+                checkin_count: 7,
+                total_access_events: 71,
+                active_accessing_users: 4,
+                distinct_assets_accessed: 5,
+              },
+              {
+                month_year: '2026-09',
+                download_count: 19,
+                checkout_count: 11,
+                view_count: 58,
+                checkin_count: 10,
+                total_access_events: 98,
+                active_accessing_users: 5,
+                distinct_assets_accessed: 6,
+              },
+              {
+                month_year: '2026-10',
+                download_count: 24,
+                checkout_count: 15,
+                view_count: 73,
+                checkin_count: 14,
+                total_access_events: 126,
+                active_accessing_users: 6,
+                distinct_assets_accessed: 6,
+              },
+            ];
           }
 
           if (sqlText.includes('v_vendor_spend')) {

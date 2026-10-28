@@ -64,14 +64,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           token = await refreshAccessToken();
         } catch {
-          if (!cached?.user) {
-            setAccessToken(null);
-            setStoredRefreshToken(null);
-            setStoredSession(null);
-            setUser(null);
-            setTenant(null);
-            setPermissions([]);
-          }
+          setAccessToken(null);
+          setStoredRefreshToken(null);
+          setStoredSession(null);
+          setUser(null);
+          setTenant(null);
+          setPermissions([]);
           return;
         }
       }
@@ -86,9 +84,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setStoredSession(session);
       }
     } catch (err: any) {
-      console.error('[AuthContext] initAuth failed to restore session:', err);
       const status = err?.status || err?.response?.status;
-      if (status === 401 || status === 403) {
+      if (status === 401 || status === 403 || !getAccessToken()) {
         setAccessToken(null);
         setStoredRefreshToken(null);
         setStoredSession(null);
@@ -202,17 +199,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const refreshProfile = async () => {
-    try {
-      const meRes = await api.get<{ data: any }>('/auth/me');
-      const session = parseAuthProfile(meRes);
-      setUser(session.user);
-      setTenant(session.tenant);
-      setPermissions(session.permissions);
-      setStoredSession(session);
-    } catch (err: any) {
-      console.error('[AuthContext] refreshProfile failed to refresh profile:', err);
-      throw err;
-    }
+    const meRes = await api.get<{ data: any }>('/auth/me');
+    const session = parseAuthProfile(meRes);
+    setUser(session.user);
+    setTenant(session.tenant);
+    setPermissions(session.permissions);
+    setStoredSession(session);
   };
 
   const hasPermission = (permission: string): boolean => {

@@ -106,17 +106,17 @@ export class ComplianceService {
 
       // 4. Calculate Factor Scores
       // Factor 1: Asset License Coverage (40 max)
-      const totalAssets = Number(assetStats.total_assets);
-      const compliantAssets = Number(assetStats.compliant_assets);
-      const unlicensedAssets = Number(assetStats.unlicensed_assets);
-      const expiredLicenseAssets = Number(assetStats.expired_license_assets);
+      const totalAssets = Number(assetStats.total_assets || 0);
+      const compliantAssets = Number(assetStats.compliant_assets || 0);
+      const unlicensedAssets = Number(assetStats.unlicensed_assets || 0);
+      const expiredLicenseAssets = Number(assetStats.expired_license_assets || 0);
 
       const coverageRatio = totalAssets === 0 ? 1 : compliantAssets / totalAssets;
       const factor1Earned = Math.round(coverageRatio * 40);
 
       // Factor 2: Seat Over-Allocation & Capacity (25 max)
-      const overAllocated = Number(licenseStats.over_allocated_licenses);
-      const exhaustedLicenses = Number(licenseStats.exhausted_licenses);
+      const overAllocated = Number(licenseStats.over_allocated_licenses || 0);
+      const exhaustedLicenses = Number(licenseStats.exhausted_licenses || 0);
       let factor2Earned = 25 - overAllocated * 15 - exhaustedLicenses * 5;
       if (factor2Earned < 0) factor2Earned = 0;
 
@@ -125,9 +125,9 @@ export class ComplianceService {
       if (factor3Earned < 0) factor3Earned = 0;
 
       // Factor 4: Expiration Horizon Risk (15 max)
-      const criticalExp = Number(expiringStats.critical_expiring);
-      const warningExp = Number(expiringStats.warning_expiring);
-      const noticeExp = Number(expiringStats.notice_expiring);
+      const criticalExp = Number(expiringStats.critical_expiring || 0);
+      const warningExp = Number(expiringStats.warning_expiring || 0);
+      const noticeExp = Number(expiringStats.notice_expiring || 0);
       let factor4Earned = 15 - criticalExp * 5 - warningExp * 3 - noticeExp * 1;
       if (factor4Earned < 0) factor4Earned = 0;
 
