@@ -1,8 +1,8 @@
 // ==============================================================================
-// AssetVault: Modern Split-Layout Enterprise Login Page
+// AssetVault: Centered Enterprise Login Page with Atmospheric Vault Backdrop
 // Course: BCSE307L Database Systems (Fall 2026-27)
-// Split-layout: left half is dark branded panel with animated floating cards;
-// right half is login form with React Hook Form, Zod, and Google OAuth feature flag.
+// Full-viewport ambient background with centered glassmorphic authentication
+// surface, React Hook Form, Zod validation, and Google OAuth feature flag.
 // ==============================================================================
 
 import React, { useState } from 'react';
@@ -15,10 +15,9 @@ import { useToast } from '../../context/ToastContext';
 import { API_BASE_URL } from '../../services/api';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { AuthBrandedPanel } from './AuthBrandedPanel';
+import { AuthAmbientBackground } from './AuthAmbientBackground';
 import {
   ShieldCheck,
-  Sparkles,
   Mail,
   Lock,
   ArrowRight,
@@ -78,13 +77,12 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'techcorp.admin@techcorp.io',
-      password: 'Password123!',
+      email: '',
+      password: '',
     },
   });
 
@@ -104,11 +102,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const fillCredentials = (email: string) => {
-    setValue('email', email, { shouldValidate: true });
-    setValue('password', 'Password123!', { shouldValidate: true });
-  };
-
   const handleGoogleLogin = () => {
     window.location.href = `${API_BASE_URL}/auth/google`;
   };
@@ -122,80 +115,38 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100 transition-colors">
-      {/* ====================================================================== */}
-      {/* Left Half: Dark Branded Panel with Animated Floating Cards             */}
-      {/* ====================================================================== */}
-      <AuthBrandedPanel />
+    <div className="min-h-screen relative flex flex-col items-center justify-center p-6 sm:p-10 bg-[#050814] text-slate-100 overflow-hidden">
+      {/* Full-Viewport Interactive Vault & Grid Background */}
+      <AuthAmbientBackground />
 
-      {/* ====================================================================== */}
-      {/* Right Half: Form Panel (Full width on mobile, 50% on desktop)          */}
-      {/* ====================================================================== */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 overflow-y-auto">
-        <div className="max-w-md w-full space-y-6">
-          {/* Mobile Header Brand (Visible on mobile only) */}
-          <div className="lg:hidden text-center mb-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/20 mb-3 text-white">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h1 className="text-2xl font-black text-white tracking-tight font-mono">
-              Asset<span className="text-indigo-400">Vault</span>
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Multi-Tenant Digital Asset & License Management System
-            </p>
+      {/* Centered Content Container */}
+      <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">
+        {/* Top Brand Identity */}
+        <div className="text-center mb-7">
+          <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 shadow-lg shadow-indigo-500/30 mb-3.5 text-white ring-1 ring-white/15">
+            <ShieldCheck className="w-7 h-7" />
           </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight font-mono">
+            Asset<span className="text-indigo-400">Vault</span>
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Multi-Tenant Digital Asset &amp; License Management System
+          </p>
+        </div>
+
+        {/* Elevated Glassmorphic Vault Card */}
+        <div className="relative w-full rounded-2xl bg-slate-900/75 backdrop-blur-2xl border border-slate-800/90 shadow-[0_24px_80px_-12px_rgba(2,6,23,0.95),0_0_50px_-12px_rgba(79,70,229,0.22)] p-7 sm:p-8 space-y-6">
+          {/* Top Specular Edge Highlight */}
+          <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-indigo-400/50 to-transparent pointer-events-none" />
 
           {/* Form Header */}
           <div>
-            <h2 className="text-2xl font-extrabold text-white tracking-tight">
+            <h2 className="text-xl font-extrabold text-white tracking-tight">
               Sign In to AssetVault
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
               Enter your corporate credentials to access digital assets and license allocations.
             </p>
-
-          {/* Seeded Demo Persona Quick Select */}
-          <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl shadow-xs space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Quick Demo Personas:</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => fillCredentials('superadmin@assetvault.io')}
-                className="p-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-left transition-all"
-              >
-                <span className="font-semibold text-purple-400 block truncate">Super Admin</span>
-                <span className="text-[10px] text-slate-400 block truncate">superadmin@assetvault.io</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillCredentials('techcorp.admin@techcorp.io')}
-                className="p-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-left transition-all"
-              >
-                <span className="font-semibold text-indigo-400 block truncate">Tenant Admin</span>
-                <span className="text-[10px] text-slate-400 block truncate">techcorp.admin@...</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillCredentials('techcorp.mgr1@techcorp.io')}
-                className="p-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-left transition-all"
-              >
-                <span className="font-semibold text-sky-400 block truncate">Asset Manager</span>
-                <span className="text-[10px] text-slate-400 block truncate">techcorp.mgr1@...</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillCredentials('techcorp.dev1@techcorp.io')}
-                className="p-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-left transition-all"
-              >
-                <span className="font-semibold text-emerald-400 block truncate">Member (Dev)</span>
-                <span className="text-[10px] text-slate-400 block truncate">techcorp.dev1@...</span>
-              </button>
-            </div>
-          </div>
           </div>
 
           {/* Server Error Alert */}
@@ -245,7 +196,7 @@ export const LoginPage: React.FC = () => {
               type="submit"
               variant="primary"
               size="md"
-              className="w-full mt-2 font-semibold shadow-md shadow-indigo-600/25"
+              className="w-full mt-2 font-semibold shadow-lg shadow-indigo-600/30"
               isLoading={isLoading}
               loadingText="Authenticating..."
               iconRight={<ArrowRight className="w-4 h-4" />}
@@ -256,13 +207,13 @@ export const LoginPage: React.FC = () => {
 
           {/* Feature Flagged: Google OAuth Button */}
           {showGoogleOAuth && (
-            <div className="space-y-4 pt-2">
+            <div className="space-y-4 pt-1">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-800" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="px-2 bg-slate-950 text-slate-400 uppercase font-medium text-[10px] tracking-wider">
+                  <span className="px-2.5 bg-slate-900 text-slate-400 uppercase font-medium text-[10px] tracking-wider">
                     Or Continue With SSO
                   </span>
                 </div>
@@ -271,7 +222,7 @@ export const LoginPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-slate-900 hover:bg-slate-850 active:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-xs"
+                className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-slate-950/70 hover:bg-slate-800/80 active:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-xs"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path
@@ -297,7 +248,7 @@ export const LoginPage: React.FC = () => {
           )}
 
           {/* Footer Link to Register Organization */}
-          <div className="text-center pt-2 text-xs text-slate-400 border-t border-slate-800/80">
+          <div className="text-center pt-3 text-xs text-slate-400 border-t border-slate-800/80">
             <span>Need a new organization? </span>
             <Link
               to="/register"

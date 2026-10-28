@@ -1,7 +1,7 @@
 // ==============================================================================
-// AssetVault: Modern Split-Layout Multi-Step Tenant Registration Page
+// AssetVault: Centered Multi-Step Tenant Registration Page
 // Course: BCSE307L Database Systems (Fall 2026-27)
-// Multi-step wizard:
+// Multi-step wizard over full-viewport ambient background:
 // Step 1: Organization name + auto-derived slug + contact email
 // Step 2: Administrator name + email + password with 5-segment strength meter
 // Fully validated with React Hook Form & Zod matching auth.validator.ts
@@ -16,7 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { AuthBrandedPanel } from './AuthBrandedPanel';
+import { AuthAmbientBackground } from './AuthAmbientBackground';
 import {
   Building2,
   Globe,
@@ -219,35 +219,35 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100 transition-colors">
-      {/* ====================================================================== */}
-      {/* Left Half: Dark Branded Panel with Animated Floating Cards             */}
-      {/* ====================================================================== */}
-      <AuthBrandedPanel />
+    <div className="min-h-screen relative flex flex-col items-center justify-center p-6 sm:p-10 bg-[#050814] text-slate-100 overflow-hidden">
+      {/* Full-Viewport Interactive Vault & Grid Background */}
+      <AuthAmbientBackground />
 
-      {/* ====================================================================== */}
-      {/* Right Half: Form Panel (Multi-Step Wizard)                             */}
-      {/* ====================================================================== */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 overflow-y-auto">
-        <div className="max-w-md w-full space-y-6">
-          {/* Mobile Header Brand (Visible on mobile only) */}
-          <div className="lg:hidden text-center mb-4">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/20 mb-2 text-white">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h1 className="text-2xl font-black text-white tracking-tight font-mono">
-              Asset<span className="text-indigo-400">Vault</span>
-            </h1>
-            <p className="text-xs text-slate-400">
-              Multi-Tenant Digital Asset & License Management System
-            </p>
+      {/* Centered Content Container */}
+      <div className="relative z-10 w-full max-w-[460px] flex flex-col items-center">
+        {/* Top Brand Identity */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 shadow-lg shadow-indigo-500/30 mb-3 text-white ring-1 ring-white/15">
+            <ShieldCheck className="w-6 h-6" />
           </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight font-mono">
+            Asset<span className="text-indigo-400">Vault</span>
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Multi-Tenant Digital Asset &amp; License Management System
+          </p>
+        </div>
+
+        {/* Elevated Glassmorphic Vault Card */}
+        <div className="relative w-full rounded-2xl bg-slate-900/75 backdrop-blur-2xl border border-slate-800/90 shadow-[0_24px_80px_-12px_rgba(2,6,23,0.95),0_0_50px_-12px_rgba(79,70,229,0.22)] p-7 sm:p-8 space-y-6">
+          {/* Top Specular Edge Highlight */}
+          <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-indigo-400/50 to-transparent pointer-events-none" />
 
           {/* Wizard Header & Progress Bar */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-extrabold text-white tracking-tight">
+                <h2 className="text-xl font-extrabold text-white tracking-tight">
                   Register Organization
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -256,7 +256,7 @@ export const RegisterPage: React.FC = () => {
                     : 'Step 2 of 2: Lead Administrator & Credentials'}
                 </p>
               </div>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-indigo-400">
+              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-950/80 border border-slate-700/80 text-indigo-400 tabular-nums">
                 Step {step} / 2
               </span>
             </div>
@@ -374,7 +374,7 @@ export const RegisterPage: React.FC = () => {
                   variant="primary"
                   size="md"
                   onClick={handleStep1Next}
-                  className="w-full mt-2 font-semibold shadow-md shadow-indigo-600/25"
+                  className="w-full mt-2 font-semibold shadow-lg shadow-indigo-600/30"
                   iconRight={<ArrowRight className="w-4 h-4" />}
                 >
                   Continue to Admin Setup
@@ -421,12 +421,12 @@ export const RegisterPage: React.FC = () => {
                   />
 
                   {/* 5-Segment Password Strength Meter */}
-                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5">
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-300">Password Strength:</span>
                       <span
                         className={cn(
-                          'font-bold text-[11px] font-mono',
+                          'font-bold text-[11px] font-mono tabular-nums',
                           satisfiedCount <= 1
                             ? 'text-rose-400'
                             : satisfiedCount === 2
@@ -495,7 +495,7 @@ export const RegisterPage: React.FC = () => {
                     type="submit"
                     variant="primary"
                     size="md"
-                    className="flex-2 font-semibold shadow-md shadow-indigo-600/25"
+                    className="flex-2 font-semibold shadow-lg shadow-indigo-600/30"
                     isLoading={isLoading}
                     loadingText="Provisioning..."
                     iconRight={<Check className="w-4 h-4" />}
@@ -508,7 +508,7 @@ export const RegisterPage: React.FC = () => {
           </form>
 
           {/* Footer Link to Sign In */}
-          <div className="text-center pt-2 text-xs text-slate-400 border-t border-slate-800/80">
+          <div className="text-center pt-3 text-xs text-slate-400 border-t border-slate-800/80">
             <span>Already have an account? </span>
             <Link
               to="/login"

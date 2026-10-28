@@ -74,3 +74,62 @@
 .animate-float-reverse {
   animation: float-reverse 7s ease-in-out infinite;
 }
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-reverse-slow {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes beam-slide {
+  0% {
+    stroke-dashoffset: 1000;
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.85;
+  }
+  80% {
+    opacity: 0.85;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 60s linear infinite;
+}
+
+.animate-spin-reverse-slow {
+  animation: spin-reverse-slow 80s linear infinite;
+}
+
+.animate-beam-1 {
+  stroke-dasharray: 120 880;
+  animation: beam-slide 8s linear infinite;
+}
+
+.animate-beam-2 {
+  stroke-dasharray: 160 840;
+  animation: beam-slide 11s linear infinite 2.5s;
+}
+
+.animate-beam-3 {
+  stroke-dasharray: 100 900;
+  animation: beam-slide 9.5s linear infinite 5s;
+}
+

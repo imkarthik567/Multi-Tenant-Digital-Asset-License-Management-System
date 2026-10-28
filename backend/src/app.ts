@@ -92,13 +92,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser(env.COOKIE_SECRET));
 
 // 7. Structured Pino HTTP Logging with Redaction (Never logs passwords/tokens/authorization)
-if (env.NODE_ENV === 'production') {
+if (env.NODE_ENV !== 'test') {
   app.use(
     pinoHttp({
       logger,
       autoLogging: {
-        ignore: (req) =>
-          !req.url?.startsWith('/api') || req.url === '/health' || req.url === '/api/health',
+        ignore: (req) => req.url === '/health' || req.url === '/api/health',
       },
     })
   );

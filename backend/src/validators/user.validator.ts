@@ -5,7 +5,6 @@
 // ==============================================================================
 
 import { z } from 'zod';
-import { passwordSchema } from './auth.validator';
 
 export const TENANT_ASSIGNABLE_ROLES = ['TENANT_ADMIN', 'ASSET_MANAGER', 'MEMBER'] as const;
 
@@ -13,7 +12,7 @@ export const createUserSchema = z
   .object({
     email: z.string().email().toLowerCase().trim(),
     fullName: z.string().min(2).max(100).trim(),
-    password: passwordSchema,
+    password: z.string().min(6, 'Password must be at least 6 characters'),
     roleName: z.enum(TENANT_ASSIGNABLE_ROLES, {
       errorMap: () => ({ message: 'roleName must be TENANT_ADMIN, ASSET_MANAGER, or MEMBER' }),
     }),
@@ -40,7 +39,7 @@ export const changeRoleSchema = z
 
 export const resetPasswordSchema = z
   .object({
-    newPassword: passwordSchema,
+    newPassword: z.string().min(6, 'Password must be at least 6 characters'),
   })
   .strip();
 

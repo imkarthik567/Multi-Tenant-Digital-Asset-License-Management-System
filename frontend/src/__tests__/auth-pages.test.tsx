@@ -105,13 +105,10 @@ describe('Auth Pages Modern Split-Layout Test Suite', () => {
   // 2. LoginPage
   // ============================================================================
   describe('2. LoginPage', () => {
-    it('renders split layout with branded panel and login form panel', () => {
+    it('renders centered login card with ambient background and brand identity', () => {
       const html = renderWithRouter(<LoginPage />);
-      // Left branded panel elements
-      expect(html).toContain('Automated Seat Quota Defense');
-      expect(html).toContain('Helvetica Now Pro Master Font');
-
-      // Right form elements
+      expect(html).toContain('Asset');
+      expect(html).toContain('Vault');
       expect(html).toContain('Sign In to AssetVault');
       expect(html).toContain('Work Email');
       expect(html).toContain('Password');
@@ -125,15 +122,6 @@ describe('Auth Pages Modern Split-Layout Test Suite', () => {
       expect(html).toContain('••••••••••••');
       expect(html).toContain('lucide-mail');
       expect(html).toContain('lucide-lock');
-    });
-
-    it('renders quick demo personas selection for testing', () => {
-      const html = renderWithRouter(<LoginPage />);
-      expect(html).toContain('Quick Demo Personas:');
-      expect(html).toContain('Super Admin');
-      expect(html).toContain('Tenant Admin');
-      expect(html).toContain('Asset Manager');
-      expect(html).toContain('Member (Dev)');
     });
 
     it('hides Google OAuth button when feature flag GOOGLE_CLIENT_ID is not set', () => {

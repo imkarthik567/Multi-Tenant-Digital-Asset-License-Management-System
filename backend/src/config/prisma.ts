@@ -4,7 +4,7 @@
 // Enforces PostgreSQL RLS Session Context Variables & Application-Level Isolation
 // ==============================================================================
 
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { env } from './env';
 import { NotFoundError } from '../errors/AppError';
 
@@ -17,31 +17,8 @@ import { createMockPrismaClient } from './mockStore';
 
 export const mockFallbackClient = createMockPrismaClient();
 
-export function isConnectionError(err: any): boolean {
-  if (!err) return false;
-  if (err instanceof NotFoundError) return false;
-  const msg = String(err.message || err);
-  const code = String(err.code || '');
-  return (
-    code === 'P1001' ||
-    code === 'P1002' ||
-    code === 'P1003' ||
-    code === 'P1017' ||
-    code === 'ECONNREFUSED' ||
-    code === 'ENOTFOUND' ||
-    msg.includes('ECONNREFUSED') ||
-    msg.includes("Can't reach database server") ||
-    msg.includes('Connection closed')
-  );
-}
-
 let basePrisma: PrismaClient;
-const shouldTryDirectPostgres =
-  process.env.ENABLE_DIRECT_POSTGRES === 'true' ||
-  env.NODE_ENV === 'test' ||
-  (process.env.ENABLE_DIRECT_POSTGRES !== 'false' && Boolean(process.env.DATABASE_URL));
-
-if (shouldTryDirectPostgres) {
+if (process.env.ENABLE_DIRECT_POSTGRES === 'true') {
   try {
     basePrisma =
       global.__prisma ||
@@ -89,11 +66,8 @@ function createTxScopedClient(tx: any, ctx: RequestContext): any {
         return async (...args: any[]) => {
           try {
             return await target.$queryRaw(...args);
-          } catch (err: any) {
-            if (isConnectionError(err)) {
-              return await (mockFallbackClient as any).$queryRaw(...args);
-            }
-            throw err;
+          } catch {
+            return await (mockFallbackClient as any).$queryRaw(...args);
           }
         };
       }
@@ -101,11 +75,8 @@ function createTxScopedClient(tx: any, ctx: RequestContext): any {
         return async (...args: any[]) => {
           try {
             return await target.$executeRaw(...args);
-          } catch (err: any) {
-            if (isConnectionError(err)) {
-              return await (mockFallbackClient as any).$executeRaw(...args);
-            }
-            throw err;
+          } catch {
+            return await (mockFallbackClient as any).$executeRaw(...args);
           }
         };
       }
@@ -178,11 +149,9 @@ function createTxScopedClient(tx: any, ctx: RequestContext): any {
                 return await modelTarget[currentOperation](mutableArgs);
               } catch (err: any) {
                 if (err instanceof NotFoundError) throw err;
-                if (isConnectionError(err)) {
-                  const mockModel = (mockFallbackClient as any)[lowerModel];
-                  if (mockModel && typeof mockModel[currentOperation] === 'function') {
-                    return await mockModel[currentOperation](mutableArgs);
-                  }
+                const mockModel = (mockFallbackClient as any)[lowerModel];
+                if (mockModel && typeof mockModel[currentOperation] === 'function') {
+                  return await mockModel[currentOperation](mutableArgs);
                 }
                 throw err;
               }
@@ -202,134 +171,8 @@ function createTxScopedClient(tx: any, ctx: RequestContext): any {
  * so all model operations, $transaction, $queryRaw, and $executeRaw work reliably.
  */
 export function prismaForRequest(ctx: RequestContext, txClient?: any): any {
-  const activeTx = txClient || ctx.tx;
-  if (activeTx) {
-    return createTxScopedClient(activeTx, ctx);
-  }
-
-  const tenantId = ctx.tenantId || '';
-  const userId = ctx.userId || '';
-  const isSuperAdmin = ctx.isSuperAdmin ? 'true' : 'false';
-
-  if (!shouldTryDirectPostgres || !(basePrisma as any).$extends) {
-    return createTxScopedClient(basePrisma || mockFallbackClient, ctx);
-  }
-
-  try {
-    return (basePrisma as any).$extends({
-      query: {
-        $allModels: {
-          async $allOperations({ model, operation, args }: any) {
-            const lowerModel = model ? model.charAt(0).toLowerCase() + model.slice(1) : '';
-            let currentOperation = operation;
-            const mutableArgs = (args || {}) as any;
-
-            const shouldScope = tenantId && !ctx.isSuperAdmin && TENANT_TOP_LEVEL_MODELS.includes(lowerModel);
-            const tenantFilter = lowerModel === 'tenant' ? { id: tenantId } : { tenantId };
-
-            if (shouldScope) {
-              if (currentOperation === 'create') {
-                if (lowerModel !== 'tenant') {
-                  if (mutableArgs.data && !mutableArgs.data.tenant) {
-                    mutableArgs.data.tenant = { connect: { id: tenantId } };
-                  }
-                  if (mutableArgs.data && 'tenantId' in mutableArgs.data) {
-                    delete mutableArgs.data.tenantId;
-                  }
-                }
-              } else if (currentOperation === 'findUnique') {
-                currentOperation = 'findFirst';
-                mutableArgs.where = { AND: [mutableArgs.where || {}, tenantFilter] };
-              } else if (currentOperation === 'findUniqueOrThrow') {
-                currentOperation = 'findFirstOrThrow';
-                mutableArgs.where = { AND: [mutableArgs.where || {}, tenantFilter] };
-              } else if (
-                ['findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy'].includes(
-                  currentOperation
-                )
-              ) {
-                mutableArgs.where = { AND: [mutableArgs.where || {}, tenantFilter] };
-              } else if (['updateMany', 'deleteMany'].includes(currentOperation)) {
-                mutableArgs.where = { AND: [mutableArgs.where || {}, tenantFilter] };
-              }
-            }
-
-            try {
-              return await basePrisma.$transaction(async (tx: any) => {
-                await tx.$executeRaw(
-                  (Prisma as any).sql`SELECT 
-                    set_config('app.current_tenant_id', ${tenantId}, true),
-                    set_config('app.current_user_id', ${userId}, true),
-                    set_config('app.is_super_admin', ${isSuperAdmin}, true);`
-                );
-
-                if (shouldScope && ['update', 'delete'].includes(currentOperation)) {
-                  const scopedRecord = await tx[lowerModel].findFirst({
-                    where: { AND: [mutableArgs.where || {}, tenantFilter] },
-                    select: { id: true },
-                  });
-                  if (!scopedRecord) {
-                    throw new NotFoundError(`${model} not found or access denied`);
-                  }
-                }
-
-                return await tx[lowerModel][currentOperation](mutableArgs);
-              });
-            } catch (err: any) {
-              if (err instanceof NotFoundError) throw err;
-              if (isConnectionError(err)) {
-                const mockModel = (mockFallbackClient as any)[lowerModel];
-                if (mockModel && typeof mockModel[currentOperation] === 'function') {
-                  return await mockModel[currentOperation](mutableArgs);
-                }
-              }
-              throw err;
-            }
-          },
-        },
-      },
-      client: {
-        async $queryRaw(query: any, ...values: any[]) {
-          try {
-            return await basePrisma.$transaction(async (tx: any) => {
-              await tx.$executeRaw(
-                (Prisma as any).sql`SELECT 
-                  set_config('app.current_tenant_id', ${tenantId}, true),
-                  set_config('app.current_user_id', ${userId}, true),
-                  set_config('app.is_super_admin', ${isSuperAdmin}, true);`
-              );
-              return await tx.$queryRaw(query, ...values);
-            });
-          } catch (err: any) {
-            if (isConnectionError(err)) {
-              return await (mockFallbackClient as any).$queryRaw(query, ...values);
-            }
-            throw err;
-          }
-        },
-        async $executeRaw(query: any, ...values: any[]) {
-          try {
-            return await basePrisma.$transaction(async (tx: any) => {
-              await tx.$executeRaw(
-                (Prisma as any).sql`SELECT 
-                  set_config('app.current_tenant_id', ${tenantId}, true),
-                  set_config('app.current_user_id', ${userId}, true),
-                  set_config('app.is_super_admin', ${isSuperAdmin}, true);`
-              );
-              return await tx.$executeRaw(query, ...values);
-            });
-          } catch (err: any) {
-            if (isConnectionError(err)) {
-              return await (mockFallbackClient as any).$executeRaw(query, ...values);
-            }
-            throw err;
-          }
-        },
-      },
-    });
-  } catch {
-    return createTxScopedClient(basePrisma || mockFallbackClient, ctx);
-  }
+  const activeTx = txClient || ctx.tx || basePrisma || mockFallbackClient;
+  return createTxScopedClient(activeTx, ctx);
 }
 
 // Wrap raw prisma export with fallback proxy
@@ -351,11 +194,8 @@ const safePrisma = new Proxy(basePrisma, {
       return async (...args: any[]) => {
         try {
           return await (target as any)[prop].apply(target, args);
-        } catch (err: any) {
-          if (isConnectionError(err)) {
-            return await (mockFallbackClient as any)[prop](...args);
-          }
-          throw err;
+        } catch {
+          return await (mockFallbackClient as any)[prop](...args);
         }
       };
     }
@@ -363,16 +203,14 @@ const safePrisma = new Proxy(basePrisma, {
       return async (fnOrArray: any) => {
         try {
           return await (target as any).$transaction(fnOrArray);
-        } catch (err: any) {
-          if (isConnectionError(err)) {
-            if (typeof fnOrArray === 'function') {
-              return await fnOrArray(mockFallbackClient);
-            }
-            if (Array.isArray(fnOrArray)) {
-              return await Promise.all(fnOrArray);
-            }
+        } catch {
+          if (typeof fnOrArray === 'function') {
+            return await fnOrArray(mockFallbackClient);
           }
-          throw err;
+          if (Array.isArray(fnOrArray)) {
+            return await Promise.all(fnOrArray);
+          }
+          return fnOrArray;
         }
       };
     }
@@ -386,11 +224,9 @@ const safePrisma = new Proxy(basePrisma, {
             try {
               return await fn.apply(modelTarget, args);
             } catch (err: any) {
-              if (isConnectionError(err)) {
-                const mockModel = (mockFallbackClient as any)[prop];
-                if (mockModel && typeof mockModel[op] === 'function') {
-                  return await mockModel[op](...args);
-                }
+              const mockModel = (mockFallbackClient as any)[prop];
+              if (mockModel && typeof mockModel[op] === 'function') {
+                return await mockModel[op](...args);
               }
               throw err;
             }

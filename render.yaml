@@ -80,6 +80,10 @@ services:
       - key: GOOGLE_CALLBACK_URL
         sync: false
 
+      # --- Gemini AI Assistant & Email Drafting (Optional) ---
+      - key: GEMINI_API_KEY
+        sync: false
+
       # --- SMTP Transactional Email Settings (Optional / Ethereal) ---
       - key: SMTP_HOST
         value: smtp.ethereal.email
