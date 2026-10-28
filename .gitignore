@@ -9,9 +9,12 @@ coverage/
 
 # Build outputs
 dist/
+backend/dist/
+frontend/dist/
 build/
 .next/
 out/
+.aistudio/
 
 # Environment and Secrets
 .env
