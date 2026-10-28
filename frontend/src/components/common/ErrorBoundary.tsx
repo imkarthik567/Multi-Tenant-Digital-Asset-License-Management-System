@@ -28,12 +28,21 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error caught by ErrorBoundary:', error, errorInfo);
+    console.warn('Caught rendering error in ErrorBoundary:', error, errorInfo);
   }
 
   private handleRetry = () => {
     this.setState({ hasError: false, error: null });
-    window.location.reload();
+  };
+
+  private handleGoHome = () => {
+    this.setState({ hasError: false, error: null });
+    const nav = (window as any).__navigate;
+    if (typeof nav === 'function') {
+      nav('/');
+    } else {
+      window.location.href = '/';
+    }
   };
 
   public render() {
@@ -67,13 +76,14 @@ export class ErrorBoundary extends Component<Props, State> {
               <RefreshCw className="w-4 h-4" />
               Reload Page
             </button>
-            <a
-              href="/"
+            <button
+              type="button"
+              onClick={this.handleGoHome}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400"
             >
               <Home className="w-4 h-4" />
               Go to Dashboard
-            </a>
+            </button>
           </div>
         </div>
       );

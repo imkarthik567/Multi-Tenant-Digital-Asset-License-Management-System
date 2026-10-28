@@ -132,9 +132,7 @@ export const DashboardPage: React.FC = () => {
       ? (user.role as any).name
       : user?.role;
 
-  if (roleName === 'MEMBER') {
-    return <Navigate to="/my-licenses" replace />;
-  }
+  const isMember = roleName === 'MEMBER';
 
   // 1. Fetch Dashboard KPI Stats (fn_tenant_dashboard_stats)
   const {
@@ -148,7 +146,7 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<any>('/reports/dashboard');
       return res?.data || res;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && !isMember,
   });
 
   // 2. Fetch License Utilization (v_license_utilization)
@@ -161,7 +159,7 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<any>('/reports/license-utilization');
       return res?.data || res;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && !isMember,
   });
 
   // 3. Fetch Expiring Licenses (v_expiring_licenses)
@@ -174,7 +172,7 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<any>('/reports/expiring-licenses');
       return res?.data || res;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && !isMember,
   });
 
   // 4. Fetch Access Trend by Month (mv_monthly_access_stats)
@@ -187,7 +185,7 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<any>('/reports/access-trend');
       return res?.data || res;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && !isMember,
   });
 
   // 5. Fetch Compliance Report
@@ -200,7 +198,7 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<any>('/reports/compliance');
       return res?.data || res;
     },
-    enabled: !isSuperAdmin,
+    enabled: !isSuperAdmin && !isMember,
   });
 
   // 6. Super Admin Platform Overview Data
@@ -216,7 +214,7 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<any>('/platform/overview');
       return res?.data || res;
     },
-    enabled: isSuperAdmin,
+    enabled: Boolean(isSuperAdmin),
   });
 
   // Handler: Invalidate All Dashboard Queries
@@ -247,6 +245,143 @@ export const DashboardPage: React.FC = () => {
       setTogglingLicenseId(null);
     }
   };
+
+  // ----------------------------------------------------------------------------
+  // Tenant Operational Analytics Data Parsing
+  // ----------------------------------------------------------------------------
+  const rawStats: any = dashboardData?.stats || {};
+  const stats = {
+    asset_count: Number(rawStats.total_assets ?? rawStats.asset_count ?? 0),
+    license_count: Number(rawStats.total_licenses ?? rawStats.license_count ?? 0),
+    user_count: Number(rawStats.user_count ?? 0),
+    active_allocated_seats: Number(rawStats.allocated_seats ?? rawStats.active_allocated_seats ?? 0),
+    total_contracted_seats: Number(rawStats.total_seats ?? rawStats.total_contracted_seats ?? 0),
+    expiring_licenses_30d: Number(rawStats.expiring_in_30_days ?? rawStats.expiring_licenses_30d ?? 0),
+    unlicensed_assets_count: Number(rawStats.unlicensed_assets_count ?? 0),
+    total_license_spend: Number(rawStats.total_license_cost ?? rawStats.total_license_spend ?? 0),
+  };
+
+  const capacityPct =
+    stats.total_contracted_seats > 0
+      ? Math.min(100, Math.round((stats.active_allocated_seats / stats.total_contracted_seats) * 100))
+      : 0;
+
+  // Horizontal Bar Chart Data: Top 10 Used vs Available Seats
+  const utilizationChartData = useMemo(() => {
+    const rows = utilizationData || [];
+    return rows.slice(0, 10).map((item: any) => ({
+      name:
+        item.license_name.length > 16
+          ? `${item.license_name.substring(0, 15)}...`
+          : item.license_name,
+      fullName: item.license_name,
+      used: Number(item.used_seats || 0),
+      available: Math.max(0, Number(item.available_seats || 0)),
+      total: Number(item.total_seats || 0),
+      pct: Number(item.utilization_pct || 0),
+    }));
+  }, [utilizationData]);
+
+  // Access Trend Area Chart Data: Monthly DOWNLOAD + CHECKOUT events
+  const accessTrendChartData = useMemo(() => {
+    const rows = accessTrendData || [];
+    if (rows.length === 0) {
+      return [
+        { month: 'May 2026', downloads: 12, checkouts: 5 },
+        { month: 'Jun 2026', downloads: 18, checkouts: 8 },
+        { month: 'Jul 2026', downloads: 24, checkouts: 14 },
+        { month: 'Aug 2026', downloads: 21, checkouts: 19 },
+        { month: 'Sep 2026', downloads: 35, checkouts: 22 },
+        { month: 'Oct 2026', downloads: 42, checkouts: 28 },
+      ];
+    }
+    return rows.map((r: any) => ({
+      month: r.month_year,
+      downloads: Number(r.download_count || 0),
+      checkouts: Number(r.checkout_count || 0),
+      total: Number(r.total_access_events || 0),
+    }));
+  }, [accessTrendData]);
+
+  // Compliance Gauge Parameters
+  const complianceScore = Number(complianceReport?.score ?? 88);
+  const complianceGrade = (complianceReport?.grade ?? 'B') as 'A' | 'B' | 'C' | 'D';
+
+  const gaugeColor =
+    complianceScore >= 90
+      ? '#10b981' // Emerald
+      : complianceScore >= 75
+      ? '#6366f1' // Indigo
+      : complianceScore >= 60
+      ? '#f59e0b' // Amber
+      : '#f43f5e'; // Rose
+
+  const gradeBadgeVariant =
+    complianceScore >= 90
+      ? 'success'
+      : complianceScore >= 75
+      ? 'info'
+      : complianceScore >= 60
+      ? 'warning'
+      : 'danger';
+
+  // Semi-circle arc geometry: radius 75, arc length = pi * 75 = 235.62
+  const ARC_LENGTH = 235.62;
+  const strokeOffset = isGaugeMounted
+    ? ARC_LENGTH - (Math.min(100, Math.max(0, complianceScore)) / 100) * ARC_LENGTH
+    : ARC_LENGTH;
+
+  // Expiring licenses list
+  const expiringList = (expiringData || []).slice(0, 6);
+
+  // Sparkline synthetic trend series for KPI cards
+  const assetSparkline = useMemo(
+    () => [
+      Math.max(1, stats.asset_count - 8),
+      Math.max(1, stats.asset_count - 6),
+      Math.max(1, stats.asset_count - 5),
+      Math.max(1, stats.asset_count - 3),
+      Math.max(1, stats.asset_count - 2),
+      Math.max(1, stats.asset_count - 1),
+      stats.asset_count,
+    ],
+    [stats.asset_count]
+  );
+
+  const licenseSparkline = useMemo(
+    () => [
+      Math.max(1, stats.license_count - 4),
+      Math.max(1, stats.license_count - 3),
+      Math.max(1, stats.license_count - 2),
+      Math.max(1, stats.license_count - 1),
+      stats.license_count,
+      stats.license_count,
+      stats.license_count,
+    ],
+    [stats.license_count]
+  );
+
+  const seatsSparkline = useMemo(
+    () => [
+      Math.max(1, stats.active_allocated_seats - 12),
+      Math.max(1, stats.active_allocated_seats - 9),
+      Math.max(1, stats.active_allocated_seats - 7),
+      Math.max(1, stats.active_allocated_seats - 5),
+      Math.max(1, stats.active_allocated_seats - 3),
+      Math.max(1, stats.active_allocated_seats - 1),
+      stats.active_allocated_seats,
+    ],
+    [stats.active_allocated_seats]
+  );
+
+  const expiringSparkline = useMemo(
+    () => [3, 4, 3, 2, 2, 1, stats.expiring_licenses_30d],
+    [stats.expiring_licenses_30d]
+  );
+
+  if (isMember) {
+    return <Navigate to="/my-licenses" replace />;
+  }
 
   // ----------------------------------------------------------------------------
   // Render Super Admin Platform Overview (Platform Governance View)
@@ -416,139 +551,6 @@ export const DashboardPage: React.FC = () => {
       </div>
     );
   }
-
-  // ----------------------------------------------------------------------------
-  // Tenant Operational Analytics Data Parsing
-  // ----------------------------------------------------------------------------
-  const rawStats: any = dashboardData?.stats || {};
-  const stats = {
-    asset_count: Number(rawStats.total_assets ?? rawStats.asset_count ?? 0),
-    license_count: Number(rawStats.total_licenses ?? rawStats.license_count ?? 0),
-    user_count: Number(rawStats.user_count ?? 0),
-    active_allocated_seats: Number(rawStats.allocated_seats ?? rawStats.active_allocated_seats ?? 0),
-    total_contracted_seats: Number(rawStats.total_seats ?? rawStats.total_contracted_seats ?? 0),
-    expiring_licenses_30d: Number(rawStats.expiring_in_30_days ?? rawStats.expiring_licenses_30d ?? 0),
-    unlicensed_assets_count: Number(rawStats.unlicensed_assets_count ?? 0),
-    total_license_spend: Number(rawStats.total_license_cost ?? rawStats.total_license_spend ?? 0),
-  };
-
-  const capacityPct =
-    stats.total_contracted_seats > 0
-      ? Math.min(100, Math.round((stats.active_allocated_seats / stats.total_contracted_seats) * 100))
-      : 0;
-
-  // Horizontal Bar Chart Data: Top 10 Used vs Available Seats
-  const utilizationChartData = useMemo(() => {
-    const rows = utilizationData || [];
-    return rows.slice(0, 10).map((item: any) => ({
-      name:
-        item.license_name.length > 16
-          ? `${item.license_name.substring(0, 15)}...`
-          : item.license_name,
-      fullName: item.license_name,
-      used: Number(item.used_seats || 0),
-      available: Math.max(0, Number(item.available_seats || 0)),
-      total: Number(item.total_seats || 0),
-      pct: Number(item.utilization_pct || 0),
-    }));
-  }, [utilizationData]);
-
-  // Access Trend Area Chart Data: Monthly DOWNLOAD + CHECKOUT events
-  const accessTrendChartData = useMemo(() => {
-    const rows = accessTrendData || [];
-    if (rows.length === 0) {
-      return [
-        { month: 'May 2026', downloads: 12, checkouts: 5 },
-        { month: 'Jun 2026', downloads: 18, checkouts: 8 },
-        { month: 'Jul 2026', downloads: 24, checkouts: 14 },
-        { month: 'Aug 2026', downloads: 21, checkouts: 19 },
-        { month: 'Sep 2026', downloads: 35, checkouts: 22 },
-        { month: 'Oct 2026', downloads: 42, checkouts: 28 },
-      ];
-    }
-    return rows.map((r: any) => ({
-      month: r.month_year,
-      downloads: Number(r.download_count || 0),
-      checkouts: Number(r.checkout_count || 0),
-      total: Number(r.total_access_events || 0),
-    }));
-  }, [accessTrendData]);
-
-  // Compliance Gauge Parameters
-  const complianceScore = Number(complianceReport?.score ?? 88);
-  const complianceGrade = (complianceReport?.grade ?? 'B') as 'A' | 'B' | 'C' | 'D';
-
-  const gaugeColor =
-    complianceScore >= 90
-      ? '#10b981' // Emerald
-      : complianceScore >= 75
-      ? '#6366f1' // Indigo
-      : complianceScore >= 60
-      ? '#f59e0b' // Amber
-      : '#f43f5e'; // Rose
-
-  const gradeBadgeVariant =
-    complianceScore >= 90
-      ? 'success'
-      : complianceScore >= 75
-      ? 'info'
-      : complianceScore >= 60
-      ? 'warning'
-      : 'danger';
-
-  // Semi-circle arc geometry: radius 75, arc length = pi * 75 = 235.62
-  const ARC_LENGTH = 235.62;
-  const strokeOffset = isGaugeMounted
-    ? ARC_LENGTH - (Math.min(100, Math.max(0, complianceScore)) / 100) * ARC_LENGTH
-    : ARC_LENGTH;
-
-  // Expiring licenses list
-  const expiringList = (expiringData || []).slice(0, 6);
-
-  // Sparkline synthetic trend series for KPI cards
-  const assetSparkline = useMemo(
-    () => [
-      Math.max(1, stats.asset_count - 8),
-      Math.max(1, stats.asset_count - 6),
-      Math.max(1, stats.asset_count - 5),
-      Math.max(1, stats.asset_count - 3),
-      Math.max(1, stats.asset_count - 2),
-      Math.max(1, stats.asset_count - 1),
-      stats.asset_count,
-    ],
-    [stats.asset_count]
-  );
-
-  const licenseSparkline = useMemo(
-    () => [
-      Math.max(1, stats.license_count - 4),
-      Math.max(1, stats.license_count - 3),
-      Math.max(1, stats.license_count - 2),
-      Math.max(1, stats.license_count - 1),
-      stats.license_count,
-      stats.license_count,
-      stats.license_count,
-    ],
-    [stats.license_count]
-  );
-
-  const seatsSparkline = useMemo(
-    () => [
-      Math.max(1, stats.active_allocated_seats - 12),
-      Math.max(1, stats.active_allocated_seats - 9),
-      Math.max(1, stats.active_allocated_seats - 7),
-      Math.max(1, stats.active_allocated_seats - 5),
-      Math.max(1, stats.active_allocated_seats - 3),
-      Math.max(1, stats.active_allocated_seats - 1),
-      stats.active_allocated_seats,
-    ],
-    [stats.active_allocated_seats]
-  );
-
-  const expiringSparkline = useMemo(
-    () => [3, 4, 3, 2, 2, 1, stats.expiring_licenses_30d],
-    [stats.expiring_licenses_30d]
-  );
 
   return (
     <div className="space-y-6">
@@ -820,7 +822,7 @@ export const DashboardPage: React.FC = () => {
           <CardHeader
             action={
               <Link
-                to="/compliance"
+                to="/reports?tab=compliance"
                 className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
               >
                 Details <ArrowRight className="w-3.5 h-3.5" />
