@@ -247,7 +247,13 @@ export const AssetDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['asset', id, 'access-logs'] });
       const fileUrl = res.data?.fileUrl || (res as any).fileUrl || res.data?.downloadUrl;
       if (fileUrl) {
-        window.open(fileUrl, '_blank');
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
       }
     } catch (err: any) {
       toast({
@@ -372,12 +378,31 @@ export const AssetDetailPage: React.FC = () => {
     );
   }
 
-  const tagsList: Tag[] = Array.isArray(asset.tags)
-    ? asset.tags.map((t: any) => (t.tag ? t.tag : t))
+  const rawTagEntries = Array.isArray((asset as any).assetTags)
+    ? (asset as any).assetTags
+    : Array.isArray(asset.tags)
+    ? asset.tags
     : [];
+  const tagsList: Tag[] = rawTagEntries
+    .map((t: any, idx: number) => {
+      if (!t) return null;
+      if (typeof t === 'string') {
+        return { id: `tag-${idx}-${t}`, name: t, color: '#6366f1' } as Tag;
+      }
+      const tagObj = t.tag ? t.tag : t;
+      if (!tagObj || !tagObj.name) return null;
+      return {
+        ...tagObj,
+        id: tagObj.id || `tag-${idx}`,
+        color: tagObj.color || '#6366f1',
+      } as Tag;
+    })
+    .filter(Boolean) as Tag[];
 
   const attachedLicenses: License[] = Array.isArray(asset.assetLicenses)
-    ? asset.assetLicenses.map((al: any) => (al.license ? al.license : al))
+    ? (asset.assetLicenses
+        .map((al: any) => (al?.license ? al.license : al))
+        .filter((lic: any) => lic && lic.id) as License[])
     : [];
 
   return (

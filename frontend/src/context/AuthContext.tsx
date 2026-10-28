@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setStoredSession(session);
       }
     } catch (err: any) {
-      console.warn('[AuthContext] initAuth failed to restore session:', err);
+      console.error('[AuthContext] initAuth failed to restore session:', err);
       const status = err?.status || err?.response?.status;
       if (status === 401 || status === 403) {
         setAccessToken(null);
@@ -210,7 +210,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setPermissions(session.permissions);
       setStoredSession(session);
     } catch (err: any) {
-      console.warn('[AuthContext] refreshProfile failed to refresh profile:', err);
+      console.error('[AuthContext] refreshProfile failed to refresh profile:', err);
       throw err;
     }
   };

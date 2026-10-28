@@ -131,7 +131,6 @@ export const DashboardPage: React.FC = () => {
     typeof user?.role === 'object' && user?.role !== null
       ? (user.role as any).name
       : user?.role;
-
   const isMember = roleName === 'MEMBER';
 
   // 1. Fetch Dashboard KPI Stats (fn_tenant_dashboard_stats)
@@ -214,40 +213,11 @@ export const DashboardPage: React.FC = () => {
       const res = await api.get<any>('/platform/overview');
       return res?.data || res;
     },
-    enabled: Boolean(isSuperAdmin),
+    enabled: isSuperAdmin && !isMember,
   });
 
-  // Handler: Invalidate All Dashboard Queries
-  const handleRefreshAll = async () => {
-    setIsRefreshing(true);
-    try {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['reports', 'dashboard'] }),
-        queryClient.invalidateQueries({ queryKey: ['reports', 'license-utilization'] }),
-        queryClient.invalidateQueries({ queryKey: ['reports', 'expiring-licenses'] }),
-        queryClient.invalidateQueries({ queryKey: ['reports', 'access-trend'] }),
-        queryClient.invalidateQueries({ queryKey: ['reports', 'compliance'] }),
-      ]);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  // Handler: Toggle License Auto-Renewal Chip
-  const handleToggleAutoRenew = async (licenseId: string, nextValue: boolean) => {
-    setTogglingLicenseId(licenseId);
-    try {
-      await api.patch(`/licenses/${licenseId}`, { autoRenew: nextValue });
-      await queryClient.invalidateQueries({ queryKey: ['reports', 'expiring-licenses'] });
-    } catch {
-      // Ignored: Server validation / rollback
-    } finally {
-      setTogglingLicenseId(null);
-    }
-  };
-
   // ----------------------------------------------------------------------------
-  // Tenant Operational Analytics Data Parsing
+  // Tenant Operational Analytics Data Parsing (Computed before any early returns)
   // ----------------------------------------------------------------------------
   const rawStats: any = dashboardData?.stats || {};
   const stats = {
@@ -268,71 +238,40 @@ export const DashboardPage: React.FC = () => {
 
   // Horizontal Bar Chart Data: Top 10 Used vs Available Seats
   const utilizationChartData = useMemo(() => {
-    const rows = utilizationData || [];
-    return rows.slice(0, 10).map((item: any) => ({
-      name:
-        item.license_name.length > 16
-          ? `${item.license_name.substring(0, 15)}...`
-          : item.license_name,
-      fullName: item.license_name,
-      used: Number(item.used_seats || 0),
-      available: Math.max(0, Number(item.available_seats || 0)),
-      total: Number(item.total_seats || 0),
-      pct: Number(item.utilization_pct || 0),
-    }));
+    const rows = Array.isArray(utilizationData) ? utilizationData : [];
+    return rows.slice(0, 10).map((item: any) => {
+      const rawName = String(item?.license_name || item?.name || 'Unnamed License');
+      return {
+        name: rawName.length > 16 ? `${rawName.substring(0, 15)}...` : rawName,
+        fullName: rawName,
+        used: Number(item?.used_seats || 0),
+        available: Math.max(0, Number(item?.available_seats || 0)),
+        total: Number(item?.total_seats || 0),
+        pct: Number(item?.utilization_pct || 0),
+      };
+    });
   }, [utilizationData]);
 
   // Access Trend Area Chart Data: Monthly DOWNLOAD + CHECKOUT events
   const accessTrendChartData = useMemo(() => {
-    const rows = accessTrendData || [];
+    const rows = Array.isArray(accessTrendData) ? accessTrendData : [];
     if (rows.length === 0) {
       return [
-        { month: 'May 2026', downloads: 12, checkouts: 5 },
-        { month: 'Jun 2026', downloads: 18, checkouts: 8 },
-        { month: 'Jul 2026', downloads: 24, checkouts: 14 },
-        { month: 'Aug 2026', downloads: 21, checkouts: 19 },
-        { month: 'Sep 2026', downloads: 35, checkouts: 22 },
-        { month: 'Oct 2026', downloads: 42, checkouts: 28 },
+        { month: 'May 2026', downloads: 12, checkouts: 5, total: 17 },
+        { month: 'Jun 2026', downloads: 18, checkouts: 8, total: 26 },
+        { month: 'Jul 2026', downloads: 24, checkouts: 14, total: 38 },
+        { month: 'Aug 2026', downloads: 21, checkouts: 19, total: 40 },
+        { month: 'Sep 2026', downloads: 35, checkouts: 22, total: 57 },
+        { month: 'Oct 2026', downloads: 42, checkouts: 28, total: 70 },
       ];
     }
     return rows.map((r: any) => ({
-      month: r.month_year,
-      downloads: Number(r.download_count || 0),
-      checkouts: Number(r.checkout_count || 0),
-      total: Number(r.total_access_events || 0),
+      month: r?.month_year || r?.month || '',
+      downloads: Number(r?.download_count || 0),
+      checkouts: Number(r?.checkout_count || 0),
+      total: Number(r?.total_access_events || 0),
     }));
   }, [accessTrendData]);
-
-  // Compliance Gauge Parameters
-  const complianceScore = Number(complianceReport?.score ?? 88);
-  const complianceGrade = (complianceReport?.grade ?? 'B') as 'A' | 'B' | 'C' | 'D';
-
-  const gaugeColor =
-    complianceScore >= 90
-      ? '#10b981' // Emerald
-      : complianceScore >= 75
-      ? '#6366f1' // Indigo
-      : complianceScore >= 60
-      ? '#f59e0b' // Amber
-      : '#f43f5e'; // Rose
-
-  const gradeBadgeVariant =
-    complianceScore >= 90
-      ? 'success'
-      : complianceScore >= 75
-      ? 'info'
-      : complianceScore >= 60
-      ? 'warning'
-      : 'danger';
-
-  // Semi-circle arc geometry: radius 75, arc length = pi * 75 = 235.62
-  const ARC_LENGTH = 235.62;
-  const strokeOffset = isGaugeMounted
-    ? ARC_LENGTH - (Math.min(100, Math.max(0, complianceScore)) / 100) * ARC_LENGTH
-    : ARC_LENGTH;
-
-  // Expiring licenses list
-  const expiringList = (expiringData || []).slice(0, 6);
 
   // Sparkline synthetic trend series for KPI cards
   const assetSparkline = useMemo(
@@ -379,6 +318,35 @@ export const DashboardPage: React.FC = () => {
     [stats.expiring_licenses_30d]
   );
 
+  // Handler: Invalidate All Dashboard Queries
+  const handleRefreshAll = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['reports', 'dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports', 'license-utilization'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports', 'expiring-licenses'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports', 'access-trend'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports', 'compliance'] }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Handler: Toggle License Auto-Renewal Chip
+  const handleToggleAutoRenew = async (licenseId: string, nextValue: boolean) => {
+    setTogglingLicenseId(licenseId);
+    try {
+      await api.patch(`/licenses/${licenseId}`, { autoRenew: nextValue });
+      await queryClient.invalidateQueries({ queryKey: ['reports', 'expiring-licenses'] });
+    } catch {
+      // Ignored: Server validation / rollback
+    } finally {
+      setTogglingLicenseId(null);
+    }
+  };
+
   if (isMember) {
     return <Navigate to="/my-licenses" replace />;
   }
@@ -413,7 +381,7 @@ export const DashboardPage: React.FC = () => {
       return 0;
     };
 
-    const tenants = platformData || [];
+    const tenants = Array.isArray(platformData) ? platformData : [];
     const totalTenants = tenants.length;
     const activeTenants = tenants.filter((t: any) => t.tenant_status === 'ACTIVE').length;
     const totalUsers = tenants.reduce((acc: number, t: any) => acc + Number(t.user_count || 0), 0);
@@ -551,6 +519,37 @@ export const DashboardPage: React.FC = () => {
       </div>
     );
   }
+
+  // Compliance Gauge Parameters
+  const complianceScore = Number(complianceReport?.score ?? 88);
+  const complianceGrade = (complianceReport?.grade ?? 'B') as 'A' | 'B' | 'C' | 'D';
+
+  const gaugeColor =
+    complianceScore >= 90
+      ? '#10b981' // Emerald
+      : complianceScore >= 75
+      ? '#6366f1' // Indigo
+      : complianceScore >= 60
+      ? '#f59e0b' // Amber
+      : '#f43f5e'; // Rose
+
+  const gradeBadgeVariant =
+    complianceScore >= 90
+      ? 'success'
+      : complianceScore >= 75
+      ? 'info'
+      : complianceScore >= 60
+      ? 'warning'
+      : 'danger';
+
+  // Semi-circle arc geometry: radius 75, arc length = pi * 75 = 235.62
+  const ARC_LENGTH = 235.62;
+  const strokeOffset = isGaugeMounted
+    ? ARC_LENGTH - (Math.min(100, Math.max(0, complianceScore)) / 100) * ARC_LENGTH
+    : ARC_LENGTH;
+
+  // Expiring licenses list
+  const expiringList = (Array.isArray(expiringData) ? expiringData : []).slice(0, 6);
 
   return (
     <div className="space-y-6">

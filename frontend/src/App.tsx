@@ -4,7 +4,7 @@
 // Multi-tenant enterprise RBAC router, silent token refresh, & lazy loading
 // ==============================================================================
 
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext';
@@ -13,35 +13,6 @@ import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-
-import { LoginPage } from './pages/auth/LoginPage';
-import { RegisterPage } from './pages/auth/RegisterPage';
-import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
-import { ForbiddenPage } from './pages/error/ForbiddenPage';
-import { NotFoundPage } from './pages/error/NotFoundPage';
-
-import { DashboardPage } from './pages/dashboard/DashboardPage';
-import { AssetListPage } from './pages/assets/AssetListPage';
-import { AssetDetailPage } from './pages/assets/AssetDetailPage';
-
-import { MyLicensesPage } from './pages/licenses/MyLicensesPage';
-import { LicenseListPage } from './pages/licenses/LicenseListPage';
-import { LicenseDetailPage } from './pages/licenses/LicenseDetailPage';
-import { AllocationListPage } from './pages/allocations/AllocationListPage';
-
-import { VendorListPage } from './pages/vendors/VendorListPage';
-import { CategoryListPage } from './pages/categories/CategoryListPage';
-import { TagListPage } from './pages/tags/TagListPage';
-
-import { UserListPage } from './pages/users/UserListPage';
-import { NotificationListPage } from './pages/notifications/NotificationListPage';
-import { ReportsPage } from './pages/reports/ReportsPage';
-import { AuditLogPage } from './pages/audit-logs/AuditLogPage';
-import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
-
-import { TenantListPage } from './pages/platform/TenantListPage';
-import { PlanListPage } from './pages/platform/PlanListPage';
-import { AiAssistantPage } from './pages/ai/AiAssistantPage';
 
 const PUBLIC_PATHS = ['/login', '/register', '/oauth-callback', '/403', '/404'];
 const LAST_ROUTE_STORAGE_KEY = 'assetvault_last_route';
@@ -96,6 +67,36 @@ const PageLoader: React.FC = () => (
     </div>
   </div>
 );
+
+// Lazy Loaded Pages
+const LoginPage = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })));
+const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage').then((m) => ({ default: m.OAuthCallbackPage })));
+const ForbiddenPage = lazy(() => import('./pages/error/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })));
+const NotFoundPage = lazy(() => import('./pages/error/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const AssetListPage = lazy(() => import('./pages/assets/AssetListPage').then((m) => ({ default: m.AssetListPage })));
+const AssetDetailPage = lazy(() => import('./pages/assets/AssetDetailPage').then((m) => ({ default: m.AssetDetailPage })));
+
+const MyLicensesPage = lazy(() => import('./pages/licenses/MyLicensesPage').then((m) => ({ default: m.MyLicensesPage })));
+const LicenseListPage = lazy(() => import('./pages/licenses/LicenseListPage').then((m) => ({ default: m.LicenseListPage })));
+const LicenseDetailPage = lazy(() => import('./pages/licenses/LicenseDetailPage').then((m) => ({ default: m.LicenseDetailPage })));
+const AllocationListPage = lazy(() => import('./pages/allocations/AllocationListPage').then((m) => ({ default: m.AllocationListPage })));
+
+const VendorListPage = lazy(() => import('./pages/vendors/VendorListPage').then((m) => ({ default: m.VendorListPage })));
+const CategoryListPage = lazy(() => import('./pages/categories/CategoryListPage').then((m) => ({ default: m.CategoryListPage })));
+const TagListPage = lazy(() => import('./pages/tags/TagListPage').then((m) => ({ default: m.TagListPage })));
+
+const UserListPage = lazy(() => import('./pages/users/UserListPage').then((m) => ({ default: m.UserListPage })));
+const NotificationListPage = lazy(() => import('./pages/notifications/NotificationListPage').then((m) => ({ default: m.NotificationListPage })));
+const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const AuditLogPage = lazy(() => import('./pages/audit-logs/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
+const TenantSettingsPage = lazy(() => import('./pages/settings/TenantSettingsPage').then((m) => ({ default: m.TenantSettingsPage })));
+
+const TenantListPage = lazy(() => import('./pages/platform/TenantListPage').then((m) => ({ default: m.TenantListPage })));
+const PlanListPage = lazy(() => import('./pages/platform/PlanListPage').then((m) => ({ default: m.PlanListPage })));
+const AiAssistantPage = lazy(() => import('./pages/ai/AiAssistantPage').then((m) => ({ default: m.AiAssistantPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {

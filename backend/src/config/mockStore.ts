@@ -717,7 +717,15 @@ export class MockPrismaStore {
   public saveState(): void {
     try {
       const fs = require('fs');
-      fs.writeFileSync(this.persistPath, JSON.stringify(this.state, null, 2), 'utf-8');
+      fs.writeFileSync(
+        this.persistPath,
+        JSON.stringify(
+          this.state,
+          (_k, v) => (typeof v === 'bigint' ? Number(v) : v),
+          2
+        ),
+        'utf-8'
+      );
     } catch {
       // Ignore write errors
     }
@@ -843,6 +851,10 @@ export class MockPrismaStore {
           } else if (item[key] === valObj.not) {
             return false;
           }
+        } else {
+          for (const [subKey, subVal] of Object.entries(valObj)) {
+            if (subVal !== undefined && item[subKey] !== subVal) return false;
+          }
         }
       } else {
         if (value === null) {
@@ -890,19 +902,160 @@ export class MockPrismaStore {
       cloned.vendors = this.state.vendors.filter((v) => v.tenantId === item.id);
       cloned.assets = this.state.assets.filter((a) => a.tenantId === item.id);
       cloned.licenses = this.state.licenses.filter((l) => l.tenantId === item.id);
+    } else if (lowerModel === 'category') {
+      cloned.parent = item.parentId ? this.state.categories.find((c) => c.id === item.parentId) || null : null;
+      cloned.children = this.state.categories.filter((c) => c.parentId === item.id);
+      cloned._count = {
+        assets: this.state.assets.filter((a) => a.categoryId === item.id && !a.deletedAt).length,
+        children: cloned.children.length,
+      };
+    } else if (lowerModel === 'vendor') {
+      cloned.contactEmail = item.contactEmail || item.supportEmail || null;
+      cloned.supportEmail = item.supportEmail || item.contactEmail || null;
+      cloned._count = {
+        licenses: this.state.licenses.filter((l) => l.vendorId === item.id && !l.deletedAt).length,
+      };
+    } else if (lowerModel === 'tag') {
+      cloned.color = item.color || '#6366f1';
+      const assetTags = (this.state as any).assetTags || (this.state as any).assettag || [];
+      cloned._count = {
+        assetTags: assetTags.filter((at: any) => at.tagId === item.id).length,
+      };
+    } else if (lowerModel === 'assetversion') {
+      cloned.versionNo = item.versionNo ?? (parseInt(String(item.versionNumber || '1'), 10) || 1);
+      cloned.fileUrl = item.fileUrl || item.storageUrl || 'https://storage.assetvault.io/files/release.tar.gz';
+      cloned.fileSizeBytes = Number(item.fileSizeBytes ?? item.fileSize ?? 1048576);
+      cloned.checksumSha256 =
+        item.checksumSha256 ||
+        item.checksum ||
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+      cloned.changeNotes = item.changeNotes ?? item.changelog ?? null;
+      cloned.uploader = this.state.users.find((u) => u.id === item.uploadedBy) || null;
+    } else if (lowerModel === 'assettag') {
+      cloned.tag = this.state.tags.find((t) => t.id === item.tagId) || null;
+      cloned.asset = this.state.assets.find((a) => a.id === item.assetId) || null;
+    } else if (lowerModel === 'assetlicense') {
+      const rawAsset = this.state.assets.find((a) => a.id === item.assetId) || null;
+      cloned.asset = rawAsset
+        ? {
+            ...rawAsset,
+            assetCode: rawAsset.assetCode || rawAsset.code || 'AST-100',
+            assetType: rawAsset.assetType || rawAsset.type || 'SOFTWARE',
+            category: this.state.categories.find((c) => c.id === rawAsset.categoryId) || null,
+            owner: this.state.users.find((u) => u.id === rawAsset.ownerId) || null,
+          }
+        : null;
+      const rawLic = this.state.licenses.find((l) => l.id === item.licenseId) || null;
+      cloned.license = rawLic
+        ? {
+            ...rawLic,
+            name: rawLic.name || rawLic.licenseKey || 'Enterprise License',
+            vendor: this.state.vendors.find((v) => v.id === rawLic.vendorId) || null,
+            licenseType:
+              this.state.licenseTypes.find((lt) => lt.id === rawLic.licenseTypeId) ||
+              this.state.licenseTypes[2] ||
+              null,
+          }
+        : null;
+    } else if (lowerModel === 'assetaccesslog') {
+      cloned.accessedAt = item.accessedAt || item.createdAt || new Date();
+      cloned.user = this.state.users.find((u) => u.id === item.userId) || null;
+      cloned.asset = this.state.assets.find((a) => a.id === item.assetId) || null;
     } else if (lowerModel === 'asset') {
+      cloned.assetCode = item.assetCode || item.code || 'AST-100';
+      cloned.assetType = item.assetType || item.type || 'SOFTWARE';
+      cloned.type = item.type || item.assetType || 'SOFTWARE';
       cloned.vendor = this.state.vendors.find((v) => v.id === item.vendorId) || null;
       cloned.category = this.state.categories.find((c) => c.id === item.categoryId) || null;
-      cloned.versions = this.state.assetVersions.filter((v) => v.assetId === item.id);
+      cloned.owner =
+        this.state.users.find((u) => u.id === item.ownerId) ||
+        this.state.users.find((u) => u.tenantId === item.tenantId) ||
+        null;
+      cloned.versions = this.state.assetVersions
+        .filter((v) => v.assetId === item.id)
+        .map((v) => this.populateRelations('assetVersion', v));
       cloned.licenses = this.state.licenses.filter((l) => l.assetId === item.id);
+      const rawAssetTags = [
+        ...((this.state as any).assetTags || []),
+        ...((this.state as any).assettag || []),
+      ].filter((at: any) => at.assetId === item.id);
+      cloned.assetTags = rawAssetTags
+        .map((at: any) => this.populateRelations('assetTag', at))
+        .filter((at: any) => at.tag);
+      const explicitAssetLicenses = ((this.state as any).assetlicense || [])
+        .filter((al: any) => al.assetId === item.id)
+        .map((al: any) => this.populateRelations('assetLicense', al))
+        .filter((al: any) => al.license);
+      const directLicenses = this.state.licenses
+        .filter((l) => l.assetId === item.id && !explicitAssetLicenses.some((al: any) => al.licenseId === l.id))
+        .map((l) =>
+          this.populateRelations('assetLicense', {
+            id: `al-${item.id}-${l.id}`,
+            assetId: item.id,
+            licenseId: l.id,
+          })
+        )
+        .filter((al: any) => al.license);
+      cloned.assetLicenses = [...explicitAssetLicenses, ...directLicenses];
     } else if (lowerModel === 'license') {
+      cloned.name = item.name || item.licenseKey || 'Enterprise License';
+      cloned.startDate = item.startDate || item.createdAt || new Date();
+      cloned.endDate =
+        item.endDate !== undefined ? item.endDate : item.expiresAt !== undefined ? item.expiresAt : null;
+      cloned.currency = item.currency || 'USD';
+      cloned.cost = item.cost ?? 0;
       cloned.asset = this.state.assets.find((a) => a.id === item.assetId) || null;
-      cloned.vendor = this.state.vendors.find((v) => v.id === item.vendorId) || null;
+      cloned.vendor = this.state.vendors.find((v) => v.id === item.vendorId) || {
+        id: 'vendor-default',
+        name: 'Enterprise Vendor',
+        contactEmail: 'support@vendor.com',
+        website: 'https://vendor.com',
+      };
       cloned.licenseType =
         this.state.licenseTypes.find((lt) => lt.id === item.licenseTypeId) ||
-        this.state.licenseTypes[2] ||
-        null;
-      cloned.allocations = this.state.allocations.filter((al) => al.licenseId === item.id);
+        this.state.licenseTypes[2] || {
+          id: 3,
+          name: 'SEAT_BASED',
+          isSeatBased: true,
+          isExpirable: true,
+        };
+      cloned.allocations = this.state.allocations
+        .filter((al) => al.licenseId === item.id && al.status === 'ACTIVE')
+        .map((al) => ({
+          ...al,
+          user: this.state.users.find((u) => u.id === al.userId) || {
+            id: al.userId,
+            fullName: 'Team Member',
+            email: 'member@workspace.io',
+          },
+        }));
+      cloned.usedSeats = item.usedSeats ?? item.allocatedSeats ?? cloned.allocations.length;
+      const explicitAssetLicenses = ((this.state as any).assetlicense || [])
+        .filter((al: any) => al.licenseId === item.id)
+        .map((al: any) => this.populateRelations('assetLicense', al))
+        .filter((al: any) => al.asset);
+      cloned.assetLicenses = explicitAssetLicenses;
+      const rawRenewals = ((this.state as any).licenserenewal || []).filter(
+        (r: any) => r.licenseId === item.id
+      );
+      cloned.renewals = rawRenewals.map((r: any) => this.populateRelations('licenseRenewal', r));
+      cloned._count = {
+        allocations: cloned.allocations.length,
+        assetLicenses: explicitAssetLicenses.length,
+      };
+    } else if (lowerModel === 'licenserenewal') {
+      cloned.renewedAt = item.renewedAt || item.createdAt || new Date();
+      cloned.renewer =
+        this.state.users.find((u) => u.id === item.performedBy || u.id === item.renewedBy) || null;
+    } else if (lowerModel === 'auditlog') {
+      cloned.performedAt = item.performedAt
+        ? new Date(item.performedAt)
+        : item.createdAt
+        ? new Date(item.createdAt)
+        : new Date();
+      cloned.tableName = item.tableName || item.entityType || 'system';
+      cloned.recordId = item.recordId || item.entityId || String(item.id);
+      cloned.user = this.state.users.find((u) => u.id === item.userId) || null;
     } else if (lowerModel === 'allocation' || lowerModel === 'licenseallocation') {
       const lic = this.state.licenses.find((l) => l.id === item.licenseId);
       if (lic) {
@@ -1004,6 +1157,7 @@ export function createMockModelClient(modelName: string): any {
         createdAt: new Date(),
         updatedAt: new Date(),
         ...(modelName.toLowerCase() === 'refreshtoken' ? { revokedAt: null } : {}),
+        ...(modelName.toLowerCase() === 'auditlog' ? { performedAt: new Date() } : {}),
         ...normalizedData,
       };
       collection.push(newItem);
@@ -1223,18 +1377,31 @@ export function createMockPrismaClient(): any {
 
           if (sqlText.includes('sp_renew_license')) {
             const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
-            const [licenseId, newEndDate, cost] = values;
+            const [licenseId, newEndDate, cost, performedBy, notes] = values;
             const lic = mockStore.state.licenses.find((l) => l.id === licenseId);
+            const renewalId = require('crypto').randomUUID();
             if (lic) {
+              const previousEndDate = lic.endDate || lic.expiresAt || new Date();
               lic.endDate = new Date(newEndDate);
               lic.expiresAt = new Date(newEndDate);
               if (cost !== undefined && cost !== null) {
                 lic.cost = Number(cost);
               }
               lic.status = 'ACTIVE';
+              const renewalCol = mockStore.getCollection('licenseRenewal');
+              renewalCol.unshift({
+                id: renewalId,
+                licenseId,
+                previousEndDate,
+                newEndDate: new Date(newEndDate),
+                cost: Number(cost ?? lic.cost ?? 0),
+                performedBy: performedBy || null,
+                notes: notes || null,
+                renewedAt: new Date(),
+              });
               mockStore.saveState();
             }
-            return [{ p_renewal_id: require('crypto').randomUUID() }];
+            return [{ p_renewal_id: renewalId }];
           }
 
           if (sqlText.includes('v_license_utilization')) {

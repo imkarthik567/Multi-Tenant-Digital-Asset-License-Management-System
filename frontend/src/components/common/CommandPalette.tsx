@@ -67,7 +67,7 @@ const DEFAULT_SUGGESTED: RecentPageItem[] = [
   { id: 'sug-1', type: 'page', title: 'Dashboard', subtitle: 'Executive overview & active alerts', url: '/' },
   { id: 'sug-2', type: 'asset', title: 'Digital Assets', subtitle: 'Hardware and software catalog', url: '/assets' },
   { id: 'sug-3', type: 'license', title: 'Software Licenses', subtitle: 'Contracts and seat allocations', url: '/licenses' },
-  { id: 'sug-4', type: 'page', title: 'Compliance Hub', subtitle: 'Audit readiness score and breakdown', url: '/compliance' },
+  { id: 'sug-4', type: 'page', title: 'Compliance Hub', subtitle: 'Audit readiness score and breakdown', url: '/reports?tab=compliance' },
   { id: 'sug-5', type: 'vendor', title: 'Vendors', subtitle: 'Supplier directory and agreements', url: '/vendors' },
 ];
 
@@ -171,7 +171,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
       '/assets': { title: 'Digital Assets', subtitle: 'Hardware and software catalog', type: 'asset' },
       '/licenses': { title: 'Software Licenses', subtitle: 'Contracts and seat allocations', type: 'license' },
       '/allocations': { title: 'Seat Allocations', subtitle: 'Employee license seat assignments', type: 'license' },
-      '/compliance': { title: 'Compliance Hub', subtitle: 'Audit readiness score and breakdown', type: 'page' },
+      '/reports?tab=compliance': { title: 'Compliance Hub', subtitle: 'Audit readiness score and breakdown', type: 'page' },
       '/reports': { title: 'Reports & Export', subtitle: 'PDF and CSV data generation', type: 'page' },
       '/vendors': { title: 'Vendors', subtitle: 'Supplier directory and agreements', type: 'vendor' },
       '/users': { title: 'User Management', subtitle: 'Tenant users, roles, and status', type: 'page' },
