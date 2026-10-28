@@ -31,6 +31,7 @@ import {
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import { FormattedChatMessage } from '../../components/ai/FormattedChatMessage';
 
 type WorkspaceMode = 'copilot' | 'optimize' | 'extractor';
 type PriorityFilter = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -121,7 +122,7 @@ const VOICE_OPTIONS = [
   { id: 'Charon', label: 'Charon (Calm & Analytical)' },
 ];
 
-const CHAT_HISTORY_STORAGE_KEY = 'assetvault_ai_chat_history_v1';
+const CHAT_HISTORY_STORAGE_KEY = 'assetvault_ai_chat_history_v2';
 
 export const AiAssistantPage: React.FC = () => {
   const toast = useToast();
@@ -390,7 +391,10 @@ export const AiAssistantPage: React.FC = () => {
         }>('/ai/copilot', {
           prompt: query,
           userName: user?.fullName,
-          history: currentHistory.slice(-10).map((m) => ({ role: m.role, text: m.text })),
+          history: currentHistory
+            .filter((m) => !m.id.startsWith('welcome-') && !m.id.startsWith('err-'))
+            .slice(-10)
+            .map((m) => ({ role: m.role, text: m.text })),
         });
 
         const replyText = res?.data?.reply || 'I am here and ready to help!';
@@ -1187,8 +1191,8 @@ export const AiAssistantPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                      {msg.text}
+                    <div className="text-sm text-slate-200 leading-relaxed">
+                      <FormattedChatMessage text={msg.text} isUser={isUser} />
                     </div>
                   </div>
                 );

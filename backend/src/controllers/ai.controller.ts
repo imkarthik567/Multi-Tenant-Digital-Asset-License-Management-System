@@ -4,7 +4,7 @@
 // ==============================================================================
 
 import { Request, Response } from 'express';
-import { aiService } from '../services/ai.service';
+import { aiService, formatUserRole } from '../services/ai.service';
 import { sendResponse } from '../utils/response.util';
 import { BadRequestError } from '../errors/AppError';
 
@@ -27,7 +27,7 @@ export class AiController {
           id: u.id,
           fullName: u.fullName || u.name || u.email,
           email: u.email,
-          role: u.role,
+          role: formatUserRole(u.role),
           department: u.department || 'Engineering',
         })),
       });
@@ -62,10 +62,15 @@ export class AiController {
       const history = Array.isArray(req.body?.history) ? req.body.history : [];
       const model = typeof req.body?.model === 'string' ? req.body.model : undefined;
       const persona = typeof req.body?.persona === 'string' ? req.body.persona : undefined;
+      const userName =
+        typeof req.body?.userName === 'string' && req.body.userName.trim()
+          ? req.body.userName.trim()
+          : (req.user as any)?.fullName || req.user?.email?.split('@')[0];
       const tenantId = req.user?.tenantId || null;
       const result = await aiService.askDatabaseCopilot(req.prisma, tenantId, prompt, history, {
         model,
         persona,
+        userName,
       });
       return sendResponse(res, 200, result);
     } catch (err: any) {

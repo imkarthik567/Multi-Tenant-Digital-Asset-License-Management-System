@@ -27,6 +27,7 @@ import {
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { openGmailModal } from '../notifications/SendGmailModal';
+import { FormattedChatMessage } from './FormattedChatMessage';
 
 export interface ChatTurn {
   id: string;
@@ -108,7 +109,7 @@ const PERSONA_OPTIONS: Array<{
   },
 ];
 
-const STORAGE_KEY = 'assetvault_gemini_chat_history';
+const STORAGE_KEY = 'assetvault_gemini_chat_history_v2';
 
 export const GeminiChatWidget: React.FC = () => {
   const toast = useToast();
@@ -131,7 +132,7 @@ export const GeminiChatWidget: React.FC = () => {
       {
         id: 'welcome-msg',
         role: 'model',
-        text: 'Hello! I am your AssetVault Gemini Assistant. Choose a specialist role and model tier above, or ask me anything about your digital assets, licenses, seat allocations, and annual spend.',
+        text: 'Hello! I am your **AssetVault Gemini Assistant**. Choose a specialist role and model tier above, or ask me anything about your **digital assets**, **vendors**, **license seat allocations**, and **annual spend**.',
         timestamp: new Date().toISOString(),
         modelUsed: 'gemini-3.8-flash',
         persona: 'DB_COPILOT',
@@ -180,7 +181,7 @@ export const GeminiChatWidget: React.FC = () => {
     };
 
     const historyForApi = messages
-      .filter((m) => m.id !== 'welcome-msg')
+      .filter((m) => m.id !== 'welcome-msg' && !m.id.startsWith('err-'))
       .map((m) => ({
         role: m.role,
         text: m.text,
@@ -392,13 +393,13 @@ export const GeminiChatWidget: React.FC = () => {
                   className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
                       isUser
                         ? 'bg-indigo-600 text-white rounded-br-xs shadow-xs'
                         : 'bg-slate-100 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700/70 rounded-bl-xs'
                     }`}
                   >
-                    {msg.text}
+                    <FormattedChatMessage text={msg.text} isUser={isUser} />
                   </div>
                   <div className="flex items-center gap-1.5 mt-1 px-1 text-[10px] text-slate-400">
                     <span>{isUser ? 'You' : 'Gemini'}</span>
