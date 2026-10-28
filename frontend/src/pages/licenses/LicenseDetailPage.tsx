@@ -63,7 +63,6 @@ import {
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { DatePicker } from '../../components/common/DatePicker';
-import { openGmailModal } from '../../components/notifications/SendGmailModal';
 
 // ==============================================================================
 // 1. Asset Type Configuration & Helpers
@@ -384,8 +383,12 @@ export const LicenseDetailPage: React.FC = () => {
     mutationFn: (payload: { userId: string; notes?: string }) =>
       api.post(`/licenses/${id}/allocate`, payload),
     onSuccess: (_res, variables) => {
-      toast.success('License seat allocated via sp_allocate_license_seat');
       const allocatedUser = users.find((u) => u.id === variables.userId);
+      toast.success(
+        allocatedUser?.email
+          ? `License seat allocated & automated email sent to ${allocatedUser.email}`
+          : 'License seat allocated & automated email dispatched to organization members'
+      );
       setIsAllocateModalOpen(false);
       setSelectedUserId('');
       setAllocationNotes('');
@@ -395,17 +398,7 @@ export const LicenseDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
       queryClient.invalidateQueries({ queryKey: ['allocations'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-
-      if (allocatedUser?.email) {
-        openGmailModal({
-          recipientName: allocatedUser.fullName || allocatedUser.email,
-          recipientEmail: allocatedUser.email,
-          licenseName: license?.name || 'Software License',
-          notificationTitle: `License Seat Allocated: ${license?.name || 'Software License'}`,
-          notificationMessage: `Your software license seat for "${license?.name || 'Software License'}" has been provisioned via sp_allocate_license_seat.${variables.notes ? ` Notes: ${variables.notes}` : ''}`,
-          notificationType: 'SYSTEM',
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
     onError: (err: any) => {
       toast.error(err.message || 'Seat capacity exceeded or user already allocated');
@@ -419,10 +412,12 @@ export const LicenseDetailPage: React.FC = () => {
         reason: 'Administrative deallocation via license console',
       }),
     onSuccess: () => {
-      toast.info('Seat released via sp_release_license_seat');
+      toast.info('Seat released & automated revocation email sent to member and admins');
       setReleaseAllocationTarget(null);
       queryClient.invalidateQueries({ queryKey: ['license', id] });
       queryClient.invalidateQueries({ queryKey: ['license', id, 'allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to release seat allocation');
@@ -433,10 +428,12 @@ export const LicenseDetailPage: React.FC = () => {
   const renewLicenseMutation = useMutation({
     mutationFn: (payload: typeof renewForm) => api.post(`/licenses/${id}/renew`, payload),
     onSuccess: () => {
-      toast.success('License contract successfully renewed via sp_renew_license');
+      toast.success('License renewed & automated renewal emails sent to seat holders and admins');
       setIsRenewModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ['license', id] });
       queryClient.invalidateQueries({ queryKey: ['license', id, 'renewals'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
     onError: (err: any) => {
       toast.error(err.message || 'Renewal validation error');
@@ -447,9 +444,11 @@ export const LicenseDetailPage: React.FC = () => {
   const editLicenseMutation = useMutation({
     mutationFn: (payload: any) => api.patch(`/licenses/${id}`, payload),
     onSuccess: () => {
-      toast.success('License parameters successfully updated');
+      toast.success('License updated & automated update emails sent to seat holders and admins');
       setIsEditModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ['license', id] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to update license');
@@ -1113,23 +1112,13 @@ export const LicenseDetailPage: React.FC = () => {
                           {canManage && (
                             <td className="py-3 px-4 text-right">
                               <div className="inline-flex items-center justify-end gap-2">
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  iconLeft={<Mail className="w-3.5 h-3.5" />}
-                                  onClick={() =>
-                                    openGmailModal({
-                                      recipientName: userName,
-                                      recipientEmail: userEmail !== '—' ? userEmail : '',
-                                      licenseName: license?.name || 'Software License',
-                                      notificationTitle: `License Seat Allocated: ${license?.name || 'Software License'}`,
-                                      notificationMessage: `Your software license seat for "${license?.name || 'Software License'}" is active in AssetVault.`,
-                                      notificationType: 'SYSTEM',
-                                    })
-                                  }
+                                <span
+                                  className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono mr-2"
+                                  title={`Automated expiry and contract updates sent to ${userEmail}`}
                                 >
-                                  Email
-                                </Button>
+                                  <Mail className="w-3 h-3" />
+                                  <span>Auto-Emailed</span>
+                                </span>
                                 <Button
                                   variant="danger"
                                   size="sm"

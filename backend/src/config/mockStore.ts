@@ -20,6 +20,7 @@ export interface MockStoreState {
   licenses: any[];
   allocations: any[];
   notifications: any[];
+  emailDeliveries: any[];
   auditLogs: any[];
   refreshTokens: any[];
   assetTags: any[];
@@ -473,13 +474,18 @@ export function createInitialState(): MockStoreState {
       tenantId: 'tenant-acme-corp',
       assetId: 'asset-1',
       vendorId: 'vendor-2',
+      licenseTypeId: 3,
+      name: 'IntelliJ IDEA Ultimate Enterprise',
       licenseKey: 'JB-INTEL-2026-ACME-99124',
       type: 'SEAT_BASED',
       status: 'ACTIVE',
       totalSeats: 35,
       allocatedSeats: 2,
       cost: 499.0,
+      currency: 'USD',
       autoRenew: true,
+      startDate: new Date('2026-01-16T00:00:00Z'),
+      endDate: new Date(Date.now() + 180 * 24 * 3600 * 1000),
       expiresAt: new Date(Date.now() + 180 * 24 * 3600 * 1000),
       createdAt: new Date('2026-01-16T00:00:00Z'),
       updatedAt: new Date('2026-01-16T00:00:00Z'),
@@ -489,13 +495,18 @@ export function createInitialState(): MockStoreState {
       tenantId: 'tenant-acme-corp',
       assetId: 'asset-2',
       vendorId: 'vendor-3',
+      licenseTypeId: 1,
+      name: 'Helvetica Neue Pro Complete',
       licenseKey: 'MONO-HN-CORP-44091',
       type: 'PERPETUAL',
       status: 'ACTIVE',
       totalSeats: 100,
       allocatedSeats: 1,
       cost: 1450.0,
+      currency: 'USD',
       autoRenew: false,
+      startDate: new Date('2026-01-17T00:00:00Z'),
+      endDate: null,
       expiresAt: null,
       createdAt: new Date('2026-01-17T00:00:00Z'),
       updatedAt: new Date('2026-01-17T00:00:00Z'),
@@ -505,14 +516,19 @@ export function createInitialState(): MockStoreState {
       tenantId: 'tenant-acme-corp',
       assetId: 'asset-3',
       vendorId: 'vendor-1',
+      licenseTypeId: 2,
+      name: 'Adobe Creative Cloud Enterprise',
       licenseKey: 'ADBE-CC-ENT-2026-081',
       type: 'SUBSCRIPTION',
       status: 'ACTIVE',
       totalSeats: 20,
-      allocatedSeats: 1,
+      allocatedSeats: 2,
       cost: 899.0,
+      currency: 'USD',
       autoRenew: true,
-      expiresAt: new Date(Date.now() + 45 * 24 * 3600 * 1000),
+      startDate: new Date('2026-01-18T00:00:00Z'),
+      endDate: new Date(Date.now() + 14 * 24 * 3600 * 1000),
+      expiresAt: new Date(Date.now() + 14 * 24 * 3600 * 1000),
       createdAt: new Date('2026-01-18T00:00:00Z'),
       updatedAt: new Date('2026-01-18T00:00:00Z'),
     },
@@ -521,14 +537,19 @@ export function createInitialState(): MockStoreState {
       tenantId: 'tenant-acme-corp',
       assetId: 'asset-4',
       vendorId: 'vendor-4',
+      licenseTypeId: 3,
+      name: 'Figma Enterprise Organization',
       licenseKey: 'FIGMA-ENT-ORGLIC-309',
       type: 'SEAT_BASED',
       status: 'ACTIVE',
       totalSeats: 25,
       allocatedSeats: 2,
       cost: 750.0,
+      currency: 'USD',
       autoRenew: true,
-      expiresAt: new Date(Date.now() + 120 * 24 * 3600 * 1000),
+      startDate: new Date('2026-01-19T00:00:00Z'),
+      endDate: new Date(Date.now() + 25 * 24 * 3600 * 1000),
+      expiresAt: new Date(Date.now() + 25 * 24 * 3600 * 1000),
       createdAt: new Date('2026-01-19T00:00:00Z'),
       updatedAt: new Date('2026-01-19T00:00:00Z'),
     },
@@ -613,28 +634,125 @@ export function createInitialState(): MockStoreState {
       allocatedAt: new Date('2026-01-25T00:00:00Z'),
       notes: 'Creative Suite seat',
     },
+    {
+      id: 'alloc-5',
+      tenantId: 'tenant-acme-corp',
+      licenseId: 'lic-3',
+      userId: 'user-member',
+      status: 'ACTIVE',
+      allocatedAt: new Date('2026-02-10T00:00:00Z'),
+      notes: 'UI/UX Design Seat',
+    },
   ];
+
+  const adobeExpDate = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().split('T')[0];
 
   const notifications = [
     {
       id: 'notif-1',
       tenantId: 'tenant-acme-corp',
       userId: 'user-tenant-admin',
-      type: 'SYSTEM',
-      title: 'AssetVault Operational',
-      message: 'Workspace is running with in-memory persistence and RLS guardrails active.',
+      licenseId: 'lic-3',
+      type: 'EXPIRY_15',
+      title: 'Adobe Creative Cloud Enterprise Expires in 14 Days',
+      message: `Automated email alert sent to admin@acme.com: License "Adobe Creative Cloud Enterprise" (ADBE-CC-ENT-2026-081) expires on ${adobeExpDate} (14 days remaining).`,
       isRead: false,
-      createdAt: new Date(),
+      emailSent: true,
+      recipientEmail: 'admin@acme.com',
+      createdAt: new Date(Date.now() - 15 * 60 * 1000),
     },
     {
       id: 'notif-2',
       tenantId: 'tenant-acme-corp',
-      userId: 'user-tenant-admin',
-      type: 'EXPIRY_60',
-      title: 'Adobe CC License Renewal',
-      message: 'License ADBE-CC-ENT-2026-081 renewal is due in 45 days.',
+      userId: 'user-member',
+      licenseId: 'lic-3',
+      type: 'EXPIRY_15',
+      title: 'Your Assigned License Expires in 14 Days',
+      message: `Automated email alert sent to member@acme.com: Your assigned seat for "Adobe Creative Cloud Enterprise" expires on ${adobeExpDate}.`,
       isRead: false,
-      createdAt: new Date(),
+      emailSent: true,
+      recipientEmail: 'member@acme.com',
+      createdAt: new Date(Date.now() - 14 * 60 * 1000),
+    },
+    {
+      id: 'notif-3',
+      tenantId: 'tenant-acme-corp',
+      userId: 'user-tenant-admin',
+      licenseId: 'lic-1',
+      type: 'SYSTEM',
+      title: 'Seat Allocated: IntelliJ IDEA Ultimate Enterprise',
+      message: 'Automated confirmation email sent to member@acme.com and admin@acme.com for seat allocation on IntelliJ IDEA Ultimate Enterprise.',
+      isRead: false,
+      emailSent: true,
+      recipientEmail: 'member@acme.com',
+      createdAt: new Date(Date.now() - 45 * 60 * 1000),
+    },
+  ];
+
+  const emailDeliveries = [
+    {
+      id: 'email-log-1',
+      tenantId: 'tenant-acme-corp',
+      tenantName: 'Acme Corporation',
+      recipientUserId: 'user-member',
+      recipientEmail: 'member@acme.com',
+      recipientName: 'Acme Team Member',
+      recipientRole: 'MEMBER',
+      licenseId: 'lic-3',
+      licenseName: 'Adobe Creative Cloud Enterprise',
+      eventType: 'EXPIRY_15',
+      subject: '[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise',
+      bodyText: `Hello Acme Team Member,\n\nThis is an automated notification from your organization workspace Acme Corporation.\n\nYour assigned software license "Adobe Creative Cloud Enterprise" (Key: ADBE-CC-ENT-2026-081) is scheduled to expire on ${adobeExpDate} (14 days remaining).\n\nRecipient Role: Assigned Seat Holder (MEMBER)\nOrganization: Acme Corporation\nAction Required: Your organization administrators have been notified to renew the contract prior to the end date.`,
+      status: 'SENT',
+      sentAt: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'email-log-2',
+      tenantId: 'tenant-acme-corp',
+      tenantName: 'Acme Corporation',
+      recipientUserId: 'user-tenant-admin',
+      recipientEmail: 'admin@acme.com',
+      recipientName: 'Acme Administrator',
+      recipientRole: 'TENANT_ADMIN',
+      licenseId: 'lic-3',
+      licenseName: 'Adobe Creative Cloud Enterprise',
+      eventType: 'EXPIRY_15',
+      subject: '[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise',
+      bodyText: `Hello Acme Administrator,\n\nThis is an automated compliance alert from your organization workspace Acme Corporation.\n\nSoftware license "Adobe Creative Cloud Enterprise" (Key: ADBE-CC-ENT-2026-081) will reach its contract end date on ${adobeExpDate} (14 days remaining).\n\nActive Seat Holders Affected: 2 members\nRecipient Role: Organization Administrator (TENANT_ADMIN)\nPlease renew the contract or adjust seat allocations in AssetVault before expiration.`,
+      status: 'SENT',
+      sentAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'email-log-3',
+      tenantId: 'tenant-acme-corp',
+      tenantName: 'Acme Corporation',
+      recipientUserId: 'user-asset-manager',
+      recipientEmail: 'manager@acme.com',
+      recipientName: 'Acme Asset Manager',
+      recipientRole: 'ASSET_MANAGER',
+      licenseId: 'lic-3',
+      licenseName: 'Adobe Creative Cloud Enterprise',
+      eventType: 'EXPIRY_15',
+      subject: '[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise',
+      bodyText: `Hello Acme Asset Manager,\n\nThis is an automated compliance alert from your organization workspace Acme Corporation.\n\nSoftware license "Adobe Creative Cloud Enterprise" (Key: ADBE-CC-ENT-2026-081) will reach its contract end date on ${adobeExpDate} (14 days remaining).\n\nRecipient Role: Asset Manager & Seat Holder (ASSET_MANAGER)\nPlease coordinate license renewal in AssetVault.`,
+      status: 'SENT',
+      sentAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'email-log-4',
+      tenantId: 'tenant-acme-corp',
+      tenantName: 'Acme Corporation',
+      recipientUserId: 'user-member',
+      recipientEmail: 'member@acme.com',
+      recipientName: 'Acme Team Member',
+      recipientRole: 'MEMBER',
+      licenseId: 'lic-1',
+      licenseName: 'IntelliJ IDEA Ultimate Enterprise',
+      eventType: 'SEAT_ALLOCATED',
+      subject: '[AssetVault] Seat Allocated: IntelliJ IDEA Ultimate Enterprise',
+      bodyText: `Hello Acme Team Member,\n\nAn active software license seat for "IntelliJ IDEA Ultimate Enterprise" (JetBrains) has been allocated to your organization account (member@acme.com) in Acme Corporation.\n\nLicense Status: ACTIVE\nContract End Date: ${new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString().split('T')[0]}\nNotes: Fullstack Core Dev seat`,
+      status: 'SENT',
+      sentAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
     },
   ];
 
@@ -665,6 +783,7 @@ export function createInitialState(): MockStoreState {
     licenses,
     allocations,
     notifications,
+    emailDeliveries,
     auditLogs,
     refreshTokens: [],
     assetTags: [],
@@ -705,6 +824,8 @@ export class MockPrismaStore {
             vendors: mergeById(initial.vendors, parsed.vendors || []),
             assets: mergeById(initial.assets, parsed.assets || []),
             licenses: mergeById(initial.licenses, parsed.licenses || []),
+            notifications: mergeById(initial.notifications, parsed.notifications || []),
+            emailDeliveries: mergeById(initial.emailDeliveries, parsed.emailDeliveries || []),
           };
         }
       }
@@ -780,6 +901,9 @@ export class MockPrismaStore {
         return this.state.allocations;
       case 'notification':
         return this.state.notifications;
+      case 'emaildelivery':
+      case 'emaildeliveries':
+        return this.state.emailDeliveries;
       case 'auditlog':
         return this.state.auditLogs;
       case 'refreshtoken':
@@ -1600,6 +1724,131 @@ export function createMockPrismaClient(): any {
             });
           }
 
+          if (sqlText.includes('SELECT id, name FROM tenants')) {
+            return mockStore.state.tenants
+              .filter((t) => t.status === 'ACTIVE' || t.status === 'TRIAL')
+              .map((t) => ({ id: t.id, name: t.name }));
+          }
+
+          if (sqlText.includes('fn_generate_expiry_notifications')) {
+            const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
+            const targetTenantId = values[0] || 'tenant-acme-corp';
+            const lookaheadDays = Number(values[1] || 30);
+
+            const tenantLicenses = mockStore.state.licenses.filter(
+              (l) =>
+                l.tenantId === targetTenantId &&
+                l.status !== 'CANCELLED' &&
+                !l.deletedAt &&
+                (l.endDate || l.expiresAt)
+            );
+
+            let createdCount = 0;
+
+            for (const lic of tenantLicenses) {
+              const rawEnd = lic.endDate || lic.expiresAt;
+              if (!rawEnd) continue;
+              const endDateObj = new Date(rawEnd);
+              const daysLeft = Math.ceil((endDateObj.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+              if (daysLeft > lookaheadDays) continue;
+
+              const notifType =
+                daysLeft <= 0
+                  ? 'EXPIRED'
+                  : daysLeft <= 7
+                  ? 'EXPIRY_7'
+                  : daysLeft <= 15
+                  ? 'EXPIRY_15'
+                  : 'EXPIRY_30';
+
+              const licenseDisplayName = lic.name || lic.licenseKey || 'Enterprise License';
+              const expDateStr = endDateObj.toISOString().split('T')[0];
+
+              // Find all active seat holders for this license + organization admins (TENANT_ADMIN=2, ASSET_MANAGER=3)
+              const activeSeatHolderIds = new Set(
+                mockStore.state.allocations
+                  .filter((a) => a.licenseId === lic.id && a.status === 'ACTIVE')
+                  .map((a) => a.userId)
+              );
+
+              const targetUsers = mockStore.state.users.filter(
+                (u) =>
+                  u.tenantId === targetTenantId &&
+                  u.isActive !== false &&
+                  (u.roleId === 2 || u.roleId === 3 || activeSeatHolderIds.has(u.id))
+              );
+
+              for (const recipient of targetUsers) {
+                const isSeatHolder = activeSeatHolderIds.has(recipient.id);
+                const roleLabel = isSeatHolder ? 'assigned seat holder' : 'organization admin';
+                const title =
+                  notifType === 'EXPIRED'
+                    ? `EXPIRED: ${licenseDisplayName}`
+                    : `${licenseDisplayName} Expires in ${daysLeft} Days`;
+                const message =
+                  notifType === 'EXPIRED'
+                    ? `Automated email alert queued for ${recipient.email} (${roleLabel}): License "${licenseDisplayName}" expired on ${expDateStr}.`
+                    : `Automated email alert queued for ${recipient.email} (${roleLabel}): License "${licenseDisplayName}" expires on ${expDateStr} (${daysLeft} days left).`;
+
+                // Create a fresh notification if no unread pending notification exists for this license + user + type
+                const existingPending = mockStore.state.notifications.find(
+                  (n) =>
+                    n.tenantId === targetTenantId &&
+                    n.userId === recipient.id &&
+                    n.licenseId === lic.id &&
+                    n.type === notifType &&
+                    n.emailSent === false
+                );
+
+                if (!existingPending) {
+                  mockStore.state.notifications.unshift({
+                    id: require('crypto').randomUUID(),
+                    tenantId: targetTenantId,
+                    userId: recipient.id,
+                    licenseId: lic.id,
+                    type: notifType,
+                    title,
+                    message,
+                    isRead: false,
+                    emailSent: false,
+                    recipientEmail: recipient.email,
+                    recipientName: recipient.fullName,
+                    createdAt: new Date(),
+                  });
+                  createdCount++;
+                }
+              }
+            }
+
+            if (createdCount > 0) {
+              mockStore.saveState();
+            }
+
+            return [{ count: createdCount, created_count: createdCount }];
+          }
+
+          if (sqlText.includes('FROM notifications n') && sqlText.includes('email_sent = FALSE')) {
+            return mockStore.state.notifications
+              .filter((n) => !n.emailSent)
+              .map((n) => {
+                const u = mockStore.state.users.find((usr) => usr.id === n.userId);
+                const t = mockStore.state.tenants.find((ten) => ten.id === n.tenantId);
+                const l = mockStore.state.licenses.find((lic) => lic.id === n.licenseId);
+                return {
+                  id: n.id,
+                  type: n.type,
+                  message: n.message,
+                  created_at: n.createdAt,
+                  email: u?.email || n.recipientEmail || '',
+                  full_name: u?.fullName || n.recipientName || 'Member',
+                  tenant_name: t?.name || 'Organization',
+                  license_name: l?.name || l?.licenseKey || 'Software License',
+                  end_date: l?.endDate || l?.expiresAt || null,
+                };
+              });
+          }
+
           if (sqlText.includes('SELECT 1')) {
             return [{ '?column?': 1, '1': 1 }];
           }
@@ -1615,6 +1864,17 @@ export function createMockPrismaClient(): any {
               : Array.isArray(queryObj?.strings)
               ? queryObj.strings.join(' ')
               : String(queryObj || '');
+
+          if (sqlText.includes('UPDATE notifications SET email_sent = TRUE')) {
+            const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
+            const notifId = values[0];
+            const notif = mockStore.state.notifications.find((n) => n.id === notifId);
+            if (notif) {
+              notif.emailSent = true;
+              mockStore.saveState();
+            }
+            return 1;
+          }
 
           if (sqlText.includes('sp_release_license_seat')) {
             const values = Array.isArray(queryObj?.values) ? queryObj.values : [];

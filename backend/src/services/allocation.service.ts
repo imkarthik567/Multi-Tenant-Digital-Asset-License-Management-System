@@ -10,6 +10,7 @@ import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.u
 import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
 import { licenseAllocationFailuresTotal } from '../middleware/observability.middleware';
+import { emailService } from './email.service';
 
 export class AllocationService {
   /**
@@ -29,7 +30,7 @@ export class AllocationService {
         throw new ForbiddenError('Standard members can only allocate license seats to themselves.');
       }
 
-      return await prisma.$transaction(async (tx: any) => {
+      const result = await prisma.$transaction(async (tx: any) => {
         await tx.$executeRaw(
           Prisma.sql`SELECT 
             set_config('app.current_tenant_id', ${tenantId}, true),
@@ -46,12 +47,21 @@ export class AllocationService {
 
         return {
           success: true,
-          message: 'License seat allocated successfully via sp_allocate_license_seat',
+          message: 'License seat allocated and automated confirmation email sent to member',
           allocationId,
           licenseId,
           userId: targetUserId,
         };
       });
+
+      await emailService.dispatchSeatAllocationEmails({
+        tenantId,
+        licenseId,
+        targetUserId,
+        allocationId: result.allocationId,
+      });
+
+      return result;
     } catch (err: any) {
       const msg = err.message || '';
       const reason = msg.includes('exhausted')
@@ -78,7 +88,11 @@ export class AllocationService {
     callerRole: string,
     reason?: string
   ) {
-    return prisma.$transaction(async (tx: any) => {
+    let targetLicenseId = '';
+    let targetUserId = '';
+    const releaseReason = reason || 'User seat release';
+
+    const result = await prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 
           set_config('app.current_tenant_id', ${tenantId}, true),
@@ -96,19 +110,34 @@ export class AllocationService {
         throw new ForbiddenError('Standard members can only release their own seat allocations.');
       }
 
+      targetLicenseId = allocation.licenseId;
+      targetUserId = allocation.userId;
+
       await allocationRepository.releaseSeat(
         tx,
         allocationId,
         callerUserId,
-        reason || 'User seat release'
+        releaseReason
       );
 
       return {
         success: true,
-        message: 'License seat released successfully via sp_release_license_seat',
+        message: 'License seat released and automated notification email sent to member',
         allocationId,
       };
     });
+
+    if (targetLicenseId && targetUserId) {
+      await emailService.dispatchSeatRevocationEmails({
+        tenantId,
+        licenseId: targetLicenseId,
+        targetUserId,
+        allocationId,
+        reason: releaseReason,
+      });
+    }
+
+    return result;
   }
 
   public async listAllocationsByLicense(

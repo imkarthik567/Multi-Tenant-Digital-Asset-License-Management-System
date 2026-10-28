@@ -789,6 +789,36 @@ export class AiService {
       };
     }
 
+    // 11.5 Check for GMAIL / EMAIL / NOTIFICATION queries
+    if (
+      q.includes('gmail') ||
+      q.includes('email') ||
+      q.includes('send mail') ||
+      q.includes('draft') ||
+      q.includes('notify') ||
+      q.includes('notification')
+    ) {
+      const primaryUser = snapshot.users[0];
+      const recipientLabel = primaryUser
+        ? `**${primaryUser.fullName || 'Team Member'}** (\`${primaryUser.email}\`)`
+        : `**${userName || 'Team Member'}**`;
+      return {
+        text: [
+          `You can send real emails directly from AssetVault using the **Google Workspace Gmail integration** (\`gmail.send\`):`,
+          ``,
+          `• **From Chat / AI Assistant:** Click **Email via Gmail** below any AI response to open the pre-filled composer with that report.`,
+          `• **From the Top Bar:** Click the **Gmail** button in the header or inside the **Notifications** bell menu.`,
+          `• **From License Allocations:** Click **Email via Gmail** on any seat allocation row or immediately after assigning a seat.`,
+          `• **AI Polish Draft:** Inside the Gmail modal, click **AI Polish Draft** to auto-generate a personalized subject & body for ${recipientLabel}, then click **Review & Confirm Send**.`,
+        ].join('\n'),
+        suggestedFollowUps: [
+          'Draft a license seat allocation email for our team.',
+          'Which licenses have upcoming renewals or compliance risks?',
+          'List all vendors and their contact emails.',
+        ],
+      };
+    }
+
     // 12. Conversational Workspace Briefing (for general summary or open-ended prompts)
     const topAssets = snapshot.assets
       .slice(0, 5)

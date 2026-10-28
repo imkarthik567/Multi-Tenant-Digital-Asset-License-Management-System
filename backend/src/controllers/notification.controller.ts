@@ -51,6 +51,16 @@ export class NotificationController {
     sendResponse(res, 200, result);
   });
 
+  public listEmailLogs = asyncHandler(async (req: Request, res: Response) => {
+    const logs = await notificationService.listEmailDeliveries(
+      req.user!.tenantId || null,
+      req.user!.id,
+      req.user!.email,
+      req.user!.role
+    );
+    sendResponse(res, 200, logs);
+  });
+
   public streamNotifications = (req: Request, res: Response): void => {
     notificationStreamService.addClient(
       req.user!.id,
@@ -62,3 +72,4 @@ export class NotificationController {
 }
 
 export const notificationController = new NotificationController();
+

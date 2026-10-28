@@ -1,11 +1,10 @@
 // ==============================================================================
-// AssetVault: Modern Slide-Over Notification Panel
+// AssetVault: Modern Slide-Over Notification & Automated Email Delivery Panel
 // Course: BCSE307L Database Systems (Fall 2026-27)
-// Slide-over right drawer, 4 tabs (All, Unread, Expiring, System),
+// Slide-over right drawer, 5 tabs (All, Unread, Expiring, System, Auto-Emails),
 // Colored type icons (rose=EXPIRED, amber=EXPIRY_7/15, blue=EXPIRY_30),
-// License name chip, relative time, unread dot indicator, optimistic mark-as-read,
-// Real-time SSE listener with slide-down animation, mobile pull-to-refresh,
-// and animated bell empty state ("You're all caught up").
+// Automated Email Delivery Log showing recipient member email, role, event type,
+// subject, expandable email body, and real-time SSE listener.
 // ==============================================================================
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -24,20 +23,22 @@ import {
   Calendar,
   Check,
   Mail,
+  ChevronDown,
+  ChevronUp,
+  Send,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { Notification } from '../../types';
+import { Notification, AutomatedEmailLog } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { NotificationStreamClient } from '../../services/notificationStream';
 import { Badge, Skeleton } from '../ui';
-import { openGmailModal } from './SendGmailModal';
 
 export interface NotificationPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export type NotificationTab = 'all' | 'unread' | 'expiring' | 'system';
+export type NotificationTab = 'all' | 'unread' | 'expiring' | 'system' | 'emails';
 
 // ==============================================================================
 // 1. Helper: Relative Time Formatter
@@ -74,11 +75,7 @@ export function formatRelativeTime(dateString?: string | null): string {
 }
 
 // ==============================================================================
-// 2. Helper: Notification Type Icon & Color Mapping
-// Requirements:
-// - rose for EXPIRED
-// - amber for EXPIRY_7/15
-// - blue for EXPIRY_30
+// 2. Helper: Notification & Email Event Type Metadata
 // ==============================================================================
 
 export function getNotificationTypeMeta(type: string) {
@@ -105,6 +102,28 @@ export function getNotificationTypeMeta(type: string) {
         badgeClass: 'text-blue-400 bg-blue-950/60 border-blue-800/60',
         dotClass: 'bg-blue-500',
         label: 'Expires in 30d',
+      };
+    case 'SEAT_ALLOCATED':
+      return {
+        icon: Users2,
+        badgeClass: 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60',
+        dotClass: 'bg-emerald-500',
+        label: 'Seat Allocated',
+      };
+    case 'SEAT_REVOKED':
+      return {
+        icon: Users2,
+        badgeClass: 'text-amber-400 bg-amber-950/60 border-amber-800/60',
+        dotClass: 'bg-amber-500',
+        label: 'Seat Released',
+      };
+    case 'LICENSE_RENEWED':
+    case 'LICENSE_UPDATED':
+      return {
+        icon: KeyRound,
+        badgeClass: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/60',
+        dotClass: 'bg-indigo-500',
+        label: type === 'LICENSE_RENEWED' ? 'Contract Renewed' : 'Contract Updated',
       };
     case 'OVER_ALLOCATION':
     case 'SEAT_LIMIT':
@@ -137,8 +156,9 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
   const toastContext = useToast();
   const toast = (toastContext as any).toast || toastContext;
 
-  // Active Tab State: All, Unread, Expiring, System
+  // Active Tab State: All, Unread, Expiring, System, Auto-Emails
   const [activeTab, setActiveTab] = useState<NotificationTab>('all');
+  const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
 
   // Real-time incoming notifications from SSE
   const [liveNotifications, setLiveNotifications] = useState<Notification[]>([]);
@@ -179,6 +199,25 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
     enabled: isOpen,
   });
 
+  const {
+    data: emailLogsResponse,
+    isLoading: isEmailLogsLoading,
+    refetch: refetchEmailLogs,
+  } = useQuery<{ data: AutomatedEmailLog[] } | AutomatedEmailLog[]>({
+    queryKey: ['email-logs'],
+    queryFn: async () => {
+      const res = await api.get<{ data: AutomatedEmailLog[] }>('/notifications/email-logs');
+      return res;
+    },
+    enabled: isOpen,
+  });
+
+  const emailLogs: AutomatedEmailLog[] = useMemo(() => {
+    if (!emailLogsResponse) return [];
+    if (Array.isArray(emailLogsResponse)) return emailLogsResponse;
+    return (emailLogsResponse as any)?.data || [];
+  }, [emailLogsResponse]);
+
   const serverNotifications: Notification[] = useMemo(() => {
     if (!notifResponse) return [];
     if (Array.isArray(notifResponse)) return notifResponse;
@@ -188,11 +227,9 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
   // Combined notifications (merging live SSE arrivals + server response)
   const allNotifications = useMemo(() => {
     const map = new Map<string, Notification>();
-    // Prepend live arrivals
     for (const n of liveNotifications) {
       map.set(n.id, n);
     }
-    // Add server notifications
     for (const n of serverNotifications) {
       if (!map.has(n.id)) {
         map.set(n.id, n);
@@ -219,8 +256,9 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
           n.type
         )
     ).length;
-    return { total, unread, expiring, system };
-  }, [allNotifications]);
+    const emails = emailLogs.length;
+    return { total, unread, expiring, system, emails };
+  }, [allNotifications, emailLogs]);
 
   // Filtered Notifications based on activeTab
   const displayedNotifications = useMemo(() => {
@@ -274,21 +312,21 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
           title: payload.title || 'New Alert',
           message: payload.message || '',
           isRead: false,
+          emailSent: payload.emailSent ?? true,
+          recipientEmail: payload.recipientEmail,
           createdAt: payload.createdAt || new Date().toISOString(),
           ...(payload.license ? { license: payload.license } : {}),
         };
 
-        // Mark as new arrival for slide-down animation
         setNewArrivalIds((prev) => new Set(prev).add(incomingId));
 
-        // Prepend to live notifications state
         setLiveNotifications((prev) => [
           newNotif,
           ...prev.filter((item) => item.id !== incomingId),
         ]);
 
-        // Invalidate query to update unread badge in topbar
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['email-logs'] });
       },
     });
 
@@ -300,19 +338,16 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
   }, [isOpen, queryClient]);
 
   // ============================================================================
-  // Mutations: Optimistic Mark as Read & Mark All as Read
+  // Mutations: Optimistic Mark as Read & Automated Expiry Email Scan
   // ============================================================================
 
-  // Single Mark as Read (optimistic update)
   const markReadMutation = useMutation({
     mutationFn: (id: string) => api.patch(`/notifications/${id}/read`, {}),
     onMutate: async (id: string) => {
-      // 1. Optimistically update local live state
       setLiveNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
       );
 
-      // 2. Optimistically update React Query cache
       await queryClient.cancelQueries({ queryKey: ['notifications'] });
       const previousData = queryClient.getQueryData(['notifications']);
 
@@ -346,7 +381,6 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
     },
   });
 
-  // Mark All as Read (optimistic update)
   const markAllReadMutation = useMutation({
     mutationFn: () => api.patch('/notifications/read-all', {}),
     onMutate: async () => {
@@ -387,21 +421,24 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
     },
   });
 
-  // Trigger License Expiry Scan
+  // Trigger Automated License Expiry Scan & Member Email Dispatch
   const runExpiryCheckMutation = useMutation({
     mutationFn: () =>
       api.post('/notifications/run-expiry-check', { lookaheadDays: 30 }),
     onSuccess: (data: any) => {
-      const generated = data?.data?.notificationsGenerated || data?.notificationsGenerated || 0;
+      const payload = data?.data || data || {};
+      const emailsSent = payload.emailsSent || 0;
+      const recipients: string[] = payload.recipients || [];
       toast.success(
-        generated > 0
-          ? `Scanned contracts: Generated ${generated} new license expiry alerts`
-          : 'Scanned contracts: All active licenses are currently compliant'
+        emailsSent > 0
+          ? `Dispatched ${emailsSent} automated expiry email(s) to organization members (${recipients.join(', ')})`
+          : 'Scanned contracts: All active licenses are compliant'
       );
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Failed to execute contract expiry check');
+      toast.error(err.message || 'Failed to execute automated expiry email scan');
     },
   });
 
@@ -423,7 +460,6 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
     const delta = currentY - touchStartY.current;
 
     if (delta > 0 && scrollContainerRef.current?.scrollTop === 0) {
-      // Apply rubberband dampening
       const distance = Math.min(delta * 0.45, 80);
       setPullDistance(distance);
     } else {
@@ -439,7 +475,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
       setIsRefreshing(true);
       setPullDistance(50);
       try {
-        await refetch();
+        await Promise.all([refetch(), refetchEmailLogs()]);
       } finally {
         setIsRefreshing(false);
         setPullDistance(0);
@@ -464,7 +500,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10 z-50">
         <div className="relative w-screen max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
           {/* ================================================================== */}
-          {/* 1. Header: Title, Unread Count, Mark All Read, Close               */}
+          {/* 1. Header: Title, Unread Count, Auto-Email Log Switch, Close       */}
           {/* ================================================================== */}
           <div className="p-4 sm:px-6 sm:py-5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -477,31 +513,35 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                     Notifications
                   </h2>
                   {counts.unread > 0 && (
-                    <Badge variant="info" size="sm" className="font-mono text-[10px] py-0 px-1.5">
+                    <Badge variant="info" size="sm" className="font-mono tabular-nums text-[10px] py-0 px-1.5">
                       {counts.unread} New
                     </Badge>
                   )}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Real-time contract alerts &amp; system updates
+                  Automated organization emails &amp; expiry alerts
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5">
-              {/* Compose Gmail Notification Button */}
+              {/* Switch to Automated Email Delivery Log */}
               <button
                 type="button"
-                onClick={() => openGmailModal({})}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-800/50 rounded-lg transition-colors cursor-pointer"
-                title="Compose and send a notification email via Gmail"
+                onClick={() => setActiveTab(activeTab === 'emails' ? 'all' : 'emails')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border rounded-lg transition-colors cursor-pointer ${
+                  activeTab === 'emails'
+                    ? 'text-emerald-200 bg-emerald-900/60 border-emerald-600/60'
+                    : 'text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 hover:bg-emerald-950/70 border-emerald-800/50'
+                }`}
+                title="View automated emails sent to organization members"
               >
                 <Mail className="w-3.5 h-3.5" />
-                <span>Send Gmail</span>
+                <span className="font-mono tabular-nums">{counts.emails} Sent</span>
               </button>
 
               {/* Mark all as read button */}
-              {counts.unread > 0 && (
+              {counts.unread > 0 && activeTab !== 'emails' && (
                 <button
                   type="button"
                   onClick={() => markAllReadMutation.mutate()}
@@ -510,7 +550,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                   title="Mark all notifications as read"
                 >
                   <CheckCheck className="w-4 h-4" />
-                  <span className="hidden sm:inline">Mark all as read</span>
+                  <span className="hidden sm:inline">Mark read</span>
                 </button>
               )}
 
@@ -527,7 +567,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
           </div>
 
           {/* ================================================================== */}
-          {/* 2. Tabs: All, Unread, Expiring, System                             */}
+          {/* 2. Tabs: All, Unread, Expiring, System, Auto-Emails                */}
           {/* ================================================================== */}
           <div className="flex items-center border-b border-slate-800 bg-slate-950/40 text-xs px-2 overflow-x-auto scrollbar-none">
             {[
@@ -535,6 +575,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
               { id: 'unread', label: 'Unread', count: counts.unread },
               { id: 'expiring', label: 'Expiring', count: counts.expiring },
               { id: 'system', label: 'System', count: counts.system },
+              { id: 'emails', label: 'Auto-Emails', count: counts.emails },
             ].map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -551,7 +592,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                   <span>{tab.label}</span>
                   {tab.count > 0 && (
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      className={`text-[10px] font-mono tabular-nums px-1.5 py-0.2 rounded-full ${
                         isActive
                           ? 'bg-indigo-600 text-white'
                           : 'bg-slate-800 text-slate-400'
@@ -589,7 +630,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
           )}
 
           {/* ================================================================== */}
-          {/* 4. Notification List / Rows / Empty State                          */}
+          {/* 4. Notification List OR Automated Email Delivery Log               */}
           {/* ================================================================== */}
           <div
             ref={scrollContainerRef}
@@ -598,7 +639,108 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
             onTouchEnd={handleTouchEnd}
             className="flex-1 overflow-y-auto p-4 space-y-2.5 divide-y-0"
           >
-            {isLoading ? (
+            {activeTab === 'emails' ? (
+              isEmailLogsLoading ? (
+                <div className="space-y-3 pt-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} variant="card" className="h-24 rounded-xl" />
+                  ))}
+                </div>
+              ) : emailLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-10 text-center my-auto min-h-[340px] space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-center text-indigo-400">
+                    <Mail className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-slate-100">
+                      No Automated Emails Logged Yet
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                      Click &ldquo;Scan Expirations &amp; Auto-Email&rdquo; below or allocate/renew a license to automatically send emails to organization members.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="px-1 pb-1 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Automated emails sent to organization members &amp; admins</span>
+                    <span className="font-mono tabular-nums text-emerald-400">{emailLogs.length} delivered</span>
+                  </div>
+                  {emailLogs.map((log) => {
+                    const meta = getNotificationTypeMeta(log.eventType);
+                    const IconComponent = meta.icon;
+                    const isExpanded = expandedEmailId === log.id;
+                    const relativeTime = formatRelativeTime(log.sentAt);
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition-colors space-y-2.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className={`p-2 rounded-xl border shrink-0 mt-0.5 ${meta.badgeClass}`}>
+                              <IconComponent className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-bold text-slate-100 truncate">
+                                  {log.recipientName}
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                  {log.recipientRole}
+                                </span>
+                              </div>
+                              <div className="text-[11px] font-mono text-indigo-400 truncate mt-0.5">
+                                To: {log.recipientEmail}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 font-mono tabular-nums">
+                              <Send className="w-2.5 h-2.5" />
+                              {log.status}
+                            </span>
+                            <div className="text-[10px] text-slate-500 font-mono tabular-nums mt-0.5">
+                              {relativeTime}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-xs font-semibold text-slate-200 leading-snug">
+                          {log.subject}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px]">
+                          <span className="text-slate-400 truncate max-w-[210px]">
+                            License: <span className="text-slate-300 font-medium">{log.licenseName}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedEmailId(isExpanded ? null : log.id)}
+                            className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
+                          >
+                            <span>{isExpanded ? 'Hide Email Body' : 'Preview Email'}</span>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-2 p-3 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 font-mono whitespace-pre-line leading-relaxed">
+                            {log.bodyText}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : isLoading ? (
               <div className="space-y-3 pt-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <Skeleton key={i} variant="card" className="h-24 rounded-xl" />
@@ -632,7 +774,6 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                 const relativeTime = formatRelativeTime(n.createdAt);
                 const isNew = newArrivalIds.has(n.id);
 
-                // Extract license name chip
                 const licenseName =
                   (n as any).license?.name ||
                   n.title ||
@@ -674,7 +815,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
 
                           <div className="flex items-center gap-1.5 shrink-0">
                             {/* Relative Timestamp */}
-                            <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                            <span className="text-[10px] text-slate-500 font-mono tabular-nums flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               <span>{relativeTime}</span>
                             </span>
@@ -694,24 +835,26 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                           {n.message}
                         </p>
 
-                        {/* Action Bar: Send Notification via Gmail */}
-                        <div className="pt-1 flex items-center justify-end">
+                        {/* Automated Email Delivery Status */}
+                        <div className="pt-1 flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono truncate">
+                            <Mail className="w-3 h-3 shrink-0" />
+                            <span className="truncate">
+                              {n.recipientEmail
+                                ? `Auto-emailed to ${n.recipientEmail}`
+                                : 'Auto-email delivery active'}
+                            </span>
+                          </span>
+
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              openGmailModal({
-                                notificationTitle: n.title || meta.label,
-                                notificationMessage: n.message,
-                                notificationType: n.type,
-                                licenseName,
-                              });
+                              setActiveTab('emails');
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-950/60 hover:bg-indigo-900/70 text-indigo-300 border border-indigo-800/60 transition-colors cursor-pointer"
-                            title="Email this notification to a team member via Gmail"
+                            className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 hover:underline shrink-0 cursor-pointer"
                           >
-                            <Mail className="w-3 h-3 text-indigo-400" />
-                            <span>Send via Gmail</span>
+                            Delivery Log &rarr;
                           </button>
                         </div>
                       </div>
@@ -723,12 +866,12 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
           </div>
 
           {/* ================================================================== */}
-          {/* 5. Footer: Expiry Scan Action & Indicator                          */}
+          {/* 5. Footer: Automated Expiry Scan & Email Dispatch Action           */}
           {/* ================================================================== */}
           <div className="p-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
             <span className="text-[11px] flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Real-time SSE Sync Active</span>
+              <span>Auto-Email Engine Active</span>
             </span>
 
             <button
@@ -736,14 +879,18 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
               onClick={() => runExpiryCheckMutation.mutate()}
               disabled={runExpiryCheckMutation.isPending}
               className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              title="Run automated database scan for contracts expiring within 30 days"
+              title="Scan expiring licenses and automatically email assigned seat holders and organization admins"
             >
               <RefreshCw
                 className={`w-3 h-3 ${
                   runExpiryCheckMutation.isPending ? 'animate-spin' : ''
                 }`}
               />
-              <span>Scan Expirations</span>
+              <span>
+                {runExpiryCheckMutation.isPending
+                  ? 'Dispatching Emails...'
+                  : 'Scan Expirations & Auto-Email'}
+              </span>
             </button>
           </div>
         </div>
@@ -751,3 +898,4 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
     </div>
   );
 };
+

@@ -8,6 +8,8 @@ import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.u
 import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
 import { notificationStreamService } from './notificationStream.service';
+import { emailService } from './email.service';
+import { mockStore } from '../config/mockStore';
 
 export class NotificationService {
   public async listUserNotifications(
@@ -23,6 +25,33 @@ export class NotificationService {
       filter
     );
     return formatPaginatedResponse(data, total, params);
+  }
+
+  public async listEmailDeliveries(
+    tenantId: string | null,
+    userId: string,
+    userEmail: string,
+    userRole: string
+  ) {
+    const allLogs = Array.isArray(mockStore.state.emailDeliveries)
+      ? mockStore.state.emailDeliveries
+      : [];
+
+    const filtered = allLogs.filter((entry) => {
+      if (userRole === 'SUPER_ADMIN') {
+        return tenantId ? entry.tenantId === tenantId : true;
+      }
+      if (entry.tenantId !== tenantId) return false;
+      if (userRole === 'MEMBER') {
+        return (
+          entry.recipientUserId === userId ||
+          entry.recipientEmail?.toLowerCase() === userEmail?.toLowerCase()
+        );
+      }
+      return true;
+    });
+
+    return filtered;
   }
 
   public async markAsRead(prismaClient: any, id: string, userId: string) {
@@ -46,26 +75,38 @@ export class NotificationService {
 
       const count = await notificationRepository.runExpiryCheck(tx, tenantId, lookaheadDays);
       return {
-        success: true,
-        message: `Expiry check completed successfully. Generated ${count} new alerts.`,
         notificationsGenerated: count,
       };
     });
 
-    if (result.notificationsGenerated > 0) {
+    const emailDispatch = await emailService.dispatchPendingExpiryEmailsForTenant(
+      tenantId,
+      lookaheadDays
+    );
+
+    if (result.notificationsGenerated > 0 || emailDispatch.emailsSent > 0) {
       notificationStreamService.broadcastNotification({
         tenantId,
         notification: {
           type: 'EXPIRY_CHECK_COMPLETED',
-          message: `${result.notificationsGenerated} license expiry alerts generated`,
+          message: `Dispatched ${emailDispatch.emailsSent} automated expiry emails to organization members (${emailDispatch.recipients.join(', ')})`,
           count: result.notificationsGenerated,
+          emailsSent: emailDispatch.emailsSent,
+          recipients: emailDispatch.recipients,
           timestamp: new Date().toISOString(),
         },
       });
     }
 
-    return result;
+    return {
+      success: true,
+      message: `Expiry check completed: ${result.notificationsGenerated} alerts generated and ${emailDispatch.emailsSent} automated emails dispatched to organization members.`,
+      notificationsGenerated: result.notificationsGenerated,
+      emailsSent: emailDispatch.emailsSent,
+      recipients: emailDispatch.recipients,
+    };
   }
 }
 
 export const notificationService = new NotificationService();
+

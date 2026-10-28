@@ -23,7 +23,6 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { SearchInput } from '../../components/common/SearchInput';
 import { Pagination } from '../../components/common/Pagination';
 import { RoleGate } from '../../components/auth/RoleGate';
-import { openGmailModal } from '../../components/notifications/SendGmailModal';
 
 export const AllocationListPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -75,13 +74,15 @@ export const AllocationListPage: React.FC = () => {
       api.post(`/allocations/${allocationId}/release`, { reason }),
     onSuccess: () => {
       toast({
-        title: 'Seat Released',
-        message: 'License seat returned to tenant pool via sp_release_license_seat',
+        title: 'Seat Released & Member Auto-Emailed',
+        message: 'Seat returned to pool and automated email sent to member and admins.',
         type: 'info',
       });
       setReleaseAllocationId(null);
       queryClient.invalidateQueries({ queryKey: ['allocations'] });
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
     onError: (err: any) => {
       toast({
@@ -225,24 +226,13 @@ export const AllocationListPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openGmailModal({
-                              recipientName: alloc.user?.fullName || 'Team Member',
-                              recipientEmail: alloc.user?.email || '',
-                              licenseName: alloc.license?.name || 'Software License',
-                              notificationTitle: `License Seat Allocated: ${alloc.license?.name || 'Enterprise License'}`,
-                              notificationMessage: `Your software license seat for "${alloc.license?.name || 'Enterprise License'}" (${alloc.license?.vendor?.name || 'Independent'}) is active as of ${new Date(alloc.allocatedAt).toLocaleDateString()}.`,
-                              notificationType: 'SYSTEM',
-                            })
-                          }
-                          className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline inline-flex items-center text-xs cursor-pointer"
-                          title="Send seat allocation email via Gmail"
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] text-emerald-500 dark:text-emerald-400 font-mono"
+                          title={`Automated lifecycle & expiry alerts enabled for ${alloc.user?.email || 'member'}`}
                         >
-                          <Mail className="w-3.5 h-3.5 mr-1" />
-                          Email User
-                        </button>
+                          <Mail className="w-3 h-3" />
+                          <span>Auto-Mail Active</span>
+                        </span>
                         {alloc.status === 'ACTIVE' && (
                           <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
                             <button

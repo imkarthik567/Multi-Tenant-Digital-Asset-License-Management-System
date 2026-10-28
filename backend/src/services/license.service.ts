@@ -10,6 +10,7 @@ import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.u
 import { toCsv } from '../utils/csv.util';
 import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
+import { emailService } from './email.service';
 
 export class LicenseService {
   private maskKey(key: string | null | undefined): string | null {
@@ -77,7 +78,7 @@ export class LicenseService {
     const licenseType = await prismaClient.licenseType.findUnique({ where: { id: data.licenseTypeId } });
     if (!licenseType) throw new BadRequestError('Referenced licenseType does not exist');
 
-    return licenseRepository.create(prismaClient, {
+    const created = await licenseRepository.create(prismaClient, {
       name: data.name,
       licenseKey: data.licenseKey,
       totalSeats: data.totalSeats,
@@ -91,13 +92,23 @@ export class LicenseService {
       licenseType: { connect: { id: data.licenseTypeId } },
       tenant: { connect: { id: tenantId } },
     });
+
+    await emailService.dispatchLicenseUpdateEmails({
+      tenantId,
+      licenseId: created.id,
+      eventType: 'LICENSE_UPDATED',
+      newEndDate: data.endDate,
+      summary: 'New software license provisioned in organization workspace',
+    });
+
+    return created;
   }
 
   public async updateLicense(prismaClient: any, id: string, data: any) {
     const existing = await licenseRepository.findById(prismaClient, id);
     if (!existing) throw new NotFoundError('License not found');
 
-    return licenseRepository.update(prismaClient, id, {
+    const updated = await licenseRepository.update(prismaClient, id, {
       name: data.name,
       licenseKey: data.licenseKey,
       totalSeats: data.totalSeats,
@@ -110,6 +121,16 @@ export class LicenseService {
       vendor: data.vendorId ? { connect: { id: data.vendorId } } : undefined,
       licenseType: data.licenseTypeId ? { connect: { id: data.licenseTypeId } } : undefined,
     });
+
+    await emailService.dispatchLicenseUpdateEmails({
+      tenantId: existing.tenantId,
+      licenseId: id,
+      eventType: 'LICENSE_UPDATED',
+      newEndDate: data.endDate ?? existing.endDate,
+      summary: 'Contract terms, capacity, or expiration end date updated',
+    });
+
+    return updated;
   }
 
   public async softDeleteLicense(prismaClient: any, id: string) {
@@ -148,10 +169,7 @@ export class LicenseService {
     performedBy: string,
     notes?: string
   ) {
-    return prisma.$transaction(async (tx: any) => {
-      // Super admin context is required so sp_renew_license can insert ledger records into license_renewals
-      // and trigger audit_logs writes without RLS policy denial. Security and tenant boundaries
-      // are strictly enforced internally by sp_renew_license via PL/pgSQL role and tenant checks.
+    const result = await prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 
           set_config('app.current_tenant_id', ${tenantId}, true),
@@ -163,11 +181,21 @@ export class LicenseService {
 
       return {
         success: true,
-        message: 'License renewed successfully via sp_renew_license',
+        message: 'License renewed and automated email sent to seat holders and admins',
         licenseId,
         newEndDate,
       };
     });
+
+    await emailService.dispatchLicenseUpdateEmails({
+      tenantId,
+      licenseId,
+      eventType: 'LICENSE_RENEWED',
+      newEndDate,
+      notes,
+    });
+
+    return result;
   }
 
   public async findRenewals(prismaClient: any, licenseId: string) {

@@ -217,7 +217,36 @@ export interface Notification {
   title?: string;
   message: string;
   isRead: boolean;
+  emailSent?: boolean;
+  recipientEmail?: string;
+  recipientName?: string;
   createdAt: string;
+}
+
+export interface AutomatedEmailLog {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  recipientUserId?: string;
+  recipientEmail: string;
+  recipientName: string;
+  recipientRole: string;
+  licenseId?: string;
+  licenseName: string;
+  eventType:
+    | 'EXPIRY_30'
+    | 'EXPIRY_15'
+    | 'EXPIRY_7'
+    | 'EXPIRED'
+    | 'SEAT_ALLOCATED'
+    | 'SEAT_REVOKED'
+    | 'LICENSE_RENEWED'
+    | 'LICENSE_UPDATED'
+    | string;
+  subject: string;
+  bodyText: string;
+  status: 'SENT' | 'FAILED';
+  sentAt: string;
 }
 
 export interface AuditLog {

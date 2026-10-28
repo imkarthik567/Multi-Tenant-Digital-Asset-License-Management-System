@@ -39,7 +39,6 @@ import {
 import { Pagination } from '../../components/common/Pagination';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
-import { openGmailModal } from '../../components/notifications/SendGmailModal';
 
 // ==============================================================================
 // 1. Role Configuration & Styling Tokens
@@ -1134,22 +1133,6 @@ export const UserListPage: React.FC = () => {
                       {/* Column 6: Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Send Gmail Notification Button */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openGmailModal({
-                                recipientName: u.fullName,
-                                recipientEmail: u.email,
-                                notificationTitle: 'Workspace Notification & License Update',
-                              })
-                            }
-                            className="p-1.5 text-indigo-400 hover:text-indigo-200 hover:bg-indigo-950/50 rounded-lg transition-colors cursor-pointer"
-                            title="Send email via Gmail"
-                          >
-                            <Mail className="w-3.5 h-3.5" />
-                          </button>
-
                           {/* Edit Email & Name Button */}
                           <button
                             type="button"

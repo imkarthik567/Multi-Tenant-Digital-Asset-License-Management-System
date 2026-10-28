@@ -1148,7 +1148,7 @@ export const AiAssistantPage: React.FC = () => {
                         <span className="font-mono tabular-nums">{msg.timestamp}</span>
                       </div>
 
-                      {/* Message Action Buttons (Speak Aloud & Copy) */}
+                      {/* Message Action Buttons (Speak Aloud, Copy) */}
                       <div className="flex items-center gap-1.5">
                         {!isUser && (
                           <button

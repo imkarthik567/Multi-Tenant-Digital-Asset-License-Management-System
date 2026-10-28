@@ -26,13 +26,17 @@ router.get('/stream', authorize('notifications:read'), (req, res) => {
 // Read-all patch route (must precede /:id/read)
 router.patch('/read-all', authorize('notifications:read'), notificationController.markAllAsRead);
 
+// Automated organization email delivery log
+router.get('/email-logs', authorize('notifications:read'), notificationController.listEmailLogs);
+
 // List notifications
 router.get('/', authorize('notifications:read'), validate({ query: queryNotificationSchema }), notificationController.listNotifications);
 
 // Mark specific notification as read
 router.patch('/:id/read', authorize('notifications:read'), notificationController.markAsRead);
 
-// Run automated license expiry check (Generates notifications via fn_generate_expiry_notifications)
+// Run automated license expiry check (Generates notifications via fn_generate_expiry_notifications & dispatches automated emails)
 router.post('/run-expiry-check', authorize('notifications:manage'), validate(runExpiryCheckSchema), notificationController.runExpiryCheck);
 
 export default router;
+
