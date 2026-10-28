@@ -550,7 +550,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                   title="Mark all notifications as read"
                 >
                   <CheckCheck className="w-4 h-4" />
-                  <span className="hidden sm:inline">Mark read</span>
+                  <span className="hidden sm:inline">Mark all as read</span>
                 </button>
               )}
 
