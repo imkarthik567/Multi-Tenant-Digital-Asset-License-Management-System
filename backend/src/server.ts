@@ -53,6 +53,6 @@ export const startServer = async (portOverride?: number) => {
   }
 };
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
   startServer();
 }

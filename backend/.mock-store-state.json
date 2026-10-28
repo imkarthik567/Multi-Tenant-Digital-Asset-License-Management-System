@@ -1,0 +1,652 @@
+{
+  "roles": [
+    {
+      "id": 1,
+      "name": "SUPER_ADMIN",
+      "description": "Global system platform administrator"
+    },
+    {
+      "id": 2,
+      "name": "TENANT_ADMIN",
+      "description": "Tenant organization owner with admin privileges"
+    },
+    {
+      "id": 3,
+      "name": "ASSET_MANAGER",
+      "description": "Asset custodian and license allocator"
+    },
+    {
+      "id": 4,
+      "name": "MEMBER",
+      "description": "Standard organization member with read & checkout rights"
+    }
+  ],
+  "plans": [
+    {
+      "id": 1,
+      "name": "Free Trial",
+      "maxUsers": 10,
+      "maxAssets": 100,
+      "monthlyPrice": 0,
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "name": "Pro",
+      "maxUsers": 50,
+      "maxAssets": 5000,
+      "monthlyPrice": 49,
+      "isActive": true
+    },
+    {
+      "id": 3,
+      "name": "Enterprise",
+      "maxUsers": 500,
+      "maxAssets": 50000,
+      "monthlyPrice": 199,
+      "isActive": true
+    }
+  ],
+  "licenseTypes": [
+    {
+      "id": 1,
+      "name": "PERPETUAL",
+      "description": "One-time purchase with indefinite usage rights",
+      "isSeatBased": false,
+      "isExpirable": false
+    },
+    {
+      "id": 2,
+      "name": "SUBSCRIPTION",
+      "description": "Recurring time-bound SaaS or enterprise subscription",
+      "isSeatBased": false,
+      "isExpirable": true
+    },
+    {
+      "id": 3,
+      "name": "SEAT_BASED",
+      "description": "Named-user or floating seat allocation contract",
+      "isSeatBased": true,
+      "isExpirable": true
+    },
+    {
+      "id": 4,
+      "name": "USAGE_BASED",
+      "description": "Metered consumption or API-quota license",
+      "isSeatBased": false,
+      "isExpirable": true
+    },
+    {
+      "id": 5,
+      "name": "OPEN_SOURCE",
+      "description": "Permissive or copyleft open-source software license",
+      "isSeatBased": false,
+      "isExpirable": false
+    }
+  ],
+  "tenants": [
+    {
+      "id": "tenant-acme-corp",
+      "name": "Acme Corporation",
+      "slug": "acme",
+      "contactEmail": "admin@acme.com",
+      "status": "ACTIVE",
+      "planId": 2,
+      "createdAt": "2026-01-15T00:00:00.000Z",
+      "updatedAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "tenant-stark-ind",
+      "name": "Stark Industries",
+      "slug": "stark",
+      "contactEmail": "admin@stark.com",
+      "status": "ACTIVE",
+      "planId": 3,
+      "createdAt": "2026-02-01T00:00:00.000Z",
+      "updatedAt": "2026-02-01T00:00:00.000Z"
+    },
+    {
+      "id": "tenant-techcorp",
+      "name": "TechCorp Dynamics",
+      "slug": "techcorp",
+      "contactEmail": "admin@techcorp.com",
+      "status": "ACTIVE",
+      "planId": 3,
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "tenant-innovatelabs",
+      "name": "InnovateLabs Inc",
+      "slug": "innovatelabs",
+      "contactEmail": "admin@innovatelabs.io",
+      "status": "ACTIVE",
+      "planId": 2,
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "updatedAt": "2026-01-12T00:00:00.000Z"
+    },
+    {
+      "id": "tenant-creativestudio",
+      "name": "CreativeStudio Visuals",
+      "slug": "creativestudio",
+      "contactEmail": "contact@creativestudio.design",
+      "status": "ACTIVE",
+      "planId": 1,
+      "createdAt": "2026-01-14T00:00:00.000Z",
+      "updatedAt": "2026-01-14T00:00:00.000Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "user-super-admin",
+      "email": "superadmin@assetvault.io",
+      "fullName": "Global Super Administrator",
+      "roleId": 1,
+      "tenantId": null,
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Executive",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "user-tenant-admin",
+      "email": "admin@acme.com",
+      "fullName": "Acme Administrator",
+      "roleId": 2,
+      "tenantId": "tenant-acme-corp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "IT Operations",
+      "createdAt": "2026-01-15T00:00:00.000Z",
+      "updatedAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "user-asset-manager",
+      "email": "manager@acme.com",
+      "fullName": "Acme Asset Manager",
+      "roleId": 3,
+      "tenantId": "tenant-acme-corp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Procurement",
+      "createdAt": "2026-01-20T00:00:00.000Z",
+      "updatedAt": "2026-01-20T00:00:00.000Z"
+    },
+    {
+      "id": "user-member",
+      "email": "member@acme.com",
+      "fullName": "Acme Team Member",
+      "roleId": 4,
+      "tenantId": "tenant-acme-corp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Engineering",
+      "createdAt": "2026-02-01T00:00:00.000Z",
+      "updatedAt": "2026-02-01T00:00:00.000Z"
+    },
+    {
+      "id": "user-techcorp-admin",
+      "email": "techcorp.admin@techcorp.io",
+      "fullName": "TechCorp Dynamics Lead Admin",
+      "roleId": 2,
+      "tenantId": "tenant-techcorp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "IT Operations",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-10-28T11:29:05.996Z",
+      "lastLoginAt": "2026-10-28T11:29:05.996Z"
+    },
+    {
+      "id": "user-techcorp-mgr1",
+      "email": "techcorp.mgr1@techcorp.io",
+      "fullName": "TechCorp Dynamics Senior Asset Manager",
+      "roleId": 3,
+      "tenantId": "tenant-techcorp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Procurement",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "user-techcorp-mgr2",
+      "email": "techcorp.mgr2@techcorp.io",
+      "fullName": "TechCorp Dynamics Content Specialist",
+      "roleId": 3,
+      "tenantId": "tenant-techcorp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Operations",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "user-techcorp-dev1",
+      "email": "techcorp.dev1@techcorp.io",
+      "fullName": "TechCorp Dynamics Engineer Alpha",
+      "roleId": 4,
+      "tenantId": "tenant-techcorp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Engineering",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "user-techcorp-dev2",
+      "email": "techcorp.dev2@techcorp.io",
+      "fullName": "TechCorp Dynamics Designer Beta",
+      "roleId": 4,
+      "tenantId": "tenant-techcorp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Design",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "user-innovatelabs-admin",
+      "email": "innovatelabs.admin@innovatelabs.io",
+      "fullName": "InnovateLabs Inc Lead Admin",
+      "roleId": 2,
+      "tenantId": "tenant-innovatelabs",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "IT Operations",
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "updatedAt": "2026-01-12T00:00:00.000Z"
+    },
+    {
+      "id": "user-innovatelabs-mgr1",
+      "email": "innovatelabs.mgr1@innovatelabs.io",
+      "fullName": "InnovateLabs Inc Senior Asset Manager",
+      "roleId": 3,
+      "tenantId": "tenant-innovatelabs",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Procurement",
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "updatedAt": "2026-01-12T00:00:00.000Z"
+    },
+    {
+      "id": "user-innovatelabs-dev1",
+      "email": "innovatelabs.dev1@innovatelabs.io",
+      "fullName": "InnovateLabs Inc Engineer Alpha",
+      "roleId": 4,
+      "tenantId": "tenant-innovatelabs",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Engineering",
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "updatedAt": "2026-01-12T00:00:00.000Z"
+    },
+    {
+      "id": "user-creativestudio-admin",
+      "email": "creativestudio.admin@creativestudio.design",
+      "fullName": "CreativeStudio Visuals Lead Admin",
+      "roleId": 2,
+      "tenantId": "tenant-creativestudio",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Creative Ops",
+      "createdAt": "2026-01-14T00:00:00.000Z",
+      "updatedAt": "2026-01-14T00:00:00.000Z"
+    }
+  ],
+  "vendors": [
+    {
+      "id": "vendor-1",
+      "tenantId": "tenant-acme-corp",
+      "name": "Adobe Systems Inc.",
+      "contactEmail": "enterprise-licensing@adobe.com",
+      "websiteUrl": "https://www.adobe.com",
+      "createdAt": "2026-01-15T00:00:00.000Z",
+      "updatedAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "vendor-2",
+      "tenantId": "tenant-acme-corp",
+      "name": "JetBrains s.r.o.",
+      "contactEmail": "sales@jetbrains.com",
+      "websiteUrl": "https://www.jetbrains.com",
+      "createdAt": "2026-01-15T00:00:00.000Z",
+      "updatedAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "vendor-3",
+      "tenantId": "tenant-acme-corp",
+      "name": "Monotype Imaging Inc.",
+      "contactEmail": "licensing@monotype.com",
+      "websiteUrl": "https://www.monotype.com",
+      "createdAt": "2026-01-15T00:00:00.000Z",
+      "updatedAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "vendor-4",
+      "tenantId": "tenant-acme-corp",
+      "name": "Figma Inc.",
+      "contactEmail": "sales@figma.com",
+      "websiteUrl": "https://www.figma.com",
+      "createdAt": "2026-01-15T00:00:00.000Z",
+      "updatedAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "vendor-techcorp-1",
+      "tenantId": "tenant-techcorp",
+      "name": "Adobe Creative Systems (techcorp)",
+      "contactEmail": "licensing@adobe.com",
+      "website": "https://adobe.com",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "vendor-innovate-1",
+      "tenantId": "tenant-innovatelabs",
+      "name": "JetBrains DevTools (innovatelabs)",
+      "contactEmail": "sales@jetbrains.com",
+      "website": "https://jetbrains.com",
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "updatedAt": "2026-01-12T00:00:00.000Z"
+    }
+  ],
+  "categories": [],
+  "tags": [],
+  "assets": [
+    {
+      "id": "asset-1",
+      "tenantId": "tenant-acme-corp",
+      "name": "IntelliJ IDEA Ultimate",
+      "type": "SOFTWARE",
+      "status": "ACTIVE",
+      "categoryId": "cat-1",
+      "vendorId": "vendor-2",
+      "description": "Premier Java, Kotlin & Fullstack development environment for engineering teams.",
+      "createdAt": "2026-01-16T00:00:00.000Z",
+      "updatedAt": "2026-01-16T00:00:00.000Z"
+    },
+    {
+      "id": "asset-2",
+      "tenantId": "tenant-acme-corp",
+      "name": "Helvetica Neue Pro Complete",
+      "type": "FONT",
+      "status": "ACTIVE",
+      "categoryId": "cat-3",
+      "vendorId": "vendor-3",
+      "description": "Corporate brand typography family across OpenType and WOFF2 formats.",
+      "createdAt": "2026-01-17T00:00:00.000Z",
+      "updatedAt": "2026-01-17T00:00:00.000Z"
+    },
+    {
+      "id": "asset-3",
+      "tenantId": "tenant-acme-corp",
+      "name": "Adobe Creative Cloud Suite",
+      "type": "SOFTWARE",
+      "status": "ACTIVE",
+      "categoryId": "cat-2",
+      "vendorId": "vendor-1",
+      "description": "Full suite including Photoshop, Illustrator, Premiere Pro, and After Effects.",
+      "createdAt": "2026-01-18T00:00:00.000Z",
+      "updatedAt": "2026-01-18T00:00:00.000Z"
+    },
+    {
+      "id": "asset-4",
+      "tenantId": "tenant-acme-corp",
+      "name": "Figma Enterprise Organization",
+      "type": "SOFTWARE",
+      "status": "ACTIVE",
+      "categoryId": "cat-2",
+      "vendorId": "vendor-4",
+      "description": "Collaborative cloud interface design, prototyping and design system maintenance.",
+      "createdAt": "2026-01-19T00:00:00.000Z",
+      "updatedAt": "2026-01-19T00:00:00.000Z"
+    },
+    {
+      "id": "asset-techcorp-1",
+      "tenantId": "tenant-techcorp",
+      "name": "TechCorp Enterprise Cloud Suite",
+      "code": "AST-TC-001",
+      "type": "SOFTWARE",
+      "status": "ACTIVE",
+      "ownerId": "user-techcorp-admin",
+      "vendorId": "vendor-techcorp-1",
+      "description": "TechCorp core cloud software asset.",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "asset-innovate-1",
+      "tenantId": "tenant-innovatelabs",
+      "name": "InnovateLabs IDE Suite",
+      "code": "AST-IL-001",
+      "type": "SOFTWARE",
+      "status": "ACTIVE",
+      "ownerId": "user-innovatelabs-admin",
+      "vendorId": "vendor-innovate-1",
+      "description": "InnovateLabs engineering IDE asset.",
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "updatedAt": "2026-01-12T00:00:00.000Z"
+    }
+  ],
+  "assetVersions": [
+    {
+      "id": "ver-1",
+      "assetId": "asset-1",
+      "versionNumber": "2026.1",
+      "storageUrl": "https://download.jetbrains.com/idea/ideaIU-2026.1.tar.gz",
+      "fileSize": 1048576000,
+      "mimeType": "application/gzip",
+      "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changelog": "Initial 2026 release with JDK 25 support",
+      "createdAt": "2026-01-16T00:00:00.000Z"
+    }
+  ],
+  "licenses": [
+    {
+      "id": "lic-1",
+      "tenantId": "tenant-acme-corp",
+      "assetId": "asset-1",
+      "vendorId": "vendor-2",
+      "licenseKey": "JB-INTEL-2026-ACME-99124",
+      "type": "SEAT_BASED",
+      "status": "ACTIVE",
+      "totalSeats": 35,
+      "allocatedSeats": 2,
+      "cost": 499,
+      "autoRenew": true,
+      "expiresAt": "2027-04-26T11:29:03.414Z",
+      "createdAt": "2026-01-16T00:00:00.000Z",
+      "updatedAt": "2026-01-16T00:00:00.000Z"
+    },
+    {
+      "id": "lic-2",
+      "tenantId": "tenant-acme-corp",
+      "assetId": "asset-2",
+      "vendorId": "vendor-3",
+      "licenseKey": "MONO-HN-CORP-44091",
+      "type": "PERPETUAL",
+      "status": "ACTIVE",
+      "totalSeats": 100,
+      "allocatedSeats": 1,
+      "cost": 1450,
+      "autoRenew": false,
+      "expiresAt": null,
+      "createdAt": "2026-01-17T00:00:00.000Z",
+      "updatedAt": "2026-01-17T00:00:00.000Z"
+    },
+    {
+      "id": "lic-3",
+      "tenantId": "tenant-acme-corp",
+      "assetId": "asset-3",
+      "vendorId": "vendor-1",
+      "licenseKey": "ADBE-CC-ENT-2026-081",
+      "type": "SUBSCRIPTION",
+      "status": "ACTIVE",
+      "totalSeats": 20,
+      "allocatedSeats": 1,
+      "cost": 899,
+      "autoRenew": true,
+      "expiresAt": "2026-12-12T11:29:03.414Z",
+      "createdAt": "2026-01-18T00:00:00.000Z",
+      "updatedAt": "2026-01-18T00:00:00.000Z"
+    },
+    {
+      "id": "lic-4",
+      "tenantId": "tenant-acme-corp",
+      "assetId": "asset-4",
+      "vendorId": "vendor-4",
+      "licenseKey": "FIGMA-ENT-ORGLIC-309",
+      "type": "SEAT_BASED",
+      "status": "ACTIVE",
+      "totalSeats": 25,
+      "allocatedSeats": 2,
+      "cost": 750,
+      "autoRenew": true,
+      "expiresAt": "2027-02-25T11:29:03.414Z",
+      "createdAt": "2026-01-19T00:00:00.000Z",
+      "updatedAt": "2026-01-19T00:00:00.000Z"
+    },
+    {
+      "id": "lic-techcorp-1",
+      "tenantId": "tenant-techcorp",
+      "assetId": "asset-techcorp-1",
+      "vendorId": "vendor-techcorp-1",
+      "licenseTypeId": 3,
+      "name": "TechCorp Enterprise Seat Pack",
+      "licenseKey": "TC-ENT-2026-001",
+      "type": "SEAT_BASED",
+      "status": "ACTIVE",
+      "totalSeats": 50,
+      "allocatedSeats": 1,
+      "cost": 1200,
+      "currency": "USD",
+      "autoRenew": true,
+      "startDate": "2026-01-01T00:00:00.000Z",
+      "endDate": "2027-04-26T11:29:03.414Z",
+      "expiresAt": "2027-04-26T11:29:03.414Z",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "lic-innovate-1",
+      "tenantId": "tenant-innovatelabs",
+      "assetId": "asset-innovate-1",
+      "vendorId": "vendor-innovate-1",
+      "licenseTypeId": 3,
+      "name": "InnovateLabs Seat Pack",
+      "licenseKey": "IL-ENT-2026-001",
+      "type": "SEAT_BASED",
+      "status": "ACTIVE",
+      "totalSeats": 25,
+      "allocatedSeats": 1,
+      "cost": 800,
+      "currency": "USD",
+      "autoRenew": true,
+      "startDate": "2026-01-01T00:00:00.000Z",
+      "endDate": "2027-04-26T11:29:03.414Z",
+      "expiresAt": "2027-04-26T11:29:03.414Z",
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "updatedAt": "2026-01-12T00:00:00.000Z"
+    }
+  ],
+  "allocations": [],
+  "notifications": [],
+  "auditLogs": [],
+  "refreshTokens": [
+    {
+      "id": "f726bf0c-fb79-43e9-8699-3b662a647527",
+      "createdAt": "2026-10-28T11:29:05.548Z",
+      "updatedAt": "2026-10-28T11:29:05.548Z",
+      "revokedAt": null,
+      "userId": "user-techcorp-admin",
+      "tokenHash": "42be9f1f575d5e3c517f8c95f757bdf25d1d514a7aff79492ff766019bae983a",
+      "expiresAt": "2026-11-04T11:29:05.548Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "225f4881-065a-4a60-b1fa-c3e6dbb28a56",
+      "createdAt": "2026-10-28T11:29:05.687Z",
+      "updatedAt": "2026-10-28T11:29:05.701Z",
+      "revokedAt": "2026-10-28T11:29:05.701Z",
+      "userId": "user-techcorp-admin",
+      "tokenHash": "3642ab15e0113366c2eb7f1f22c27b5d450e40905352610b82eb579477ad022b",
+      "expiresAt": "2026-11-04T11:29:05.687Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "7391cd31-3a52-4fbe-b6af-6c88615ecb41",
+      "createdAt": "2026-10-28T11:29:05.702Z",
+      "updatedAt": "2026-10-28T11:29:05.719Z",
+      "revokedAt": "2026-10-28T11:29:05.719Z",
+      "userId": "user-techcorp-admin",
+      "tokenHash": "582fb2f3876c713235cea6bd946fbc6d97fb2ef222b4f5deb866b56ae1756a5c",
+      "expiresAt": "2026-11-04T11:29:05.701Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "974ad26a-67b0-476e-a118-47a659b4650b",
+      "createdAt": "2026-10-28T11:29:05.720Z",
+      "updatedAt": "2026-10-28T11:29:05.730Z",
+      "revokedAt": "2026-10-28T11:29:05.730Z",
+      "userId": "user-techcorp-admin",
+      "tokenHash": "73dd9ccd4a54f7df1527ae808aee83d624d944ac4bbce75e2aa5f8ee9e621806",
+      "expiresAt": "2026-11-04T11:29:05.719Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "92701887-55d0-4922-a900-873a102e53ec",
+      "createdAt": "2026-10-28T11:29:05.731Z",
+      "updatedAt": "2026-10-28T11:29:05.731Z",
+      "revokedAt": null,
+      "userId": "user-techcorp-admin",
+      "tokenHash": "e2abfb4587e59068abb574ff8aea9c6335447bb793687d8e0adbd650d4a5cd63",
+      "expiresAt": "2026-11-04T11:29:05.730Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "8af49e8e-adab-43bb-afce-8810480a6054",
+      "createdAt": "2026-10-28T11:29:05.853Z",
+      "updatedAt": "2026-10-28T11:29:05.867Z",
+      "revokedAt": "2026-10-28T11:29:05.866Z",
+      "userId": "user-techcorp-admin",
+      "tokenHash": "ab2556901661c30a70d0f75a723a884bcf896b292d9ac6d028b02b4a5658d08e",
+      "expiresAt": "2026-11-04T11:29:05.853Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "da5e2a56-5650-4420-9aae-4fe946c83e04",
+      "createdAt": "2026-10-28T11:29:05.868Z",
+      "updatedAt": "2026-10-28T11:29:05.877Z",
+      "revokedAt": "2026-10-28T11:29:05.877Z",
+      "userId": "user-techcorp-admin",
+      "tokenHash": "c5138e18abb1424d21a9d87a235044e4aaab5526559109dd9bb9a2e5063f2421",
+      "expiresAt": "2026-11-04T11:29:05.866Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "b5421901-44bc-4d3d-a6c2-f6f348a3cd3d",
+      "createdAt": "2026-10-28T11:29:05.878Z",
+      "updatedAt": "2026-10-28T11:29:05.878Z",
+      "revokedAt": null,
+      "userId": "user-techcorp-admin",
+      "tokenHash": "8ec1256a5356175b1520e652d200304f13f9eff0eafbef0739f24126ab6003fa",
+      "expiresAt": "2026-11-04T11:29:05.877Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "38b5966f-1059-4d19-99df-2fd445c3ccd2",
+      "createdAt": "2026-10-28T11:29:05.995Z",
+      "updatedAt": "2026-10-28T11:29:06.007Z",
+      "revokedAt": "2026-10-28T11:29:06.007Z",
+      "userId": "user-techcorp-admin",
+      "tokenHash": "b8b9f568c0c4604640703e4c44901846fcf5ba278a217aef9824820c5930552b",
+      "expiresAt": "2026-11-04T11:29:05.995Z",
+      "ipAddress": "127.0.0.1"
+    }
+  ],
+  "assetTags": [],
+  "assetaccesslog": [],
+  "licenserenewal": [],
+  "assetlicense": []
+}

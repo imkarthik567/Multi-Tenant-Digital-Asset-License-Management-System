@@ -52,6 +52,7 @@ export function createInitialState(): MockStoreState {
       id: 'tenant-acme-corp',
       name: 'Acme Corporation',
       slug: 'acme',
+      contactEmail: 'admin@acme.com',
       status: 'ACTIVE',
       planId: 2,
       createdAt: new Date('2026-01-15T00:00:00Z'),
@@ -61,10 +62,41 @@ export function createInitialState(): MockStoreState {
       id: 'tenant-stark-ind',
       name: 'Stark Industries',
       slug: 'stark',
+      contactEmail: 'admin@stark.com',
       status: 'ACTIVE',
       planId: 3,
       createdAt: new Date('2026-02-01T00:00:00Z'),
       updatedAt: new Date('2026-02-01T00:00:00Z'),
+    },
+    {
+      id: 'tenant-techcorp',
+      name: 'TechCorp Dynamics',
+      slug: 'techcorp',
+      contactEmail: 'admin@techcorp.com',
+      status: 'ACTIVE',
+      planId: 3,
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'tenant-innovatelabs',
+      name: 'InnovateLabs Inc',
+      slug: 'innovatelabs',
+      contactEmail: 'admin@innovatelabs.io',
+      status: 'ACTIVE',
+      planId: 2,
+      createdAt: new Date('2026-01-12T00:00:00Z'),
+      updatedAt: new Date('2026-01-12T00:00:00Z'),
+    },
+    {
+      id: 'tenant-creativestudio',
+      name: 'CreativeStudio Visuals',
+      slug: 'creativestudio',
+      contactEmail: 'contact@creativestudio.design',
+      status: 'ACTIVE',
+      planId: 1,
+      createdAt: new Date('2026-01-14T00:00:00Z'),
+      updatedAt: new Date('2026-01-14T00:00:00Z'),
     },
   ];
 
@@ -117,6 +149,117 @@ export function createInitialState(): MockStoreState {
       createdAt: new Date('2026-02-01T00:00:00Z'),
       updatedAt: new Date('2026-02-01T00:00:00Z'),
     },
+    // TechCorp Dynamics users
+    {
+      id: 'user-techcorp-admin',
+      email: 'techcorp.admin@techcorp.io',
+      fullName: 'TechCorp Dynamics Lead Admin',
+      roleId: 2,
+      tenantId: 'tenant-techcorp',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'IT Operations',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'user-techcorp-mgr1',
+      email: 'techcorp.mgr1@techcorp.io',
+      fullName: 'TechCorp Dynamics Senior Asset Manager',
+      roleId: 3,
+      tenantId: 'tenant-techcorp',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Procurement',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'user-techcorp-mgr2',
+      email: 'techcorp.mgr2@techcorp.io',
+      fullName: 'TechCorp Dynamics Content Specialist',
+      roleId: 3,
+      tenantId: 'tenant-techcorp',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Operations',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'user-techcorp-dev1',
+      email: 'techcorp.dev1@techcorp.io',
+      fullName: 'TechCorp Dynamics Engineer Alpha',
+      roleId: 4,
+      tenantId: 'tenant-techcorp',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Engineering',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'user-techcorp-dev2',
+      email: 'techcorp.dev2@techcorp.io',
+      fullName: 'TechCorp Dynamics Designer Beta',
+      roleId: 4,
+      tenantId: 'tenant-techcorp',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Design',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    // InnovateLabs users
+    {
+      id: 'user-innovatelabs-admin',
+      email: 'innovatelabs.admin@innovatelabs.io',
+      fullName: 'InnovateLabs Inc Lead Admin',
+      roleId: 2,
+      tenantId: 'tenant-innovatelabs',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'IT Operations',
+      createdAt: new Date('2026-01-12T00:00:00Z'),
+      updatedAt: new Date('2026-01-12T00:00:00Z'),
+    },
+    {
+      id: 'user-innovatelabs-mgr1',
+      email: 'innovatelabs.mgr1@innovatelabs.io',
+      fullName: 'InnovateLabs Inc Senior Asset Manager',
+      roleId: 3,
+      tenantId: 'tenant-innovatelabs',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Procurement',
+      createdAt: new Date('2026-01-12T00:00:00Z'),
+      updatedAt: new Date('2026-01-12T00:00:00Z'),
+    },
+    {
+      id: 'user-innovatelabs-dev1',
+      email: 'innovatelabs.dev1@innovatelabs.io',
+      fullName: 'InnovateLabs Inc Engineer Alpha',
+      roleId: 4,
+      tenantId: 'tenant-innovatelabs',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Engineering',
+      createdAt: new Date('2026-01-12T00:00:00Z'),
+      updatedAt: new Date('2026-01-12T00:00:00Z'),
+    },
+    // CreativeStudio users
+    {
+      id: 'user-creativestudio-admin',
+      email: 'creativestudio.admin@creativestudio.design',
+      fullName: 'CreativeStudio Visuals Lead Admin',
+      roleId: 2,
+      tenantId: 'tenant-creativestudio',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Creative Ops',
+      createdAt: new Date('2026-01-14T00:00:00Z'),
+      updatedAt: new Date('2026-01-14T00:00:00Z'),
+    },
   ];
 
   const vendors = [
@@ -155,6 +298,24 @@ export function createInitialState(): MockStoreState {
       websiteUrl: 'https://www.figma.com',
       createdAt: new Date('2026-01-15T00:00:00Z'),
       updatedAt: new Date('2026-01-15T00:00:00Z'),
+    },
+    {
+      id: 'vendor-techcorp-1',
+      tenantId: 'tenant-techcorp',
+      name: 'Adobe Creative Systems (techcorp)',
+      contactEmail: 'licensing@adobe.com',
+      website: 'https://adobe.com',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'vendor-innovate-1',
+      tenantId: 'tenant-innovatelabs',
+      name: 'JetBrains DevTools (innovatelabs)',
+      contactEmail: 'sales@jetbrains.com',
+      website: 'https://jetbrains.com',
+      createdAt: new Date('2026-01-12T00:00:00Z'),
+      updatedAt: new Date('2026-01-12T00:00:00Z'),
     },
   ];
 
@@ -264,6 +425,32 @@ export function createInitialState(): MockStoreState {
       createdAt: new Date('2026-01-19T00:00:00Z'),
       updatedAt: new Date('2026-01-19T00:00:00Z'),
     },
+    {
+      id: 'asset-techcorp-1',
+      tenantId: 'tenant-techcorp',
+      name: 'TechCorp Enterprise Cloud Suite',
+      code: 'AST-TC-001',
+      type: 'SOFTWARE',
+      status: 'ACTIVE',
+      ownerId: 'user-techcorp-admin',
+      vendorId: 'vendor-techcorp-1',
+      description: 'TechCorp core cloud software asset.',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'asset-innovate-1',
+      tenantId: 'tenant-innovatelabs',
+      name: 'InnovateLabs IDE Suite',
+      code: 'AST-IL-001',
+      type: 'SOFTWARE',
+      status: 'ACTIVE',
+      ownerId: 'user-innovatelabs-admin',
+      vendorId: 'vendor-innovate-1',
+      description: 'InnovateLabs engineering IDE asset.',
+      createdAt: new Date('2026-01-12T00:00:00Z'),
+      updatedAt: new Date('2026-01-12T00:00:00Z'),
+    },
   ];
 
   const assetVersions = [
@@ -344,6 +531,48 @@ export function createInitialState(): MockStoreState {
       expiresAt: new Date(Date.now() + 120 * 24 * 3600 * 1000),
       createdAt: new Date('2026-01-19T00:00:00Z'),
       updatedAt: new Date('2026-01-19T00:00:00Z'),
+    },
+    {
+      id: 'lic-techcorp-1',
+      tenantId: 'tenant-techcorp',
+      assetId: 'asset-techcorp-1',
+      vendorId: 'vendor-techcorp-1',
+      licenseTypeId: 3,
+      name: 'TechCorp Enterprise Seat Pack',
+      licenseKey: 'TC-ENT-2026-001',
+      type: 'SEAT_BASED',
+      status: 'ACTIVE',
+      totalSeats: 50,
+      allocatedSeats: 1,
+      cost: 1200.0,
+      currency: 'USD',
+      autoRenew: true,
+      startDate: new Date('2026-01-01T00:00:00Z'),
+      endDate: new Date(Date.now() + 180 * 24 * 3600 * 1000),
+      expiresAt: new Date(Date.now() + 180 * 24 * 3600 * 1000),
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'lic-innovate-1',
+      tenantId: 'tenant-innovatelabs',
+      assetId: 'asset-innovate-1',
+      vendorId: 'vendor-innovate-1',
+      licenseTypeId: 3,
+      name: 'InnovateLabs Seat Pack',
+      licenseKey: 'IL-ENT-2026-001',
+      type: 'SEAT_BASED',
+      status: 'ACTIVE',
+      totalSeats: 25,
+      allocatedSeats: 1,
+      cost: 800.0,
+      currency: 'USD',
+      autoRenew: true,
+      startDate: new Date('2026-01-01T00:00:00Z'),
+      endDate: new Date(Date.now() + 180 * 24 * 3600 * 1000),
+      expiresAt: new Date(Date.now() + 180 * 24 * 3600 * 1000),
+      createdAt: new Date('2026-01-12T00:00:00Z'),
+      updatedAt: new Date('2026-01-12T00:00:00Z'),
     },
   ];
 
@@ -459,12 +688,23 @@ export class MockPrismaStore {
         const raw = fs.readFileSync(this.persistPath, 'utf-8');
         const parsed = JSON.parse(raw);
         if (parsed && Array.isArray(parsed.users) && Array.isArray(parsed.tenants)) {
+          const mergeById = (baseArr: any[], savedArr: any[]) => {
+            const map = new Map<string, any>();
+            for (const item of baseArr) map.set(String(item.id), item);
+            for (const item of savedArr) map.set(String(item.id), item);
+            return Array.from(map.values());
+          };
           return {
             ...initial,
             ...parsed,
             roles: initial.roles,
             plans: initial.plans,
             licenseTypes: initial.licenseTypes,
+            tenants: mergeById(initial.tenants, parsed.tenants),
+            users: mergeById(initial.users, parsed.users),
+            vendors: mergeById(initial.vendors, parsed.vendors || []),
+            assets: mergeById(initial.assets, parsed.assets || []),
+            licenses: mergeById(initial.licenses, parsed.licenses || []),
           };
         }
       }
@@ -573,6 +813,14 @@ export class MockPrismaStore {
           const itemVal = String(item[key] || '').toLowerCase();
           const search = String(valObj.contains || '').toLowerCase();
           if (!itemVal.includes(search)) return false;
+        } else if ('startsWith' in valObj) {
+          const itemVal = String(item[key] || '').toLowerCase();
+          const search = String(valObj.startsWith || '').toLowerCase();
+          if (!itemVal.startsWith(search)) return false;
+        } else if ('endsWith' in valObj) {
+          const itemVal = String(item[key] || '').toLowerCase();
+          const search = String(valObj.endsWith || '').toLowerCase();
+          if (!itemVal.endsWith(search)) return false;
         } else if ('gte' in valObj) {
           const a = item[key] instanceof Date || typeof item[key] === 'string' ? new Date(item[key]).getTime() : item[key];
           const b = valObj.gte instanceof Date || typeof valObj.gte === 'string' ? new Date(valObj.gte).getTime() : valObj.gte;
@@ -638,6 +886,10 @@ export class MockPrismaStore {
       cloned.createdAt = item.createdAt ? new Date(item.createdAt) : new Date();
     } else if (lowerModel === 'tenant') {
       cloned.plan = this.state.plans.find((p) => p.id === item.planId) || this.state.plans[0] || null;
+      cloned.users = this.state.users.filter((u) => u.tenantId === item.id);
+      cloned.vendors = this.state.vendors.filter((v) => v.tenantId === item.id);
+      cloned.assets = this.state.assets.filter((a) => a.tenantId === item.id);
+      cloned.licenses = this.state.licenses.filter((l) => l.tenantId === item.id);
     } else if (lowerModel === 'asset') {
       cloned.vendor = this.state.vendors.find((v) => v.id === item.vendorId) || null;
       cloned.category = this.state.categories.find((c) => c.id === item.categoryId) || null;

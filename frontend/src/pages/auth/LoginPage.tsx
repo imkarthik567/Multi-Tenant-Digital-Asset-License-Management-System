@@ -77,6 +77,7 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -85,6 +86,19 @@ export const LoginPage: React.FC = () => {
       password: '',
     },
   });
+
+  const demoPersonas = [
+    { label: 'Super Admin', email: 'superadmin@assetvault.io', password: 'Password123!' },
+    { label: 'Tenant Admin', email: 'admin@acme.com', password: 'Password123!' },
+    { label: 'Asset Manager', email: 'manager@acme.com', password: 'Password123!' },
+    { label: 'Member (Dev)', email: 'member@acme.com', password: 'Password123!' },
+  ];
+
+  const handleSelectPersona = (email: string, password: string) => {
+    setValue('email', email, { shouldValidate: true });
+    setValue('password', password, { shouldValidate: true });
+    setServerError(null);
+  };
 
   const onSubmit = async (data: LoginFormData) => {
     try {
@@ -204,6 +218,25 @@ export const LoginPage: React.FC = () => {
               Sign In to AssetVault
             </Button>
           </form>
+
+          {/* Quick Demo Personas */}
+          <div className="pt-2 border-t border-slate-800/80 space-y-2">
+            <p className="text-[11px] font-semibold text-slate-400">
+              Quick Demo Personas:
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {demoPersonas.map((persona) => (
+                <button
+                  key={persona.label}
+                  type="button"
+                  onClick={() => handleSelectPersona(persona.email, persona.password)}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-950/70 hover:bg-indigo-950/50 border border-slate-800 hover:border-indigo-500/40 text-[11px] font-medium text-slate-300 hover:text-indigo-200 transition-colors text-left truncate cursor-pointer"
+                >
+                  {persona.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Feature Flagged: Google OAuth Button */}
           {showGoogleOAuth && (

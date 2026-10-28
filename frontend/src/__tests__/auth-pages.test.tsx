@@ -124,6 +124,15 @@ describe('Auth Pages Modern Split-Layout Test Suite', () => {
       expect(html).toContain('lucide-lock');
     });
 
+    it('renders quick demo personas selection for testing', () => {
+      const html = renderWithRouter(<LoginPage />);
+      expect(html).toContain('Quick Demo Personas:');
+      expect(html).toContain('Super Admin');
+      expect(html).toContain('Tenant Admin');
+      expect(html).toContain('Asset Manager');
+      expect(html).toContain('Member (Dev)');
+    });
+
     it('hides Google OAuth button when feature flag GOOGLE_CLIENT_ID is not set', () => {
       delete (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID;
       delete (import.meta as any).env?.GOOGLE_CLIENT_ID;

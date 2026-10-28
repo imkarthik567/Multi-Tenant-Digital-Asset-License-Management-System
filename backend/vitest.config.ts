@@ -14,7 +14,7 @@ export default defineConfig({
         process.env.DATABASE_URL ||
         'postgresql://assetvault_app:app_password@localhost:5432/assetvault_db?schema=public',
       // Provide deterministic secrets so env validation (backend/src/config/env.ts) passes under test
-      NODE_ENV: process.env.NODE_ENV || 'test',
+      NODE_ENV: 'test',
       JWT_ACCESS_SECRET:
         process.env.JWT_ACCESS_SECRET || 'test_jwt_access_secret_at_least_32_chars_long',
       JWT_REFRESH_SECRET:

@@ -17,8 +17,15 @@ import { createMockPrismaClient } from './mockStore';
 
 export const mockFallbackClient = createMockPrismaClient();
 
+const isRemotePostgresUrl = Boolean(
+  process.env.DATABASE_URL &&
+    !process.env.DATABASE_URL.includes('localhost:5432') &&
+    !process.env.DATABASE_URL.includes('127.0.0.1:5432') &&
+    !process.env.DATABASE_URL.includes('postgres:5432')
+);
+
 let basePrisma: PrismaClient;
-if (process.env.ENABLE_DIRECT_POSTGRES === 'true') {
+if (process.env.ENABLE_DIRECT_POSTGRES === 'true' || isRemotePostgresUrl) {
   try {
     basePrisma =
       global.__prisma ||
