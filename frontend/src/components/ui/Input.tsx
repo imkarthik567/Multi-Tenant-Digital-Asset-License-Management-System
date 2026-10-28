@@ -1,9 +1,10 @@
 // ==============================================================================
 // AssetVault Design System: Input Component
-// Label, helper text, error state, left icon slot & right action slot
+// Label, helper text, error state, left icon slot, right action slot & password toggle
 // ==============================================================================
 
-import React, { forwardRef, useId } from 'react';
+import React, { forwardRef, useId, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -14,6 +15,7 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   iconRight?: React.ReactNode;
   rightAction?: React.ReactNode;
   inputSize?: 'sm' | 'md' | 'lg';
+  showPasswordToggle?: boolean;
 }
 
 const sizeStyles = {
@@ -34,7 +36,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       iconRight,
       rightAction,
       inputSize = 'md',
+      showPasswordToggle,
       disabled,
+      type,
       ...props
     },
     ref
@@ -42,7 +46,36 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const generatedId = useId();
     const inputId = id || generatedId;
     const hasError = Boolean(error);
-    const rightSlot = rightAction || iconRight;
+
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+    const isPasswordField = type === 'password';
+    const canTogglePassword = isPasswordField && (showPasswordToggle ?? true);
+
+    const effectiveType = canTogglePassword
+      ? isPasswordVisible
+        ? 'text'
+        : 'password'
+      : type;
+
+    const passwordToggleNode =
+      canTogglePassword && !rightAction && !iconRight ? (
+        <button
+          type="button"
+          onClick={() => setIsPasswordVisible((prev) => !prev)}
+          className="p-1 -mr-1 text-[var(--av-color-text-muted,#64748b)] hover:text-[var(--av-color-text-primary,#f8fafc)] focus:outline-none focus:text-[var(--av-color-primary,#6366f1)] rounded-md transition-colors"
+          title={isPasswordVisible ? 'Hide password' : 'Show password'}
+          aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+          tabIndex={-1}
+        >
+          {isPasswordVisible ? (
+            <EyeOff className="w-4 h-4" />
+          ) : (
+            <Eye className="w-4 h-4" />
+          )}
+        </button>
+      ) : null;
+
+    const rightSlot = rightAction || iconRight || passwordToggleNode;
 
     return (
       <div className="w-full flex flex-col gap-1.5">
@@ -86,6 +119,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               rightSlot ? 'pr-10' : '',
               className
             )}
+            type={effectiveType}
             {...props}
           />
 

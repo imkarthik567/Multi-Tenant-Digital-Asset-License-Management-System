@@ -20,13 +20,13 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--av-color-primary,#6366f1)] hover:bg-[var(--av-color-primary-hover,#4f46e5)] text-white shadow-sm hover:shadow active:scale-[0.98]',
+    'bg-[var(--av-color-primary,#6366f1)] hover:bg-[var(--av-color-primary-hover,#4f46e5)] text-white font-medium shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/30 active:scale-[0.98]',
   secondary:
-    'bg-[var(--av-color-card,#0f172a)] hover:bg-[var(--av-color-card-hover,#1e293b)] text-[var(--av-color-text-primary,#f8fafc)] border border-[var(--av-color-border,#1e293b)] hover:border-[var(--av-color-border-subtle,#334155)] shadow-sm active:scale-[0.98]',
+    'bg-[var(--av-color-card,#0f172a)] hover:bg-[var(--av-color-card-hover,#1e293b)] text-[var(--av-color-text-primary,#f8fafc)] border border-[var(--av-color-border,#1e293b)] hover:border-indigo-500/40 shadow-sm active:scale-[0.98]',
   ghost:
-    'bg-transparent hover:bg-slate-800/50 text-[var(--av-color-text-secondary,#94a3b8)] hover:text-[var(--av-color-text-primary,#f8fafc)] active:scale-[0.98]',
+    'bg-transparent hover:bg-white/[0.06] text-[var(--av-color-text-secondary,#94a3b8)] hover:text-[var(--av-color-text-primary,#f8fafc)] active:scale-[0.98]',
   danger:
-    'bg-[var(--av-color-danger,#f43f5e)] hover:bg-[var(--av-color-danger-hover,#e11d48)] text-white shadow-sm hover:shadow active:scale-[0.98]',
+    'bg-[var(--av-color-danger,#f43f5e)] hover:bg-[var(--av-color-danger-hover,#e11d48)] text-white font-medium shadow-md shadow-rose-500/20 active:scale-[0.98]',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

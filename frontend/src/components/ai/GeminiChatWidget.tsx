@@ -256,11 +256,11 @@ export const GeminiChatWidget: React.FC = () => {
           type="button"
           onClick={() => setIsOpen(true)}
           aria-label="Open Gemini AI Chatbot"
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-xs shadow-xl shadow-indigo-600/30 border border-indigo-400/30 transition-all duration-200 cursor-pointer group"
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-gradient-to-r from-[#4f46e5] to-[#3730a3] hover:from-[#6366f1] hover:to-[#4f46e5] text-white font-semibold text-xs shadow-2xl shadow-indigo-600/30 border border-indigo-400/30 transition-all duration-200 cursor-pointer group"
         >
-          <span className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-white/15">
-            <Sparkles className="w-4 h-4 text-indigo-100 group-hover:rotate-12 transition-transform" />
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-indigo-600" />
+          <span className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-white/10">
+            <Sparkles className="w-4 h-4 text-cyan-300 group-hover:rotate-12 transition-transform" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-[#3730a3]" />
           </span>
           <span>Gemini Copilot</span>
         </button>
@@ -269,16 +269,16 @@ export const GeminiChatWidget: React.FC = () => {
       {/* Multi-Turn Chat Window */}
       {isOpen && (
         <div
-          className={`fixed z-50 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl overflow-hidden transition-all duration-200 ${
+          className={`fixed z-50 flex flex-col bg-[#0b1120] border border-slate-800 shadow-2xl rounded-2xl overflow-hidden transition-all duration-200 ${
             isExpanded
               ? 'inset-4 sm:inset-8 lg:inset-12'
               : 'bottom-5 right-5 w-[calc(100vw-2.5rem)] sm:w-[440px] h-[620px] max-h-[calc(100vh-3rem)]'
           }`}
         >
           {/* Header Bar */}
-          <div className="px-4 py-3 bg-slate-950 text-white border-b border-slate-800 flex items-center justify-between gap-2 shrink-0">
+          <div className="px-4 py-3 bg-[#030712] text-white border-b border-slate-800 flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-indigo-950/60 border border-indigo-800/50 flex items-center justify-center text-indigo-400 shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -286,7 +286,7 @@ export const GeminiChatWidget: React.FC = () => {
                   <h3 className="text-xs font-bold tracking-tight text-white truncate">
                     AssetVault Gemini Chat
                   </h3>
-                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded">
+                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-950 text-indigo-300 border border-indigo-800/50 rounded">
                     Multi-Turn
                   </span>
                 </div>
@@ -432,10 +432,10 @@ export const GeminiChatWidget: React.FC = () => {
                     key={idx}
                     type="button"
                     onClick={() => handleSendMessage(prompt)}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-500/40 transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs bg-[#0b1120] hover:bg-[#131c31] text-slate-200 border border-slate-800 hover:border-indigo-500/40 transition-colors flex items-center justify-between gap-2 cursor-pointer"
                   >
                     <span className="truncate">{prompt}</span>
-                    <Zap className="w-3 h-3 text-indigo-400 shrink-0" />
+                    <Zap className="w-3 h-3 text-cyan-400 shrink-0" />
                   </button>
                 ))}
               </div>
@@ -450,22 +450,22 @@ export const GeminiChatWidget: React.FC = () => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="p-3 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0"
+            className="p-3 bg-[#030712] border-t border-slate-800 flex items-center gap-2 shrink-0"
           >
-            <MessageSquare className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
+            <MessageSquare className="w-4 h-4 text-slate-500 shrink-0 ml-1" />
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={`Ask ${currentPersonaObj.shortLabel}...`}
               disabled={isSending}
-              className="flex-1 bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+              className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
             />
             <button
               type="submit"
               disabled={!input.trim() || isSending}
               aria-label="Send message"
-              className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition-colors cursor-pointer shrink-0"
+              className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 text-white transition-colors cursor-pointer shrink-0"
             >
               <Send className="w-3.5 h-3.5" />
             </button>

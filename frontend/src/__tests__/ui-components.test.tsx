@@ -165,6 +165,15 @@ describe('AssetVault Base UI Components Suite', () => {
       expect(html).toContain('pl-9');
       expect(html).toContain('pr-10');
     });
+
+    it('renders password hide and see toggle button when type is password', () => {
+      const html = renderToStaticMarkup(
+        <Input type="password" placeholder="••••••••••••" />
+      );
+      expect(html).toContain('type="password"');
+      expect(html).toContain('aria-label="Show password"');
+      expect(html).toContain('title="Show password"');
+    });
   });
 
   describe('5. Select Component', () => {

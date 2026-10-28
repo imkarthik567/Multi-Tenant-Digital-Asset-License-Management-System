@@ -146,23 +146,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
   };
 
   return (
-    <header className="h-14 px-3 sm:px-6 backdrop-blur-md bg-white/80 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 sticky top-0 z-30 transition-colors">
+    <header className="h-14 px-3 sm:px-6 backdrop-blur-md bg-[#030712]/85 border-b border-slate-800/80 flex items-center justify-between gap-3 sticky top-0 z-30 transition-colors">
       {/* Left: Mobile Drawer Trigger & Breadcrumb Trail */}
       <div className="flex items-center gap-2.5 min-w-0">
         <button
           type="button"
           onClick={onMobileMenuToggle}
-          className="lg:hidden p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg transition-colors cursor-pointer"
+          className="lg:hidden p-1.5 text-slate-400 hover:bg-white/[0.06] rounded-lg transition-colors cursor-pointer"
           aria-label="Toggle navigation drawer"
         >
           <Menu className="w-5 h-5" />
         </button>
 
         {/* Breadcrumb Trail */}
-        <nav aria-label="Breadcrumbs" className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 min-w-0">
+        <nav aria-label="Breadcrumbs" className="flex items-center gap-1.5 text-xs text-slate-400 min-w-0">
           <Link
             to="/"
-            className="flex items-center hover:text-slate-900 dark:hover:text-slate-100 transition-colors shrink-0"
+            className="flex items-center hover:text-white transition-colors shrink-0"
             title="Home"
           >
             <Home className="w-3.5 h-3.5" />
@@ -175,15 +175,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
 
             return (
               <React.Fragment key={crumb.path}>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-600 shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                 {isLast ? (
-                  <span className="font-semibold text-slate-900 dark:text-slate-100 truncate max-w-[140px] sm:max-w-[200px]">
+                  <span className="font-semibold text-slate-100 truncate max-w-[140px] sm:max-w-[200px]">
                     {crumb.label}
                   </span>
                 ) : (
                   <Link
                     to={crumb.path}
-                    className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors truncate max-w-[100px] sm:max-w-[160px]"
+                    className="hover:text-slate-200 transition-colors truncate max-w-[100px] sm:max-w-[160px]"
                   >
                     {crumb.label}
                   </Link>
@@ -200,12 +200,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
         <button
           type="button"
           onClick={() => setIsSearchOpen(true)}
-          className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/90 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-800 transition-all cursor-pointer shadow-xs"
+          className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-400 bg-[#0b1120] hover:bg-[#131c31] hover:text-slate-200 rounded-lg border border-slate-800 hover:border-indigo-500/40 transition-all cursor-pointer shadow-xs"
           aria-label="Open global search (Cmd+K)"
         >
-          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <Search className="w-3.5 h-3.5 text-slate-500 shrink-0" />
           <span className="hidden md:inline truncate text-[11px] font-medium">Search workspace...</span>
-          <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded shadow-xs">
+          <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-[#030712] text-slate-400 border border-slate-800 rounded shadow-xs">
             ⌘K
           </kbd>
         </button>
@@ -215,9 +215,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('assetvault:toggle-ai-chat'))}
           aria-label="Toggle Gemini AI Chatbot"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800/70 rounded-lg transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-indigo-200 bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-800/50 rounded-lg transition-colors cursor-pointer shadow-sm shadow-indigo-500/10"
         >
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
           <span className="hidden sm:inline text-[11px]">AI Chat</span>
         </button>
 
@@ -226,7 +226,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           type="button"
           onClick={toggleTheme}
           aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg transition-colors cursor-pointer"
+          className="p-2 text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors cursor-pointer"
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
@@ -236,11 +236,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           type="button"
           onClick={() => setIsNotifPanelOpen(true)}
           aria-label="Notifications"
-          className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg transition-colors relative cursor-pointer"
+          className="p-2 text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors relative cursor-pointer"
         >
           <Bell className="w-4 h-4" />
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-950 animate-pulse" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-[#030712] animate-pulse" />
           )}
         </button>
 
@@ -249,7 +249,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           <button
             type="button"
             onClick={() => setIsUserMenuOpen((prev) => !prev)}
-            className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
+            className="flex items-center gap-2 p-1 rounded-lg hover:bg-[#131c31] transition-colors cursor-pointer"
             aria-label="User profile menu"
           >
             <Avatar
@@ -259,7 +259,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
               isOnline={true}
             />
             <div className="hidden sm:block text-left text-xs leading-tight">
-              <span className="font-semibold text-slate-800 dark:text-slate-200 block truncate max-w-[120px]">
+              <span className="font-semibold text-white block truncate max-w-[120px]">
                 {user?.fullName}
               </span>
               <span className="text-[10px] text-slate-400 uppercase font-medium">
@@ -270,9 +270,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
           </button>
 
           {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl py-1.5 z-50 animate-fade-in text-xs divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="absolute right-0 mt-2 w-56 bg-[#0b1120] border border-slate-800 rounded-xl shadow-2xl py-1.5 z-50 animate-fade-in text-xs divide-y divide-slate-800">
               <div className="p-3">
-                <p className="font-bold text-slate-900 dark:text-slate-100 truncate">
+                <p className="font-bold text-white truncate">
                   {user?.fullName}
                 </p>
                 <p className="text-slate-400 truncate mt-0.5">{user?.email}</p>
@@ -285,18 +285,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
                 <Link
                   to="/settings"
                   onClick={() => setIsUserMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2 text-slate-300 hover:bg-[#131c31] hover:text-white transition-colors"
                 >
-                  <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                  <UserIcon className="w-3.5 h-3.5 text-indigo-400" />
                   <span>Profile & Password</span>
                 </Link>
                 {userRole === 'TENANT_ADMIN' && (
                   <Link
                     to="/settings"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="flex items-center gap-2.5 px-3 py-2 text-slate-300 hover:bg-[#131c31] hover:text-white transition-colors"
                   >
-                    <Settings className="w-3.5 h-3.5 text-slate-400" />
+                    <Settings className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Organization Settings</span>
                   </Link>
                 )}
@@ -304,9 +304,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
                   <Link
                     to="/platform/tenants"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="flex items-center gap-2.5 px-3 py-2 text-slate-300 hover:bg-[#131c31] hover:text-white transition-colors"
                   >
-                    <Shield className="w-3.5 h-3.5 text-slate-400" />
+                    <Shield className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Platform Admin</span>
                   </Link>
                 )}
@@ -316,7 +316,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors font-medium cursor-pointer"
+                  className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-slate-300 hover:text-rose-300 hover:bg-rose-950/30 transition-colors font-medium cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Log out</span>

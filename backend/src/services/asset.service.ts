@@ -217,7 +217,7 @@ export class AssetService {
       to: toVer,
       comparison: {
         versionDelta: toVer.versionNo - fromVer.versionNo,
-        sizeDeltaBytes: Number(toVer.fileSizeBytes - fromVer.fileSizeBytes),
+        sizeDeltaBytes: Number(toVer.fileSizeBytes) - Number(fromVer.fileSizeBytes),
         checksumIdentical: toVer.checksumSha256 === fromVer.checksumSha256,
         changeNotes: toVer.changeNotes,
       },

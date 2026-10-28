@@ -526,12 +526,12 @@ export const DashboardPage: React.FC = () => {
 
   const gaugeColor =
     complianceScore >= 90
-      ? '#10b981' // Emerald
+      ? '#10b981' // Vibrant Emerald
       : complianceScore >= 75
-      ? '#6366f1' // Indigo
+      ? '#6366f1' // Royal Indigo
       : complianceScore >= 60
-      ? '#f59e0b' // Amber
-      : '#f43f5e'; // Rose
+      ? '#f59e0b' // Amber Warning
+      : '#f43f5e'; // Rose Critical
 
   const gradeBadgeVariant =
     complianceScore >= 90
@@ -614,13 +614,13 @@ export const DashboardPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* KPI 1: Total Assets */}
-          <Card hoverElevation className="p-5 flex flex-col justify-between">
+          <Card hoverElevation className="p-5 flex flex-col justify-between bg-[#0b1120]/90 backdrop-blur-xl border border-slate-800">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Total Assets
                 </span>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 shadow-sm">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 shadow-sm shadow-indigo-500/10">
                   <Package className="w-5 h-5" />
                 </div>
               </div>
@@ -628,26 +628,26 @@ export const DashboardPage: React.FC = () => {
                 <div className="text-2xl font-black text-slate-100 tracking-tight">
                   {stats.asset_count.toLocaleString()}
                 </div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
-                  <TrendingUp className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-indigo-950/50 text-indigo-300 border border-indigo-500/30">
+                  <TrendingUp className="w-3 h-3 text-indigo-400" />
                   +12.4%
                 </span>
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between">
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">Tracked in vault</span>
               <Sparkline data={assetSparkline} color="#6366f1" id="assets" />
             </div>
           </Card>
 
           {/* KPI 2: Active Licenses */}
-          <Card hoverElevation className="p-5 flex flex-col justify-between">
+          <Card hoverElevation className="p-5 flex flex-col justify-between bg-[#0b1120]/90 backdrop-blur-xl border border-slate-800">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Active Licenses
                 </span>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 shadow-sm">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 shadow-sm shadow-cyan-500/10">
                   <KeyRound className="w-5 h-5" />
                 </div>
               </div>
@@ -655,26 +655,26 @@ export const DashboardPage: React.FC = () => {
                 <div className="text-2xl font-black text-slate-100 tracking-tight">
                   {stats.license_count.toLocaleString()}
                 </div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
-                  <TrendingUp className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-cyan-950/50 text-cyan-300 border border-cyan-500/30">
+                  <TrendingUp className="w-3 h-3 text-cyan-400" />
                   +8.5%
                 </span>
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between">
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">Supplier contracts</span>
-              <Sparkline data={licenseSparkline} color="#10b981" id="licenses" />
+              <Sparkline data={licenseSparkline} color="#06b6d4" id="licenses" />
             </div>
           </Card>
 
           {/* KPI 3: Seats Used */}
-          <Card hoverElevation className="p-5 flex flex-col justify-between">
+          <Card hoverElevation className="p-5 flex flex-col justify-between bg-[#0b1120]/90 backdrop-blur-xl border border-slate-800">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Seats Used
                 </span>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-sky-950/60 border border-sky-800/40 text-sky-400 shadow-sm">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 shadow-sm shadow-emerald-500/10">
                   <Users className="w-5 h-5" />
                 </div>
               </div>
@@ -683,32 +683,25 @@ export const DashboardPage: React.FC = () => {
                   {stats.active_allocated_seats}{' '}
                   <span className="text-sm font-normal text-slate-400">/ {stats.total_contracted_seats}</span>
                 </div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-950/60 text-sky-400 border border-sky-800/40">
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-950/50 text-emerald-300 border border-emerald-500/30">
                   {capacityPct}% cap
                 </span>
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between">
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">Active allocations</span>
-              <Sparkline data={seatsSparkline} color="#0ea5e9" id="seats" />
+              <Sparkline data={seatsSparkline} color="#10b981" id="seats" />
             </div>
           </Card>
 
           {/* KPI 4: Expiring in 30d */}
-          <Card hoverElevation className="p-5 flex flex-col justify-between">
+          <Card hoverElevation className="p-5 flex flex-col justify-between bg-[#0b1120]/90 backdrop-blur-xl border border-slate-800">
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Expiring in 30d
                 </span>
-                <div
-                  className={cn(
-                    'w-9 h-9 rounded-xl flex items-center justify-center border shadow-sm',
-                    stats.expiring_licenses_30d > 0
-                      ? 'bg-rose-950/60 border-rose-800/40 text-rose-400'
-                      : 'bg-emerald-950/60 border-emerald-800/40 text-emerald-400'
-                  )}
-                >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-amber-950/60 border border-amber-800/40 text-amber-400 shadow-sm shadow-amber-500/10">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
               </div>
@@ -717,22 +710,22 @@ export const DashboardPage: React.FC = () => {
                   {stats.expiring_licenses_30d}
                 </div>
                 {stats.expiring_licenses_30d > 0 ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-950/60 text-rose-400 border border-rose-800/40">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-950/50 text-amber-300 border border-amber-500/30">
                     Action req
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
-                    <CheckCircle2 className="w-3 h-3" />
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-950/50 text-emerald-300 border border-emerald-500/30">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                     Healthy
                   </span>
                 )}
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between">
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">Urgent renewal alert</span>
               <Sparkline
                 data={expiringSparkline}
-                color={stats.expiring_licenses_30d > 0 ? '#f43f5e' : '#10b981'}
+                color="#f59e0b"
                 id="expiring"
               />
             </div>
@@ -792,18 +785,18 @@ export const DashboardPage: React.FC = () => {
                       />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: '#0f172a',
+                          backgroundColor: '#0b1120',
                           borderColor: '#1e293b',
-                          borderRadius: '10px',
+                          borderRadius: '8px',
                           color: '#f8fafc',
                           fontSize: '12px',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.6)',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.8)',
                         }}
                         formatter={(val: any, name: any) => [`${val} seats`, name]}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
                       <Bar dataKey="used" name="Used Seats" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={12} />
-                      <Bar dataKey="available" name="Available Seats" fill="#10b981" radius={[0, 4, 4, 0]} barSize={12} />
+                      <Bar dataKey="available" name="Available Seats" fill="#1e293b" radius={[0, 4, 4, 0]} barSize={12} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1069,12 +1062,12 @@ export const DashboardPage: React.FC = () => {
                     >
                       <defs>
                         <linearGradient id="downloadGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
                           <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
                         </linearGradient>
                         <linearGradient id="checkoutGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                          <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.12} />
@@ -1082,12 +1075,12 @@ export const DashboardPage: React.FC = () => {
                       <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: '#0f172a',
+                          backgroundColor: '#0b1120',
                           borderColor: '#1e293b',
-                          borderRadius: '10px',
+                          borderRadius: '8px',
                           color: '#f8fafc',
                           fontSize: '12px',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.6)',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.8)',
                         }}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '6px' }} />
@@ -1104,7 +1097,7 @@ export const DashboardPage: React.FC = () => {
                         type="monotone"
                         dataKey="checkouts"
                         name="Checkouts"
-                        stroke="#10b981"
+                        stroke="#06b6d4"
                         strokeWidth={2}
                         fillOpacity={1}
                         fill="url(#checkoutGrad)"

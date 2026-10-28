@@ -1,7 +1,6 @@
 // ==============================================================================
-// AssetVault: Centered Multi-Step Tenant Registration Page
-// Course: BCSE307L Database Systems (Fall 2026-27)
-// Multi-step wizard over full-viewport ambient background:
+// AssetVault: Clean Split-Card Multi-Step Tenant Registration Page
+// Multi-step wizard inside matching split-card container:
 // Step 1: Organization name + auto-derived slug + contact email
 // Step 2: Administrator name + email + password with 5-segment strength meter
 // Fully validated with React Hook Form & Zod matching auth.validator.ts
@@ -114,6 +113,7 @@ export const RegisterPage: React.FC = () => {
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerTenantSchema),
     mode: 'onChange',
+    shouldUnregister: false,
     defaultValues: {
       tenantName: '',
       slug: '',
@@ -165,21 +165,39 @@ export const RegisterPage: React.FC = () => {
     return passwordRules.filter((r) => r.met).length;
   }, [passwordRules]);
 
-  // Color mapping: red -> orange -> yellow -> green
+  // Color mapping: Deep Navy Slate / Royal Indigo / Cyan / Emerald progression
   const strengthColorClass = useMemo(() => {
     if (satisfiedCount <= 1) return 'bg-rose-500';
     if (satisfiedCount === 2) return 'bg-amber-500';
-    if (satisfiedCount <= 4) return 'bg-yellow-400';
-    return 'bg-emerald-500';
+    if (satisfiedCount <= 4) return 'bg-indigo-500';
+    return 'bg-cyan-400';
   }, [satisfiedCount]);
 
   const strengthLabel = useMemo(() => {
     if (!passwordValue) return 'Enter password';
-    if (satisfiedCount <= 1) return 'Weak (Red)';
-    if (satisfiedCount === 2) return 'Fair (Orange)';
-    if (satisfiedCount <= 4) return 'Good (Yellow)';
-    return 'Strong (Green)';
+    if (satisfiedCount <= 1) return 'Weak';
+    if (satisfiedCount === 2) return 'Fair';
+    if (satisfiedCount <= 4) return 'Good';
+    return 'Strong';
   }, [passwordValue, satisfiedCount]);
+
+  const onInvalid = (fieldErrors: any) => {
+    if (fieldErrors.tenantName || fieldErrors.slug || fieldErrors.contactEmail) {
+      setStep(1);
+      const msg =
+        fieldErrors.tenantName?.message ||
+        fieldErrors.slug?.message ||
+        fieldErrors.contactEmail?.message;
+      setServerError(`Step 1: ${msg}`);
+      toast.error(msg, 'Please check Step 1 fields');
+    } else {
+      const msg =
+        fieldErrors.adminFullName?.message ||
+        fieldErrors.adminEmail?.message ||
+        fieldErrors.password?.message;
+      setServerError(msg || 'Please resolve the highlighted validation errors.');
+    }
+  };
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
@@ -219,119 +237,117 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-6 sm:p-10 bg-[#050814] text-slate-100 overflow-hidden">
-      {/* Full-Viewport Interactive Vault & Grid Background */}
+    <div className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 lg:p-10 bg-[#030712] text-slate-100 overflow-hidden">
+      {/* Full-Viewport Ambient Background */}
       <AuthAmbientBackground />
 
-      {/* Centered Content Container */}
-      <div className="relative z-10 w-full max-w-[460px] flex flex-col items-center">
-        {/* Top Brand Identity */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 shadow-lg shadow-indigo-500/30 mb-3 text-white ring-1 ring-white/15">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight font-mono">
-            Asset<span className="text-indigo-400">Vault</span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Multi-Tenant Digital Asset &amp; License Management System
-          </p>
-        </div>
+      {/* Main Split-Card Container */}
+      <div className="relative z-10 w-full max-w-[1060px] min-h-[620px] rounded-[28px] bg-[#0b1120]/95 backdrop-blur-2xl border border-slate-800/80 shadow-[0_32px_120px_-24px_rgba(2,6,23,0.95)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 animate-fade-in items-stretch">
+        {/* LEFT COLUMN: 2-Step Registration Wizard (6 columns on desktop) */}
+        <div className="lg:col-span-6 p-7 sm:p-10 lg:p-11 flex flex-col justify-between relative z-10">
+          <div>
+            {/* Top Brand Identity */}
+            <div className="mb-6">
+              <Link to="/login" className="inline-flex items-center gap-3 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4f46e5] to-[#3730a3] text-white flex items-center justify-center font-black text-sm shadow-md shadow-indigo-500/25 ring-1 ring-indigo-400/30 transition-transform shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <span className="text-xl font-bold text-white tracking-tight">
+                  Asset<span className="text-indigo-400">Vault</span>
+                </span>
+              </Link>
+            </div>
 
-        {/* Elevated Glassmorphic Vault Card */}
-        <div className="relative w-full rounded-2xl bg-slate-900/75 backdrop-blur-2xl border border-slate-800/90 shadow-[0_24px_80px_-12px_rgba(2,6,23,0.95),0_0_50px_-12px_rgba(79,70,229,0.22)] p-7 sm:p-8 space-y-6">
-          {/* Top Specular Edge Highlight */}
-          <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-indigo-400/50 to-transparent pointer-events-none" />
-
-          {/* Wizard Header & Progress Bar */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-extrabold text-white tracking-tight">
-                  Register Organization
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {step === 1
-                    ? 'Step 1 of 2: Organization Profile & Workspace'
-                    : 'Step 2 of 2: Lead Administrator & Credentials'}
-                </p>
+            {/* Wizard Header & Progress Bar */}
+            <div className="space-y-3 mb-5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-100 tracking-tight">
+                    Register Organization
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {step === 1
+                      ? 'Step 1 of 2: Organization Profile & Workspace'
+                      : 'Step 2 of 2: Lead Administrator & Credentials'}
+                  </p>
+                </div>
+                <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-[#030712] border border-slate-800 text-indigo-300 tabular-nums shrink-0">
+                  Step {step} / 2
+                </span>
               </div>
-              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-950/80 border border-slate-700/80 text-indigo-400 tabular-nums">
-                Step {step} / 2
-              </span>
-            </div>
 
-            {/* Top Progress Bar Track */}
-            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                className={cn(
-                  'h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-300 ease-out',
-                  step === 1 ? 'w-1/2' : 'w-full'
-                )}
-              />
-            </div>
-
-            {/* Step Breadcrumb Indicators */}
-            <div className="flex items-center justify-between text-xs pt-1">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className={cn(
-                  'flex items-center gap-1.5 font-semibold transition-colors',
-                  step === 1
-                    ? 'text-indigo-400'
-                    : 'text-slate-400 hover:text-slate-200'
-                )}
-              >
-                <span
+              {/* Top Progress Bar Track */}
+              <div className="w-full bg-[#131c31] rounded-full h-1.5 overflow-hidden">
+                <div
                   className={cn(
-                    'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
-                    step === 2
-                      ? 'bg-emerald-500 text-slate-950'
-                      : 'bg-indigo-600 text-white'
+                    'h-full bg-gradient-to-r from-indigo-600 to-cyan-400 transition-all duration-300 ease-out',
+                    step === 1 ? 'w-1/2' : 'w-full'
+                  )}
+                />
+              </div>
+
+              {/* Step Breadcrumb Indicators */}
+              <div className="flex items-center justify-between text-xs pt-1">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className={cn(
+                    'flex items-center gap-1.5 font-semibold transition-colors cursor-pointer',
+                    step === 1
+                      ? 'text-indigo-300'
+                      : 'text-slate-400 hover:text-slate-200'
                   )}
                 >
-                  {step === 2 ? <Check className="w-3 h-3 stroke-[3]" /> : '1'}
-                </span>
-                <span>Organization</span>
-              </button>
+                  <span
+                    className={cn(
+                      'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+                      step === 2
+                        ? 'bg-indigo-950 text-cyan-300 border border-indigo-700/50'
+                        : 'bg-indigo-600 text-white'
+                    )}
+                  >
+                    {step === 2 ? <Check className="w-3 h-3 stroke-[3]" /> : '1'}
+                  </span>
+                  <span>Organization</span>
+                </button>
 
-              <div className="w-12 h-px bg-slate-800" />
+                <div className="w-12 h-px bg-slate-800" />
 
-              <div
-                className={cn(
-                  'flex items-center gap-1.5 font-semibold',
-                  step === 2 ? 'text-indigo-400' : 'text-slate-500'
-                )}
-              >
-                <span
+                <div
                   className={cn(
-                    'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
-                    step === 2 ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                    'flex items-center gap-1.5 font-semibold',
+                    step === 2 ? 'text-indigo-300' : 'text-slate-500'
                   )}
                 >
-                  2
-                </span>
-                <span>Administrator</span>
+                  <span
+                    className={cn(
+                      'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+                      step === 2
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-[#131c31] text-slate-400 border border-slate-800'
+                    )}
+                  >
+                    2
+                  </span>
+                  <span>Administrator</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Server Error Alert */}
-          {serverError && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 flex items-start gap-2.5 animate-fade-in">
-              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <span>{serverError}</span>
-            </div>
-          )}
+            {/* Server Error Alert */}
+            {serverError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 flex items-start gap-2.5 animate-fade-in">
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <span>{serverError}</span>
+              </div>
+            )}
 
-          {/* Registration Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* ================================================================ */}
-            {/* STEP 1: ORGANIZATION DETAILS                                      */}
-            {/* ================================================================ */}
-            {step === 1 && (
-              <div className="space-y-4 animate-fade-in">
+            {/* Registration Form */}
+            <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-4">
+              {/* ================================================================ */}
+              {/* STEP 1: ORGANIZATION DETAILS                                      */}
+              {/* ================================================================ */}
+              <div className={cn('space-y-4 animate-fade-in', step !== 1 && 'hidden')}>
                 <div>
                   <Input
                     label="Organization / Company Name"
@@ -374,19 +390,17 @@ export const RegisterPage: React.FC = () => {
                   variant="primary"
                   size="md"
                   onClick={handleStep1Next}
-                  className="w-full mt-2 font-semibold shadow-lg shadow-indigo-600/30"
+                  className="w-full mt-2 font-semibold shadow-lg shadow-indigo-600/25"
                   iconRight={<ArrowRight className="w-4 h-4" />}
                 >
                   Continue to Admin Setup
                 </Button>
               </div>
-            )}
 
-            {/* ================================================================ */}
-            {/* STEP 2: LEAD ADMINISTRATOR & PASSWORD WITH STRENGTH METER         */}
-            {/* ================================================================ */}
-            {step === 2 && (
-              <div className="space-y-4 animate-fade-in">
+              {/* ================================================================ */}
+              {/* STEP 2: LEAD ADMINISTRATOR & PASSWORD WITH STRENGTH METER         */}
+              {/* ================================================================ */}
+              <div className={cn('space-y-4 animate-fade-in', step !== 2 && 'hidden')}>
                 <div>
                   <Input
                     label="Lead Administrator Full Name"
@@ -421,21 +435,10 @@ export const RegisterPage: React.FC = () => {
                   />
 
                   {/* 5-Segment Password Strength Meter */}
-                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+                  <div className="p-3 rounded-xl bg-[#030712] border border-slate-800 space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-300">Password Strength:</span>
-                      <span
-                        className={cn(
-                          'font-bold text-[11px] font-mono tabular-nums',
-                          satisfiedCount <= 1
-                            ? 'text-rose-400'
-                            : satisfiedCount === 2
-                            ? 'text-amber-400'
-                            : satisfiedCount <= 4
-                            ? 'text-yellow-400'
-                            : 'text-emerald-400'
-                        )}
-                      >
+                      <span className="font-bold text-[11px] font-mono tabular-nums text-cyan-300">
                         {strengthLabel} ({satisfiedCount}/5)
                       </span>
                     </div>
@@ -463,13 +466,13 @@ export const RegisterPage: React.FC = () => {
                           key={rule.id}
                           className={cn(
                             'flex items-center gap-1.5 transition-colors',
-                            rule.met ? 'text-emerald-400 font-medium' : 'text-slate-500'
+                            rule.met ? 'text-slate-200 font-medium' : 'text-slate-500'
                           )}
                         >
                           <CheckCircle2
                             className={cn(
                               'w-3.5 h-3.5 shrink-0',
-                              rule.met ? 'opacity-100 text-emerald-400' : 'opacity-30 text-slate-600'
+                              rule.met ? 'opacity-100 text-cyan-400' : 'opacity-30 text-slate-600'
                             )}
                           />
                           <span>{rule.label}</span>
@@ -495,7 +498,7 @@ export const RegisterPage: React.FC = () => {
                     type="submit"
                     variant="primary"
                     size="md"
-                    className="flex-2 font-semibold shadow-lg shadow-indigo-600/30"
+                    className="flex-2 font-semibold shadow-lg shadow-indigo-600/25"
                     isLoading={isLoading}
                     loadingText="Provisioning..."
                     iconRight={<Check className="w-4 h-4" />}
@@ -504,18 +507,99 @@ export const RegisterPage: React.FC = () => {
                   </Button>
                 </div>
               </div>
-            )}
-          </form>
+            </form>
+          </div>
 
           {/* Footer Link to Sign In */}
-          <div className="text-center pt-3 text-xs text-slate-400 border-t border-slate-800/80">
+          <div className="pt-5 mt-5 text-xs text-slate-400 border-t border-slate-800/80">
             <span>Already have an account? </span>
             <Link
               to="/login"
-              className="font-bold text-indigo-400 hover:text-indigo-300 hover:underline"
+              className="font-semibold text-indigo-400 hover:text-cyan-300 hover:underline transition-colors"
             >
               Sign In &rarr;
             </Link>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Branded Project Introduction Panel (6 columns on desktop) */}
+        <div className="hidden lg:flex lg:col-span-6 relative m-3 rounded-[22px] overflow-hidden select-none border border-indigo-400/20 bg-gradient-to-br from-[#4f46e5] via-[#3730a3] to-[#1e1b4b] p-10 xl:p-12 flex-col justify-between shadow-inner">
+          {/* Subtle Top-Right Cyan Ambient Glow */}
+          <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-indigo-400/15 blur-3xl pointer-events-none" />
+
+          {/* Subtle Geometric Contour Lines SVG */}
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none opacity-25"
+            viewBox="0 0 600 700"
+            fill="none"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M 180 -40 C 260 220, 320 440, 260 740"
+              stroke="#ffffff"
+              strokeOpacity="0.24"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M 310 -40 C 380 220, 430 440, 370 740"
+              stroke="#22d3ee"
+              strokeOpacity="0.28"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M 430 -40 C 490 220, 540 440, 480 740"
+              stroke="#ffffff"
+              strokeOpacity="0.22"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M -40 290 L 520 60 L 640 500"
+              stroke="#ffffff"
+              strokeOpacity="0.18"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M -40 420 L 570 175 L 660 560"
+              stroke="#22d3ee"
+              strokeOpacity="0.20"
+              strokeWidth="1.5"
+            />
+          </svg>
+
+          {/* Top Emblem Icon */}
+          <div className="relative z-10">
+            <svg
+              className="w-12 h-12 text-white"
+              viewBox="0 0 48 48"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M24 6V42M6 24H42M11.27 11.27L36.73 36.73M36.73 11.27L11.27 36.73"
+                stroke="currentColor"
+                strokeWidth="4.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+
+          {/* Center Hero Greeting & Project Explanation */}
+          <div className="relative z-10 my-auto py-8">
+            <h2 className="text-4xl xl:text-5xl font-extrabold text-white tracking-tight leading-[1.15]">
+              Hello
+              <br />
+              AssetVault! <span className="inline-block">👋</span>
+            </h2>
+            <p className="mt-6 text-base xl:text-[17px] text-indigo-100/95 leading-relaxed max-w-[400px] font-normal">
+              Skip repetitive and manual asset-licensing spreadsheets. Centralize your digital assets, automate seat allocations, and stay audit-ready while saving tons of time!
+            </p>
+          </div>
+
+          {/* Bottom Copyright Footer */}
+          <div className="relative z-10 text-xs text-indigo-200/75 font-medium">
+            &copy; {new Date().getFullYear()} AssetVault. All rights reserved.
           </div>
         </div>
       </div>

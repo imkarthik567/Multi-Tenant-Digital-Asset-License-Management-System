@@ -13,34 +13,34 @@ export const AuthAmbientBackground: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0 bg-[#050814]"
+      className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0 bg-[#030712]"
       aria-hidden="true"
     >
       {/* Interactive Cursor Spotlight */}
       <div
         className="absolute inset-0 transition-opacity duration-300"
         style={{
-          background: `radial-gradient(650px circle at ${mousePos.x}px ${mousePos.y}px, rgba(99, 102, 241, 0.13), rgba(34, 211, 238, 0.05) 40%, transparent 70%)`,
+          background: `radial-gradient(650px circle at ${mousePos.x}px ${mousePos.y}px, rgba(79, 70, 229, 0.14), rgba(6, 182, 212, 0.05) 40%, transparent 70%)`,
         }}
       />
 
-      {/* Deep Atmospheric Aurora & Volumetric Light Cones */}
-      <div className="absolute -top-48 left-1/2 -translate-x-1/2 w-[1100px] h-[520px] rounded-full bg-gradient-to-b from-indigo-600/22 via-cyan-500/10 to-transparent blur-[130px] animate-float-slow" />
-      <div className="absolute -bottom-56 left-1/4 w-[700px] h-[420px] rounded-full bg-indigo-700/15 blur-[140px] animate-float-reverse" />
-      <div className="absolute top-1/4 -right-32 w-[550px] h-[550px] rounded-full bg-cyan-500/10 blur-[130px] animate-float-medium" />
+      {/* Deep Navy Slate Aurora & Volumetric Royal Indigo / Cyan Light Cones */}
+      <div className="absolute -top-48 left-1/2 -translate-x-1/2 w-[1100px] h-[520px] rounded-full bg-gradient-to-b from-indigo-600/18 via-indigo-500/8 to-transparent blur-[130px] animate-float-slow" />
+      <div className="absolute -bottom-56 left-1/4 w-[700px] h-[420px] rounded-full bg-cyan-500/10 blur-[140px] animate-float-reverse" />
+      <div className="absolute top-1/4 -right-32 w-[550px] h-[550px] rounded-full bg-indigo-500/12 blur-[130px] animate-float-medium" />
 
       {/* Angled Top-Down Architectural Light Rays */}
       <div
         className="absolute inset-0 opacity-40"
         style={{
           backgroundImage:
-            'conic-gradient(from 180deg at 50% -10%, transparent 140deg, rgba(99, 102, 241, 0.16) 168deg, rgba(34, 211, 238, 0.14) 180deg, rgba(99, 102, 241, 0.16) 192deg, transparent 220deg)',
+            'conic-gradient(from 180deg at 50% -10%, transparent 140deg, rgba(79, 70, 229, 0.10) 168deg, rgba(255, 255, 255, 0.04) 180deg, rgba(6, 182, 212, 0.08) 192deg, transparent 220deg)',
         }}
       />
 
       {/* Fine Isometric / Architectural Coordinate Grid with Radial Vignette */}
       <div
-        className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.06)_1px,transparent_1px)] bg-[size:48px_48px]"
+        className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.04)_1px,transparent_1px)] bg-[size:48px_48px]"
         style={{
           maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, #000 35%, transparent 100%)',
           WebkitMaskImage:
@@ -50,7 +50,7 @@ export const AuthAmbientBackground: React.FC = () => {
 
       {/* Sub-grid precision hairlines */}
       <div
-        className="absolute inset-0 bg-[linear-gradient(to_right,rgba(99,102,241,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(99,102,241,0.04)_1px,transparent_1px)] bg-[size:192px_192px]"
+        className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.025)_1px,transparent_1px)] bg-[size:192px_192px]"
         style={{
           maskImage: 'radial-gradient(ellipse 70% 70% at 50% 50%, #000 40%, transparent 100%)',
           WebkitMaskImage:
@@ -68,19 +68,19 @@ export const AuthAmbientBackground: React.FC = () => {
         >
           <defs>
             <linearGradient id="vaultRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
-              <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.3" />
+              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.45" />
+              <stop offset="50%" stopColor="#4f46e5" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.38" />
             </linearGradient>
             <linearGradient id="beamGradIndigo" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity="0" />
-              <stop offset="50%" stopColor="#818cf8" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
+              <stop offset="0%" stopColor="#4f46e5" stopOpacity="0" />
+              <stop offset="50%" stopColor="#818cf8" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="#4f46e5" stopOpacity="0" />
             </linearGradient>
             <linearGradient id="beamGradCyan" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#22d3ee" stopOpacity="0" />
-              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0" />
+              <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
             </linearGradient>
           </defs>
 
@@ -104,10 +104,10 @@ export const AuthAmbientBackground: React.FC = () => {
               strokeWidth="1.2"
               strokeDasharray="6 14 24 14"
             />
-            <circle cx="600" cy="170" r="3.5" fill="#818cf8" fillOpacity="0.8" />
-            <circle cx="1030" cy="600" r="3.5" fill="#22d3ee" fillOpacity="0.8" />
-            <circle cx="600" cy="1030" r="3.5" fill="#818cf8" fillOpacity="0.8" />
-            <circle cx="170" cy="600" r="3.5" fill="#22d3ee" fillOpacity="0.8" />
+            <circle cx="600" cy="170" r="3.5" fill="#818cf8" fillOpacity="0.85" />
+            <circle cx="1030" cy="600" r="3.5" fill="#22d3ee" fillOpacity="0.85" />
+            <circle cx="600" cy="1030" r="3.5" fill="#818cf8" fillOpacity="0.85" />
+            <circle cx="170" cy="600" r="3.5" fill="#22d3ee" fillOpacity="0.85" />
           </g>
 
           {/* Counter-Rotating Inner Security Ring */}
@@ -127,8 +127,8 @@ export const AuthAmbientBackground: React.FC = () => {
               cx="600"
               cy="600"
               r="310"
-              stroke="#6366f1"
-              strokeOpacity="0.18"
+              stroke="#818cf8"
+              strokeOpacity="0.22"
               strokeWidth="1"
               strokeDasharray="80 180"
             />
@@ -137,7 +137,7 @@ export const AuthAmbientBackground: React.FC = () => {
           {/* Animated Data Traces Converging Toward the Vault Center */}
           <path
             d="M 60 360 L 340 360 L 440 460"
-            stroke="rgba(99, 102, 241, 0.14)"
+            stroke="rgba(148, 163, 184, 0.14)"
             strokeWidth="1.2"
           />
           <path
@@ -150,7 +150,7 @@ export const AuthAmbientBackground: React.FC = () => {
 
           <path
             d="M 1140 380 L 860 380 L 760 480"
-            stroke="rgba(34, 211, 238, 0.14)"
+            stroke="rgba(148, 163, 184, 0.14)"
             strokeWidth="1.2"
           />
           <path
@@ -163,7 +163,7 @@ export const AuthAmbientBackground: React.FC = () => {
 
           <path
             d="M 100 840 L 360 840 L 450 750"
-            stroke="rgba(34, 211, 238, 0.12)"
+            stroke="rgba(148, 163, 184, 0.12)"
             strokeWidth="1.2"
           />
           <path
@@ -176,7 +176,7 @@ export const AuthAmbientBackground: React.FC = () => {
 
           <path
             d="M 1100 820 L 840 820 L 750 730"
-            stroke="rgba(99, 102, 241, 0.12)"
+            stroke="rgba(148, 163, 184, 0.12)"
             strokeWidth="1.2"
           />
           <path
@@ -188,10 +188,10 @@ export const AuthAmbientBackground: React.FC = () => {
           />
 
           {/* Glowing Intersection Nodes */}
-          <circle cx="340" cy="360" r="3" fill="#6366f1" fillOpacity="0.5" />
-          <circle cx="860" cy="380" r="3" fill="#22d3ee" fillOpacity="0.5" />
-          <circle cx="360" cy="840" r="3" fill="#22d3ee" fillOpacity="0.5" />
-          <circle cx="840" cy="820" r="3" fill="#6366f1" fillOpacity="0.5" />
+          <circle cx="340" cy="360" r="3" fill="#818cf8" fillOpacity="0.7" />
+          <circle cx="860" cy="380" r="3" fill="#22d3ee" fillOpacity="0.7" />
+          <circle cx="360" cy="840" r="3" fill="#22d3ee" fillOpacity="0.7" />
+          <circle cx="840" cy="820" r="3" fill="#818cf8" fillOpacity="0.7" />
         </svg>
       </div>
 

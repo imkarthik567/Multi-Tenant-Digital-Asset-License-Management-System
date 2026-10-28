@@ -83,62 +83,62 @@ export function getNotificationTypeMeta(type: string) {
     case 'EXPIRED':
       return {
         icon: AlertOctagon,
-        badgeClass: 'text-rose-400 bg-rose-950/60 border-rose-800/60',
-        dotClass: 'bg-rose-500',
+        badgeClass: 'text-rose-400 bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-rose-400',
         label: 'Expired',
       };
     case 'EXPIRY_7':
     case 'EXPIRY_15':
       return {
         icon: AlertTriangle,
-        badgeClass: 'text-amber-400 bg-amber-950/60 border-amber-800/60',
-        dotClass: 'bg-amber-500',
+        badgeClass: 'text-amber-400 bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-amber-400',
         label: type === 'EXPIRY_7' ? 'Expires in 7d' : 'Expires in 15d',
       };
     case 'EXPIRY_30':
     case 'LICENSE_EXPIRY':
       return {
         icon: Calendar,
-        badgeClass: 'text-blue-400 bg-blue-950/60 border-blue-800/60',
-        dotClass: 'bg-blue-500',
+        badgeClass: 'text-blue-400 bg-zinc-900 border-zinc-800',
+        dotClass: 'bg-blue-400',
         label: 'Expires in 30d',
       };
     case 'SEAT_ALLOCATED':
       return {
         icon: Users2,
-        badgeClass: 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60',
-        dotClass: 'bg-emerald-500',
+        badgeClass: 'text-white bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-white',
         label: 'Seat Allocated',
       };
     case 'SEAT_REVOKED':
       return {
         icon: Users2,
-        badgeClass: 'text-amber-400 bg-amber-950/60 border-amber-800/60',
-        dotClass: 'bg-amber-500',
+        badgeClass: 'text-zinc-300 bg-zinc-900 border-zinc-800',
+        dotClass: 'bg-zinc-400',
         label: 'Seat Released',
       };
     case 'LICENSE_RENEWED':
     case 'LICENSE_UPDATED':
       return {
         icon: KeyRound,
-        badgeClass: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/60',
-        dotClass: 'bg-indigo-500',
+        badgeClass: 'text-white bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-white',
         label: type === 'LICENSE_RENEWED' ? 'Contract Renewed' : 'Contract Updated',
       };
     case 'OVER_ALLOCATION':
     case 'SEAT_LIMIT':
       return {
         icon: Users2,
-        badgeClass: 'text-purple-400 bg-purple-950/60 border-purple-800/60',
-        dotClass: 'bg-purple-500',
+        badgeClass: 'text-zinc-200 bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-zinc-300',
         label: 'Seat Quota Alert',
       };
     case 'SYSTEM':
     default:
       return {
         icon: Info,
-        badgeClass: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/60',
-        dotClass: 'bg-indigo-500',
+        badgeClass: 'text-indigo-300 bg-zinc-900 border-zinc-800',
+        dotClass: 'bg-zinc-400',
         label: 'System Notice',
       };
   }
@@ -498,22 +498,22 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
 
       {/* Slide-over Right Drawer Container */}
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10 z-50">
-        <div className="relative w-screen max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
+        <div className="relative w-screen max-w-md bg-[#0b1120] border-l border-slate-800 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
           {/* ================================================================== */}
           {/* 1. Header: Title, Unread Count, Auto-Email Log Switch, Close       */}
           {/* ================================================================== */}
-          <div className="p-4 sm:px-6 sm:py-5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+          <div className="p-4 sm:px-6 sm:py-5 border-b border-slate-800 bg-[#030712] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-indigo-950/60 border border-indigo-800/60 text-indigo-400">
+              <div className="p-2 rounded-xl bg-indigo-950/60 border border-indigo-800/50 text-indigo-400">
                 <Bell className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base font-extrabold text-slate-100 tracking-tight">
+                  <h2 className="text-base font-extrabold text-white tracking-tight">
                     Notifications
                   </h2>
                   {counts.unread > 0 && (
-                    <Badge variant="info" size="sm" className="font-mono tabular-nums text-[10px] py-0 px-1.5">
+                    <Badge variant="info" size="sm" className="font-mono tabular-nums text-[10px] py-0 px-1.5 font-bold">
                       {counts.unread} New
                     </Badge>
                   )}
@@ -531,8 +531,8 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                 onClick={() => setActiveTab(activeTab === 'emails' ? 'all' : 'emails')}
                 className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'emails'
-                    ? 'text-emerald-200 bg-emerald-900/60 border-emerald-600/60'
-                    : 'text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 hover:bg-emerald-950/70 border-emerald-800/50'
+                    ? 'text-white bg-indigo-600 border-indigo-500'
+                    : 'text-slate-300 hover:text-white bg-[#131c31] hover:bg-slate-800 border-slate-700'
                 }`}
                 title="View automated emails sent to organization members"
               >
@@ -546,7 +546,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                   type="button"
                   onClick={() => markAllReadMutation.mutate()}
                   disabled={markAllReadMutation.isPending}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#131c31] rounded-lg transition-colors cursor-pointer"
                   title="Mark all notifications as read"
                 >
                   <CheckCheck className="w-4 h-4" />
@@ -558,7 +558,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 text-slate-400 hover:text-slate-100 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#131c31] transition-colors cursor-pointer"
                 aria-label="Close notification panel"
               >
                 <X className="w-5 h-5" />
@@ -569,7 +569,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
           {/* ================================================================== */}
           {/* 2. Tabs: All, Unread, Expiring, System, Auto-Emails                */}
           {/* ================================================================== */}
-          <div className="flex items-center border-b border-slate-800 bg-slate-950/40 text-xs px-2 overflow-x-auto scrollbar-none">
+          <div className="flex items-center border-b border-slate-800 bg-[#030712] text-xs px-2 overflow-x-auto scrollbar-none">
             {[
               { id: 'all', label: 'All', count: counts.total },
               { id: 'unread', label: 'Unread', count: counts.unread },
@@ -585,8 +585,8 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                   onClick={() => setActiveTab(tab.id as NotificationTab)}
                   className={`flex items-center gap-1.5 px-3 py-2.5 font-semibold border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                     isActive
-                      ? 'border-indigo-500 text-indigo-400 bg-indigo-950/20'
-                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-850/50'
+                      ? 'border-indigo-500 text-indigo-300 bg-indigo-950/30'
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#131c31]/50'
                   }`}
                 >
                   <span>{tab.label}</span>
@@ -594,7 +594,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                     <span
                       className={`text-[10px] font-mono tabular-nums px-1.5 py-0.2 rounded-full ${
                         isActive
-                          ? 'bg-indigo-600 text-white'
+                          ? 'bg-indigo-600 text-white font-bold'
                           : 'bg-slate-800 text-slate-400'
                       }`}
                     >

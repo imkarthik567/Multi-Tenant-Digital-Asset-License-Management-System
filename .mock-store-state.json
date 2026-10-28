@@ -89,6 +89,7 @@
       "id": "tenant-acme-corp",
       "name": "Acme Corporation",
       "slug": "acme",
+      "contactEmail": "admin@acme.com",
       "status": "ACTIVE",
       "planId": 2,
       "createdAt": "2026-01-15T00:00:00.000Z",
@@ -98,6 +99,7 @@
       "id": "tenant-stark-ind",
       "name": "Stark Industries",
       "slug": "stark",
+      "contactEmail": "admin@stark.com",
       "status": "ACTIVE",
       "planId": 3,
       "createdAt": "2026-02-01T00:00:00.000Z",
@@ -134,17 +136,52 @@
       "updatedAt": "2026-01-14T00:00:00.000Z"
     },
     {
-      "id": "tenant-1793086309675-ap3y",
-      "createdAt": "2026-10-27T07:31:49.675Z",
-      "updatedAt": "2026-10-27T07:31:49.675Z",
-      "name": "Future Group",
-      "slug": "future-group",
-      "contactEmail": "futuregroup123@gmail.com",
+      "id": "tenant-karthik",
+      "name": "Karthik Enterprise Workspace",
+      "slug": "karthik-org",
+      "contactEmail": "karthikeyan.s050607@gmail.com",
+      "status": "ACTIVE",
+      "planId": 3,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "98943980-b6e6-4649-b867-71cceed9a4cd",
+      "createdAt": "2026-10-28T19:09:14.154Z",
+      "updatedAt": "2026-10-28T19:09:14.154Z",
+      "name": "Test Org",
+      "slug": "test-org",
+      "contactEmail": "test@example.com",
       "planId": 1,
       "status": "TRIAL"
     }
   ],
   "users": [
+    {
+      "id": "user-karthik-admin",
+      "email": "karthikeyan.s050607@gmail.com",
+      "fullName": "Karthikeyan S",
+      "roleId": 2,
+      "tenantId": "tenant-karthik",
+      "passwordHash": "$2a$12$XlWtiYi51zoib014XNXOLup5ViquXE8g68fOz/k4fBc6UKEpoS5iu",
+      "isActive": true,
+      "department": "Executive Leadership",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-10-28T19:21:40.963Z",
+      "lastLoginAt": "2026-10-28T19:21:40.963Z"
+    },
+    {
+      "id": "user-karthik-admin-alt",
+      "email": "karthiksmrk7377@gmail.com",
+      "fullName": "Karthikeyan S",
+      "roleId": 2,
+      "tenantId": "tenant-karthik",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Executive Leadership",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    },
     {
       "id": "user-super-admin",
       "email": "superadmin@assetvault.io",
@@ -167,7 +204,8 @@
       "isActive": true,
       "department": "IT Operations",
       "createdAt": "2026-01-15T00:00:00.000Z",
-      "updatedAt": "2026-01-15T00:00:00.000Z"
+      "updatedAt": "2026-10-28T16:59:59.202Z",
+      "lastLoginAt": "2026-10-28T16:59:59.202Z"
     },
     {
       "id": "user-asset-manager",
@@ -203,8 +241,7 @@
       "isActive": true,
       "department": "IT Operations",
       "createdAt": "2026-01-10T00:00:00.000Z",
-      "updatedAt": "2026-10-28T12:47:34.808Z",
-      "lastLoginAt": "2026-10-28T12:47:34.808Z"
+      "updatedAt": "2026-01-10T00:00:00.000Z"
     },
     {
       "id": "user-techcorp-mgr1",
@@ -216,8 +253,7 @@
       "isActive": true,
       "department": "Procurement",
       "createdAt": "2026-01-10T00:00:00.000Z",
-      "updatedAt": "2026-10-28T12:47:32.497Z",
-      "lastLoginAt": "2026-10-28T12:47:32.497Z"
+      "updatedAt": "2026-01-10T00:00:00.000Z"
     },
     {
       "id": "user-techcorp-mgr2",
@@ -229,8 +265,7 @@
       "isActive": true,
       "department": "Operations",
       "createdAt": "2026-01-10T00:00:00.000Z",
-      "updatedAt": "2026-10-28T12:47:20.098Z",
-      "lastLoginAt": "2026-10-28T12:47:20.098Z"
+      "updatedAt": "2026-01-10T00:00:00.000Z"
     },
     {
       "id": "user-techcorp-dev1",
@@ -242,8 +277,7 @@
       "isActive": true,
       "department": "Engineering",
       "createdAt": "2026-01-10T00:00:00.000Z",
-      "updatedAt": "2026-10-28T12:47:27.064Z",
-      "lastLoginAt": "2026-10-28T12:47:27.064Z"
+      "updatedAt": "2026-01-10T00:00:00.000Z"
     },
     {
       "id": "user-techcorp-dev2",
@@ -255,8 +289,19 @@
       "isActive": true,
       "department": "Design",
       "createdAt": "2026-01-10T00:00:00.000Z",
-      "updatedAt": "2026-10-28T12:47:19.950Z",
-      "lastLoginAt": "2026-10-28T12:47:19.950Z"
+      "updatedAt": "2026-01-10T00:00:00.000Z"
+    },
+    {
+      "id": "user-techcorp-dev3",
+      "email": "techcorp.dev3@techcorp.io",
+      "fullName": "TechCorp Dynamics Security Auditor",
+      "roleId": 4,
+      "tenantId": "tenant-techcorp",
+      "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
+      "isActive": true,
+      "department": "Security",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-01-10T00:00:00.000Z"
     },
     {
       "id": "user-innovatelabs-admin",
@@ -268,8 +313,7 @@
       "isActive": true,
       "department": "IT Operations",
       "createdAt": "2026-01-12T00:00:00.000Z",
-      "updatedAt": "2026-10-28T12:47:21.498Z",
-      "lastLoginAt": "2026-10-28T12:47:21.498Z"
+      "updatedAt": "2026-01-12T00:00:00.000Z"
     },
     {
       "id": "user-innovatelabs-mgr1",
@@ -286,15 +330,14 @@
     {
       "id": "user-innovatelabs-dev1",
       "email": "innovatelabs.dev1@innovatelabs.io",
-      "fullName": "Honest Developer Name",
+      "fullName": "InnovateLabs Inc Engineer Alpha",
       "roleId": 4,
       "tenantId": "tenant-innovatelabs",
       "passwordHash": "$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi",
       "isActive": true,
       "department": "Engineering",
       "createdAt": "2026-01-12T00:00:00.000Z",
-      "updatedAt": "2026-10-28T12:47:21.723Z",
-      "lastLoginAt": "2026-10-28T12:47:21.614Z"
+      "updatedAt": "2026-01-12T00:00:00.000Z"
     },
     {
       "id": "user-creativestudio-admin",
@@ -309,28 +352,16 @@
       "updatedAt": "2026-01-14T00:00:00.000Z"
     },
     {
-      "id": "user-1793086309676-swqw",
-      "createdAt": "2026-10-27T07:31:49.676Z",
-      "updatedAt": "2026-10-27T09:54:21.781Z",
-      "tenantId": "tenant-1793086309675-ap3y",
+      "id": "9ec289f3-2587-49e0-b06a-d9dd5d753619",
+      "createdAt": "2026-10-28T19:09:14.155Z",
+      "updatedAt": "2026-10-28T19:09:14.155Z",
+      "tenantId": "98943980-b6e6-4649-b867-71cceed9a4cd",
       "roleId": 2,
-      "email": "futuregroup123@gmail.com",
-      "fullName": "Sudir Niranj R",
-      "passwordHash": "$2a$12$XqytgXbjZCSv8JN7cX6xaux4h1JHKrTzzuc0/cnZ9KAx8rRlpX/sG",
+      "email": "test@example.com",
+      "fullName": "Test Admin",
+      "passwordHash": "$2a$12$72UiubTLolvkScY1HtnoyOjDJixuyvEf9o12yEZuSERX5KGro7zPy",
       "isActive": true,
-      "lastLoginAt": "2026-10-27T09:54:21.724Z"
-    },
-    {
-      "id": "user-1793086350485-q7kw",
-      "createdAt": "2026-10-27T07:32:30.485Z",
-      "updatedAt": "2026-10-27T09:40:40.564Z",
-      "email": "karthikeyan2007@gmail.com",
-      "fullName": "Karthik",
-      "passwordHash": "$2a$12$/vhcm4HEU2pb7St4HxweqO2ICerl2X2Av908lIVOsCDZSTNWZ7/rm",
-      "avatarUrl": null,
-      "isActive": true,
-      "tenantId": "tenant-1793086309675-ap3y",
-      "roleId": 3
+      "lastLoginAt": "2026-10-28T19:09:14.155Z"
     }
   ],
   "vendors": [
@@ -387,16 +418,6 @@
       "website": "https://jetbrains.com",
       "createdAt": "2026-01-12T00:00:00.000Z",
       "updatedAt": "2026-01-12T00:00:00.000Z"
-    },
-    {
-      "id": "vendor-1793086580715-086n",
-      "createdAt": "2026-10-27T07:36:20.715Z",
-      "updatedAt": "2026-10-27T07:36:20.715Z",
-      "name": "Microsoft",
-      "contactEmail": "microsoft123@gmail.com",
-      "website": "https://www.microsoft.com",
-      "supportPhone": "+91 9876543210",
-      "tenantId": "tenant-1793086309675-ap3y"
     }
   ],
   "categories": [
@@ -534,13 +555,36 @@
     {
       "id": "ver-1",
       "assetId": "asset-1",
+      "versionNo": 1,
       "versionNumber": "2026.1",
       "storageUrl": "https://download.jetbrains.com/idea/ideaIU-2026.1.tar.gz",
+      "fileUrl": "https://download.jetbrains.com/idea/ideaIU-2026.1.tar.gz",
       "fileSize": 1048576000,
+      "fileSizeBytes": 1048576000,
       "mimeType": "application/gzip",
       "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "checksumSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "changelog": "Initial 2026 release with JDK 25 support",
+      "changeNotes": "Initial 2026 release with JDK 25 support",
+      "uploadedBy": "user-tenant-admin",
       "createdAt": "2026-01-16T00:00:00.000Z"
+    },
+    {
+      "id": "ver-2",
+      "assetId": "asset-1",
+      "versionNo": 2,
+      "versionNumber": "2026.2",
+      "storageUrl": "https://download.jetbrains.com/idea/ideaIU-2026.2.tar.gz",
+      "fileUrl": "https://download.jetbrains.com/idea/ideaIU-2026.2.tar.gz",
+      "fileSize": 1059061760,
+      "fileSizeBytes": 1059061760,
+      "mimeType": "application/gzip",
+      "checksum": "f4c1d55309fd2d250bgafbf5d5a007fc38bf52f5750ca045da06002c8963c966",
+      "checksumSha256": "f4c1d55309fd2d250bgafbf5d5a007fc38bf52f5750ca045da06002c8963c966",
+      "changelog": "Maintenance release with updated language servers",
+      "changeNotes": "Maintenance release with updated language servers",
+      "uploadedBy": "user-tenant-admin",
+      "createdAt": "2026-02-20T00:00:00.000Z"
     }
   ],
   "licenses": [
@@ -549,14 +593,19 @@
       "tenantId": "tenant-acme-corp",
       "assetId": "asset-1",
       "vendorId": "vendor-2",
+      "licenseTypeId": 3,
+      "name": "IntelliJ IDEA Ultimate Enterprise",
       "licenseKey": "JB-INTEL-2026-ACME-99124",
       "type": "SEAT_BASED",
       "status": "ACTIVE",
       "totalSeats": 35,
       "allocatedSeats": 2,
       "cost": 499,
+      "currency": "USD",
       "autoRenew": true,
-      "expiresAt": "2027-04-25T07:28:57.320Z",
+      "startDate": "2026-01-16T00:00:00.000Z",
+      "endDate": "2027-04-26T16:59:46.521Z",
+      "expiresAt": "2027-04-26T16:59:46.521Z",
       "createdAt": "2026-01-16T00:00:00.000Z",
       "updatedAt": "2026-01-16T00:00:00.000Z"
     },
@@ -565,13 +614,18 @@
       "tenantId": "tenant-acme-corp",
       "assetId": "asset-2",
       "vendorId": "vendor-3",
+      "licenseTypeId": 1,
+      "name": "Helvetica Neue Pro Complete",
       "licenseKey": "MONO-HN-CORP-44091",
       "type": "PERPETUAL",
       "status": "ACTIVE",
       "totalSeats": 100,
       "allocatedSeats": 1,
       "cost": 1450,
+      "currency": "USD",
       "autoRenew": false,
+      "startDate": "2026-01-17T00:00:00.000Z",
+      "endDate": null,
       "expiresAt": null,
       "createdAt": "2026-01-17T00:00:00.000Z",
       "updatedAt": "2026-01-17T00:00:00.000Z"
@@ -581,14 +635,19 @@
       "tenantId": "tenant-acme-corp",
       "assetId": "asset-3",
       "vendorId": "vendor-1",
+      "licenseTypeId": 2,
+      "name": "Adobe Creative Cloud Enterprise",
       "licenseKey": "ADBE-CC-ENT-2026-081",
       "type": "SUBSCRIPTION",
       "status": "ACTIVE",
       "totalSeats": 20,
-      "allocatedSeats": 1,
+      "allocatedSeats": 2,
       "cost": 899,
+      "currency": "USD",
       "autoRenew": true,
-      "expiresAt": "2026-12-11T07:28:57.320Z",
+      "startDate": "2026-01-18T00:00:00.000Z",
+      "endDate": "2026-11-11T16:59:46.521Z",
+      "expiresAt": "2026-11-11T16:59:46.521Z",
       "createdAt": "2026-01-18T00:00:00.000Z",
       "updatedAt": "2026-01-18T00:00:00.000Z"
     },
@@ -597,14 +656,19 @@
       "tenantId": "tenant-acme-corp",
       "assetId": "asset-4",
       "vendorId": "vendor-4",
+      "licenseTypeId": 3,
+      "name": "Figma Enterprise Organization",
       "licenseKey": "FIGMA-ENT-ORGLIC-309",
       "type": "SEAT_BASED",
       "status": "ACTIVE",
       "totalSeats": 25,
       "allocatedSeats": 2,
       "cost": 750,
+      "currency": "USD",
       "autoRenew": true,
-      "expiresAt": "2027-02-24T07:28:57.320Z",
+      "startDate": "2026-01-19T00:00:00.000Z",
+      "endDate": "2026-11-22T16:59:46.521Z",
+      "expiresAt": "2026-11-22T16:59:46.521Z",
       "createdAt": "2026-01-19T00:00:00.000Z",
       "updatedAt": "2026-01-19T00:00:00.000Z"
     },
@@ -624,8 +688,8 @@
       "currency": "USD",
       "autoRenew": true,
       "startDate": "2026-01-01T00:00:00.000Z",
-      "endDate": "2027-04-26T12:47:14.217Z",
-      "expiresAt": "2027-04-26T12:47:14.217Z",
+      "endDate": "2027-04-26T16:59:46.521Z",
+      "expiresAt": "2027-04-26T16:59:46.521Z",
       "createdAt": "2026-01-10T00:00:00.000Z",
       "updatedAt": "2026-01-10T00:00:00.000Z"
     },
@@ -645,91 +709,13 @@
       "currency": "USD",
       "autoRenew": true,
       "startDate": "2026-01-01T00:00:00.000Z",
-      "endDate": "2027-04-26T12:47:14.218Z",
-      "expiresAt": "2027-04-26T12:47:14.218Z",
+      "endDate": "2027-04-26T16:59:46.521Z",
+      "expiresAt": "2027-04-26T16:59:46.521Z",
       "createdAt": "2026-01-12T00:00:00.000Z",
       "updatedAt": "2026-01-12T00:00:00.000Z"
-    },
-    {
-      "id": "2afbd6aa-670a-4c6b-9fe2-0b888ca34f07",
-      "createdAt": "2026-10-27T07:51:01.607Z",
-      "updatedAt": "2026-10-27T07:51:01.607Z",
-      "name": "Future Group logo",
-      "licenseKey": "TEST-1234-5678-DEMO",
-      "totalSeats": 15,
-      "allocatedSeats": 1,
-      "usedSeats": 1,
-      "cost": 499,
-      "currency": "USD",
-      "startDate": "2026-10-27T00:00:00.000Z",
-      "endDate": "2027-10-27T00:00:00.000Z",
-      "autoRenew": true,
-      "status": "ACTIVE",
-      "tenantId": "tenant-1793086309675-ap3y",
-      "vendorId": "vendor-1793086580715-086n",
-      "licenseTypeId": 3
-    },
-    {
-      "id": "84a2d672-3d44-480a-8f23-79dc816737d7",
-      "createdAt": "2026-10-28T12:47:22.349Z",
-      "updatedAt": "2026-10-28T12:47:22.349Z",
-      "tenantId": "tenant-techcorp",
-      "vendorId": "vendor-techcorp-1",
-      "licenseTypeId": 3,
-      "name": "Concurrency Race Test License 1793191642349",
-      "licenseKey": "RACE-KEY-1793191642349",
-      "totalSeats": 3,
-      "cost": 300,
-      "startDate": "2026-10-28T12:47:22.349Z",
-      "status": "ACTIVE",
-      "allocatedSeats": 3,
-      "usedSeats": 3
     }
   ],
   "allocations": [
-    {
-      "id": "1e834219-b44b-488a-9e8b-4dba7408a447",
-      "tenantId": "tenant-techcorp",
-      "licenseId": "84a2d672-3d44-480a-8f23-79dc816737d7",
-      "userId": "user-techcorp-mgr2",
-      "allocatedBy": "user-techcorp-admin",
-      "status": "ACTIVE",
-      "allocatedAt": "2026-10-28T12:47:22.405Z",
-      "revokedAt": null,
-      "notes": "Allocated via sp_allocate_license_seat"
-    },
-    {
-      "id": "b81857e2-e8b3-4ae9-b2ac-8ac5e16b1830",
-      "tenantId": "tenant-techcorp",
-      "licenseId": "84a2d672-3d44-480a-8f23-79dc816737d7",
-      "userId": "user-techcorp-mgr1",
-      "allocatedBy": "user-techcorp-admin",
-      "status": "ACTIVE",
-      "allocatedAt": "2026-10-28T12:47:22.370Z",
-      "revokedAt": null,
-      "notes": "Allocated via sp_allocate_license_seat"
-    },
-    {
-      "id": "dc95d8e6-6e8f-4662-8397-5b15674a99ff",
-      "tenantId": "tenant-techcorp",
-      "licenseId": "84a2d672-3d44-480a-8f23-79dc816737d7",
-      "userId": "user-techcorp-admin",
-      "allocatedBy": "user-techcorp-admin",
-      "status": "ACTIVE",
-      "allocatedAt": "2026-10-28T12:47:22.366Z",
-      "revokedAt": null,
-      "notes": "Allocated via sp_allocate_license_seat"
-    },
-    {
-      "id": "alloc-future-group-1",
-      "tenantId": "tenant-1793086309675-ap3y",
-      "licenseId": "2afbd6aa-670a-4c6b-9fe2-0b888ca34f07",
-      "userId": "user-1793086350485-q7kw",
-      "allocatedBy": "user-1793086309676-swqw",
-      "status": "ACTIVE",
-      "allocatedAt": "2026-10-27T09:56:00.000Z",
-      "notes": "Allocated via sp_allocate_license_seat"
-    },
     {
       "id": "alloc-1",
       "tenantId": "tenant-acme-corp",
@@ -765,6 +751,15 @@
       "status": "ACTIVE",
       "allocatedAt": "2026-01-25T00:00:00.000Z",
       "notes": "Creative Suite seat"
+    },
+    {
+      "id": "alloc-5",
+      "tenantId": "tenant-acme-corp",
+      "licenseId": "lic-3",
+      "userId": "user-member",
+      "status": "ACTIVE",
+      "allocatedAt": "2026-02-10T00:00:00.000Z",
+      "notes": "UI/UX Design Seat"
     }
   ],
   "notifications": [
@@ -772,21 +767,106 @@
       "id": "notif-1",
       "tenantId": "tenant-acme-corp",
       "userId": "user-tenant-admin",
-      "type": "SYSTEM",
-      "title": "AssetVault Operational",
-      "message": "Workspace is running with in-memory persistence and RLS guardrails active.",
+      "licenseId": "lic-3",
+      "type": "EXPIRY_15",
+      "title": "Adobe Creative Cloud Enterprise Expires in 14 Days",
+      "message": "Automated email alert sent to admin@acme.com: License \"Adobe Creative Cloud Enterprise\" (ADBE-CC-ENT-2026-081) expires on 2026-11-11 (14 days remaining).",
       "isRead": false,
-      "createdAt": "2026-10-27T07:28:57.320Z"
+      "emailSent": true,
+      "recipientEmail": "admin@acme.com",
+      "createdAt": "2026-10-28T16:44:46.522Z"
     },
     {
       "id": "notif-2",
       "tenantId": "tenant-acme-corp",
-      "userId": "user-tenant-admin",
-      "type": "EXPIRY_60",
-      "title": "Adobe CC License Renewal",
-      "message": "License ADBE-CC-ENT-2026-081 renewal is due in 45 days.",
+      "userId": "user-member",
+      "licenseId": "lic-3",
+      "type": "EXPIRY_15",
+      "title": "Your Assigned License Expires in 14 Days",
+      "message": "Automated email alert sent to member@acme.com: Your assigned seat for \"Adobe Creative Cloud Enterprise\" expires on 2026-11-11.",
       "isRead": false,
-      "createdAt": "2026-10-27T07:28:57.320Z"
+      "emailSent": true,
+      "recipientEmail": "member@acme.com",
+      "createdAt": "2026-10-28T16:45:46.522Z"
+    },
+    {
+      "id": "notif-3",
+      "tenantId": "tenant-acme-corp",
+      "userId": "user-tenant-admin",
+      "licenseId": "lic-1",
+      "type": "SYSTEM",
+      "title": "Seat Allocated: IntelliJ IDEA Ultimate Enterprise",
+      "message": "Automated confirmation email sent to member@acme.com and admin@acme.com for seat allocation on IntelliJ IDEA Ultimate Enterprise.",
+      "isRead": false,
+      "emailSent": true,
+      "recipientEmail": "member@acme.com",
+      "createdAt": "2026-10-28T16:14:46.522Z"
+    }
+  ],
+  "emailDeliveries": [
+    {
+      "id": "email-log-1",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-member",
+      "recipientEmail": "member@acme.com",
+      "recipientName": "Acme Team Member",
+      "recipientRole": "MEMBER",
+      "licenseId": "lic-3",
+      "licenseName": "Adobe Creative Cloud Enterprise",
+      "eventType": "EXPIRY_15",
+      "subject": "[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise",
+      "bodyText": "Hello Acme Team Member,\n\nThis is an automated notification from your organization workspace Acme Corporation.\n\nYour assigned software license \"Adobe Creative Cloud Enterprise\" (Key: ADBE-CC-ENT-2026-081) is scheduled to expire on 2026-11-11 (14 days remaining).\n\nRecipient Role: Assigned Seat Holder (MEMBER)\nOrganization: Acme Corporation\nAction Required: Your organization administrators have been notified to renew the contract prior to the end date.",
+      "status": "SENT",
+      "sentAt": "2026-10-28T16:45:46.522Z"
+    },
+    {
+      "id": "email-log-2",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-tenant-admin",
+      "recipientEmail": "admin@acme.com",
+      "recipientName": "Acme Administrator",
+      "recipientRole": "TENANT_ADMIN",
+      "licenseId": "lic-3",
+      "licenseName": "Adobe Creative Cloud Enterprise",
+      "eventType": "EXPIRY_15",
+      "subject": "[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise",
+      "bodyText": "Hello Acme Administrator,\n\nThis is an automated compliance alert from your organization workspace Acme Corporation.\n\nSoftware license \"Adobe Creative Cloud Enterprise\" (Key: ADBE-CC-ENT-2026-081) will reach its contract end date on 2026-11-11 (14 days remaining).\n\nActive Seat Holders Affected: 2 members\nRecipient Role: Organization Administrator (TENANT_ADMIN)\nPlease renew the contract or adjust seat allocations in AssetVault before expiration.",
+      "status": "SENT",
+      "sentAt": "2026-10-28T16:44:46.522Z"
+    },
+    {
+      "id": "email-log-3",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-asset-manager",
+      "recipientEmail": "manager@acme.com",
+      "recipientName": "Acme Asset Manager",
+      "recipientRole": "ASSET_MANAGER",
+      "licenseId": "lic-3",
+      "licenseName": "Adobe Creative Cloud Enterprise",
+      "eventType": "EXPIRY_15",
+      "subject": "[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise",
+      "bodyText": "Hello Acme Asset Manager,\n\nThis is an automated compliance alert from your organization workspace Acme Corporation.\n\nSoftware license \"Adobe Creative Cloud Enterprise\" (Key: ADBE-CC-ENT-2026-081) will reach its contract end date on 2026-11-11 (14 days remaining).\n\nRecipient Role: Asset Manager & Seat Holder (ASSET_MANAGER)\nPlease coordinate license renewal in AssetVault.",
+      "status": "SENT",
+      "sentAt": "2026-10-28T16:44:46.522Z"
+    },
+    {
+      "id": "email-log-4",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-member",
+      "recipientEmail": "member@acme.com",
+      "recipientName": "Acme Team Member",
+      "recipientRole": "MEMBER",
+      "licenseId": "lic-1",
+      "licenseName": "IntelliJ IDEA Ultimate Enterprise",
+      "eventType": "SEAT_ALLOCATED",
+      "subject": "[AssetVault] Seat Allocated: IntelliJ IDEA Ultimate Enterprise",
+      "bodyText": "Hello Acme Team Member,\n\nAn active software license seat for \"IntelliJ IDEA Ultimate Enterprise\" (JetBrains) has been allocated to your organization account (member@acme.com) in Acme Corporation.\n\nLicense Status: ACTIVE\nContract End Date: 2027-04-26\nNotes: Fullstack Core Dev seat",
+      "status": "SENT",
+      "sentAt": "2026-10-28T16:14:46.522Z"
     }
   ],
   "auditLogs": [
@@ -803,498 +883,111 @@
       "createdAt": "2026-01-16T00:00:00.000Z"
     },
     {
-      "id": "auditlog-1793086309677-bmog",
-      "createdAt": "2026-10-27T07:31:49.677Z",
-      "updatedAt": "2026-10-27T07:31:49.677Z",
-      "tenantId": "tenant-1793086309675-ap3y",
-      "userId": "user-1793086309676-swqw",
+      "id": "1793214609666",
+      "createdAt": "2026-10-28T19:09:14.156Z",
+      "updatedAt": "2026-10-28T19:09:14.156Z",
+      "performedAt": "2026-10-28T19:09:14.156Z",
+      "tenantId": "98943980-b6e6-4649-b867-71cceed9a4cd",
+      "userId": "9ec289f3-2587-49e0-b06a-d9dd5d753619",
       "tableName": "tenants",
-      "recordId": "tenant-1793086309675-ap3y",
+      "recordId": "98943980-b6e6-4649-b867-71cceed9a4cd",
       "action": "INSERT",
       "newData": {
         "event": "TENANT_ONBOARDED",
-        "tenantName": "Future Group",
-        "slug": "future-group",
+        "tenantName": "Test Org",
+        "slug": "test-org",
         "plan": "Free Trial",
-        "adminEmail": "futuregroup123@gmail.com",
-        "ipAddress": "169.254.169.126",
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+        "adminEmail": "test@example.com",
+        "ipAddress": "127.0.0.1",
+        "userAgent": "curl/7.88.1"
       }
-    },
-    {
-      "id": "5628e968-54ff-4f53-b2cf-838ec8a911ff",
-      "createdAt": "2026-10-27T09:58:45.055Z",
-      "updatedAt": "2026-10-27T09:58:45.055Z",
-      "tableName": "licenses",
-      "recordId": "2afbd6aa-670a-4c6b-9fe2-0b888ca34f07",
-      "action": "UPDATE",
-      "newData": {
-        "event": "LICENSE_KEY_REVEALED",
-        "accessedBy": "user-1793086309676-swqw",
-        "revealedAt": "2026-10-27T09:58:45.055Z"
-      },
-      "tenantId": "tenant-1793086309675-ap3y",
-      "userId": "user-1793086309676-swqw"
-    },
-    {
-      "id": "e91009c2-41cf-4e62-88a4-bc2260530fec",
-      "createdAt": "2026-10-27T09:59:18.879Z",
-      "updatedAt": "2026-10-27T09:59:18.879Z",
-      "tableName": "licenses",
-      "recordId": "2afbd6aa-670a-4c6b-9fe2-0b888ca34f07",
-      "action": "UPDATE",
-      "newData": {
-        "event": "LICENSE_KEY_REVEALED",
-        "accessedBy": "user-1793086309676-swqw",
-        "revealedAt": "2026-10-27T09:59:18.879Z"
-      },
-      "tenantId": "tenant-1793086309675-ap3y",
-      "userId": "user-1793086309676-swqw"
-    },
-    {
-      "id": "ff8d720c-1b71-4b8f-9cf8-82bb5b78f2e6",
-      "createdAt": "2026-10-27T09:59:31.554Z",
-      "updatedAt": "2026-10-27T09:59:31.554Z",
-      "tableName": "licenses",
-      "recordId": "2afbd6aa-670a-4c6b-9fe2-0b888ca34f07",
-      "action": "UPDATE",
-      "newData": {
-        "event": "LICENSE_KEY_REVEALED",
-        "accessedBy": "user-1793086309676-swqw",
-        "revealedAt": "2026-10-27T09:59:31.554Z"
-      },
-      "tenantId": "tenant-1793086309675-ap3y",
-      "userId": "user-1793086309676-swqw"
     }
   ],
   "refreshTokens": [
     {
-      "id": "refreshtoken-1793086309727-pv41",
-      "createdAt": "2026-10-27T07:31:49.727Z",
-      "updatedAt": "2026-10-27T07:31:49.727Z",
-      "userId": "user-1793086309676-swqw",
-      "tokenHash": "b68812f0b0b562cd3f968b0dc97b812a8838a7f9ec729c8cd707a5a4c31e6c31",
-      "expiresAt": "2026-11-03T07:31:49.681Z",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-      "ipAddress": "169.254.169.126"
-    },
-    {
-      "id": "4d208c89-97ef-49a5-a8a1-90e1dda9bd05",
-      "createdAt": "2026-10-27T07:49:17.844Z",
-      "updatedAt": "2026-10-27T07:49:17.844Z",
-      "userId": "user-1793086309676-swqw",
-      "tokenHash": "20ec9e18081db79235862e85c28bbc370dbd1af8ad72d6b057520992ef58f117",
-      "expiresAt": "2026-11-03T07:49:17.792Z",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-      "ipAddress": "169.254.169.126"
-    },
-    {
-      "id": "d8f0f7b8-cef8-4afa-a54c-c195d9a6f4bd",
-      "createdAt": "2026-10-27T08:45:33.813Z",
-      "updatedAt": "2026-10-27T08:45:33.813Z",
+      "id": "29197f08-1163-4147-b7a2-b92e47f67cfc",
+      "createdAt": "2026-10-28T16:59:49.961Z",
+      "updatedAt": "2026-10-28T16:59:49.961Z",
       "revokedAt": null,
-      "userId": "user-1793086309676-swqw",
-      "tokenHash": "4125815a503a7643bb755754d6d865062471270de9ed0a7802f278079fc29c0b",
-      "expiresAt": "2026-11-03T08:45:33.758Z",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-      "ipAddress": "169.254.169.126"
+      "userId": "user-tenant-admin",
+      "tokenHash": "566c07472e72466773c6908a94fb3a69d7f5fe0e73bef7a3e5080de9babf3904",
+      "expiresAt": "2026-11-04T16:59:49.960Z",
+      "userAgent": "curl/7.88.1",
+      "ipAddress": "127.0.0.1"
     },
     {
-      "id": "fbb08ab8-9c54-4db8-92a5-188fec846991",
-      "createdAt": "2026-10-27T09:10:35.602Z",
-      "updatedAt": "2026-10-27T09:10:35.602Z",
+      "id": "527ef106-3675-4cc7-885d-54d887e7735a",
+      "createdAt": "2026-10-28T16:59:59.200Z",
+      "updatedAt": "2026-10-28T16:59:59.200Z",
       "revokedAt": null,
-      "userId": "user-1793086309676-swqw",
-      "tokenHash": "29e1ee7fa666005e6a78f016b20c32a91b56d3a437e8e0b4d996ada41bb1c309",
-      "expiresAt": "2026-11-03T09:10:35.550Z",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-      "ipAddress": "169.254.169.126"
+      "userId": "user-tenant-admin",
+      "tokenHash": "74751599106eac500ff08023bf0c60b9cee50c02b146286a8c16e48831e56908",
+      "expiresAt": "2026-11-04T16:59:59.200Z",
+      "userAgent": "node",
+      "ipAddress": "127.0.0.1"
     },
     {
-      "id": "87424b9c-b008-438c-b6fd-a2d737f9108f",
-      "createdAt": "2026-10-27T09:26:09.358Z",
-      "updatedAt": "2026-10-27T09:26:09.358Z",
+      "id": "f8b68411-2dbf-4db6-9bf0-2e00808c73a9",
+      "createdAt": "2026-10-28T19:09:14.160Z",
+      "updatedAt": "2026-10-28T19:09:14.160Z",
       "revokedAt": null,
-      "userId": "user-1793086309676-swqw",
-      "tokenHash": "19a5b99c048a2c6d3c87cad2c0cdc847f455eefeb999e1c1d2c6914a157f4c2c",
-      "expiresAt": "2026-11-03T09:26:09.307Z",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-      "ipAddress": "169.254.169.126"
+      "userId": "9ec289f3-2587-49e0-b06a-d9dd5d753619",
+      "tokenHash": "b040d76d0b5b2e53092e31063fa2bd1bd04442db87d690424b6d101eb5bc183e",
+      "expiresAt": "2026-11-04T19:09:14.160Z",
+      "userAgent": "curl/7.88.1",
+      "ipAddress": "127.0.0.1"
     },
     {
-      "id": "bf18e4bb-014c-4661-b469-328b6e5657bf",
-      "createdAt": "2026-10-27T09:54:21.723Z",
-      "updatedAt": "2026-10-27T09:54:21.723Z",
+      "id": "6f5a5e8d-bf82-4261-a57a-4c4902baf339",
+      "createdAt": "2026-10-28T19:18:52.428Z",
+      "updatedAt": "2026-10-28T19:18:52.428Z",
       "revokedAt": null,
-      "userId": "user-1793086309676-swqw",
-      "tokenHash": "008a686ea65df76fe37dc17ad65da96199c9724a22d43c5bdff697f7e51efc3b",
-      "expiresAt": "2026-11-03T09:54:21.670Z",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-      "ipAddress": "169.254.169.126"
+      "userId": "user-karthik-admin",
+      "tokenHash": "27e4c57553cf5bd8a9e5f9b38354ff2b02e320ca5964c85c06835dbc7491c645",
+      "expiresAt": "2026-11-04T19:18:52.427Z"
     },
     {
-      "id": "3a6d02f8-aca4-4b9a-b67f-c167618d7d4c",
-      "createdAt": "2026-10-28T12:47:16.341Z",
-      "updatedAt": "2026-10-28T12:47:16.341Z",
+      "id": "41155dac-de9b-4059-a9ec-533b826143fe",
+      "createdAt": "2026-10-28T19:19:02.681Z",
+      "updatedAt": "2026-10-28T19:19:02.681Z",
       "revokedAt": null,
-      "userId": "user-techcorp-admin",
-      "tokenHash": "1464bac6a3f62adafa8e6ab7feb5f3e039abfc4163f8068cf9a1cca6de8117a5",
-      "expiresAt": "2026-11-04T12:47:16.341Z",
-      "ipAddress": "127.0.0.1"
+      "userId": "user-karthik-admin",
+      "tokenHash": "7c833a9f88c4443a3568f5a3f1bb99ccc14f85ac58d55a1a53e79dbb655017a3",
+      "expiresAt": "2026-11-04T19:19:02.680Z"
     },
     {
-      "id": "4c0b9ae2-3bd3-4881-b304-6bbaef26c6db",
-      "createdAt": "2026-10-28T12:47:19.705Z",
-      "updatedAt": "2026-10-28T12:47:19.716Z",
-      "revokedAt": "2026-10-28T12:47:19.716Z",
-      "userId": "user-techcorp-mgr1",
-      "tokenHash": "429e09e1bd31fccc0f1f68c78894ba21dab4f08b4c13b9125de65eed06fd82dc",
-      "expiresAt": "2026-11-04T12:47:19.705Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "e5bc85f4-2eea-44ed-b2e2-6260c425e7d5",
-      "createdAt": "2026-10-28T12:47:19.717Z",
-      "updatedAt": "2026-10-28T12:47:19.717Z",
+      "id": "cddd2da8-bca3-4d64-8dca-31759fc843fb",
+      "createdAt": "2026-10-28T19:21:26.933Z",
+      "updatedAt": "2026-10-28T19:21:26.933Z",
       "revokedAt": null,
-      "userId": "user-techcorp-mgr1",
-      "tokenHash": "6986bb306685f8b975c290e3ccd8ef053603f2251099dafa9fd9595da6360eee",
-      "expiresAt": "2026-11-04T12:47:19.716Z",
+      "userId": "user-karthik-admin",
+      "tokenHash": "89b82400ce2d9afd04a1358101b62bcb161e32a34d23084b72164e514deb4ae4",
+      "expiresAt": "2026-11-04T19:21:26.932Z",
+      "userAgent": "curl/7.88.1",
       "ipAddress": "127.0.0.1"
     },
     {
-      "id": "bc28c6fd-b63e-4a61-9df5-aaae1138048c",
-      "createdAt": "2026-10-28T12:47:19.828Z",
-      "updatedAt": "2026-10-28T12:47:19.836Z",
-      "revokedAt": "2026-10-28T12:47:19.836Z",
-      "userId": "user-techcorp-dev1",
-      "tokenHash": "122d29be5d9fce287fb004863dbccfa3dc7e6dae7a5bbe7b5bb824719da77f7a",
-      "expiresAt": "2026-11-04T12:47:19.828Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "05eec0ba-724f-4e59-b131-b3c98e58878a",
-      "createdAt": "2026-10-28T12:47:19.837Z",
-      "updatedAt": "2026-10-28T12:47:19.845Z",
-      "revokedAt": "2026-10-28T12:47:19.845Z",
-      "userId": "user-techcorp-dev1",
-      "tokenHash": "bee723e85435f7b46299410fd87c2faeb077f575beab36a057b1ce6297d014e6",
-      "expiresAt": "2026-11-04T12:47:19.836Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "de2cceb1-e4ed-41ef-8541-886115f4d1f4",
-      "createdAt": "2026-10-28T12:47:19.840Z",
-      "updatedAt": "2026-10-28T12:47:19.840Z",
+      "id": "fc68da8a-5d61-4072-b3f6-59a289479234",
+      "createdAt": "2026-10-28T19:21:40.962Z",
+      "updatedAt": "2026-10-28T19:21:40.962Z",
       "revokedAt": null,
-      "userId": "user-techcorp-dev1",
-      "tokenHash": "8f4214af68557b957719daf0744c484a0ad4a28e102b5938706e93a3990fbb49",
-      "expiresAt": "2026-11-04T12:47:19.840Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "2fea8a95-0a30-4528-8230-6e6392d35ca6",
-      "createdAt": "2026-10-28T12:47:19.845Z",
-      "updatedAt": "2026-10-28T12:47:19.845Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-dev1",
-      "tokenHash": "e450b167942588a8eb1efde26a1b2f47d65b8336cde8219071ab000187fb18ca",
-      "expiresAt": "2026-11-04T12:47:19.845Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "4a9963ef-895e-48e5-a117-e5e5130b14de",
-      "createdAt": "2026-10-28T12:47:19.949Z",
-      "updatedAt": "2026-10-28T12:47:19.960Z",
-      "revokedAt": "2026-10-28T12:47:19.960Z",
-      "userId": "user-techcorp-dev2",
-      "tokenHash": "20a08896fd0a09f7cec5750370a15a57d648bef59c781f03b268875223affb2a",
-      "expiresAt": "2026-11-04T12:47:19.949Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "74572a58-4db0-4b42-8dbb-cfee84214554",
-      "createdAt": "2026-10-28T12:47:19.961Z",
-      "updatedAt": "2026-10-28T12:47:19.961Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-dev2",
-      "tokenHash": "2569be04cba861a065798a67aac83aefa0c3e54b3c07d6393c5cc9fc48845c7a",
-      "expiresAt": "2026-11-04T12:47:19.960Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "b8ae816a-1ac4-4e17-a8eb-988e0d39a2bb",
-      "createdAt": "2026-10-28T12:47:19.967Z",
-      "updatedAt": "2026-10-28T12:47:19.967Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-dev2",
-      "tokenHash": "7cdfe751653c09280c7798ea204a7da954652271f6b4a7e9e57457a6100316c5",
-      "expiresAt": "2026-11-04T12:47:19.967Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "32300629-7abd-4af9-b8cd-ab0f5fd96c42",
-      "createdAt": "2026-10-28T12:47:19.972Z",
-      "updatedAt": "2026-10-28T12:47:19.972Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-dev2",
-      "tokenHash": "c848712413afb78ff1d4c690980ae6b52a37380beb5d1f1b6cadd8d770b166cd",
-      "expiresAt": "2026-11-04T12:47:19.972Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "669959e4-f739-4653-bae4-f9e5814a94f9",
-      "createdAt": "2026-10-28T12:47:19.975Z",
-      "updatedAt": "2026-10-28T12:47:19.975Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-dev2",
-      "tokenHash": "778a9cdb325911f146ac7d3c67bbeb3d71316cd7f8625db28070a816d18979ca",
-      "expiresAt": "2026-11-04T12:47:19.975Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "d77071db-8d3c-4d92-be9a-aa26de643e13",
-      "createdAt": "2026-10-28T12:47:19.978Z",
-      "updatedAt": "2026-10-28T12:47:19.978Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-dev2",
-      "tokenHash": "099fbedd0eefa7c756520c8f82cc51731d7534336c6fa9ca926e25901d1c93bb",
-      "expiresAt": "2026-11-04T12:47:19.978Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "6948a008-63fa-4f8f-a02a-70e3d416fc9e",
-      "createdAt": "2026-10-28T12:47:20.097Z",
-      "updatedAt": "2026-10-28T12:47:20.109Z",
-      "revokedAt": "2026-10-28T12:47:10.109Z",
-      "userId": "user-techcorp-mgr2",
-      "tokenHash": "67061dacfd1e45182062ea92f6ad5c5b220e7a564bcfed3a10efc140cf91a95c",
-      "expiresAt": "2026-11-04T12:47:20.097Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "ed6aae78-c1ca-46c2-ae05-8968abf47912",
-      "createdAt": "2026-10-28T12:47:20.107Z",
-      "updatedAt": "2026-10-28T12:47:20.113Z",
-      "revokedAt": "2026-10-28T12:47:20.113Z",
-      "userId": "user-techcorp-mgr2",
-      "tokenHash": "37ddfc08881e6cfdbaee570f9a89156b477c37056ca362cf9f08e5bb1f8ea76d",
-      "expiresAt": "2026-11-04T12:47:20.106Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "dcb734cc-2c43-4ce4-ae9a-3680bc515cdb",
-      "createdAt": "2026-10-28T12:47:21.373Z",
-      "updatedAt": "2026-10-28T12:47:21.373Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-admin",
-      "tokenHash": "4f42ff174bf211b74288a52568a534bb5d8f68dde3ba149eff90e454e461f381",
-      "expiresAt": "2026-11-04T12:47:21.373Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "30b86e5c-2d22-439a-9eb4-7b754d56e4c0",
-      "createdAt": "2026-10-28T12:47:21.497Z",
-      "updatedAt": "2026-10-28T12:47:21.497Z",
-      "revokedAt": null,
-      "userId": "user-innovatelabs-admin",
-      "tokenHash": "90ebb1c9918f5b5c7027a4477743685073ae0f410229883409da307ffca23735",
-      "expiresAt": "2026-11-04T12:47:21.497Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "f7314e75-ee12-442c-b9a5-cdb091fe7706",
-      "createdAt": "2026-10-28T12:47:21.613Z",
-      "updatedAt": "2026-10-28T12:47:21.613Z",
-      "revokedAt": null,
-      "userId": "user-innovatelabs-dev1",
-      "tokenHash": "123c408fd2e6f2d9e0a8d2b0eb41b71d1cf4334157fb717987faadbdbff58d07",
-      "expiresAt": "2026-11-04T12:47:21.613Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "a951773e-bfa5-4ebf-9ec4-b9fccbc7c0bf",
-      "createdAt": "2026-10-28T12:47:23.331Z",
-      "updatedAt": "2026-10-28T12:47:23.331Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-admin",
-      "tokenHash": "2c42a1659991ef167cc7b54582115292e90d5f2f7aa96bc74a42fa099fd7d66a",
-      "expiresAt": "2026-11-04T12:47:23.330Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "6b28b0a1-8b1a-47e5-8008-cbf6b216e766",
-      "createdAt": "2026-10-28T12:47:27.063Z",
-      "updatedAt": "2026-10-28T12:47:27.063Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-dev1",
-      "tokenHash": "dbecb19f82a4504066ee1d3a6a8c5d569121a95419931f8f875ef43a1845443f",
-      "expiresAt": "2026-11-04T12:47:27.062Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "aaa7ff26-e6ed-44ee-aff3-768205a267b0",
-      "createdAt": "2026-10-28T12:47:28.719Z",
-      "updatedAt": "2026-10-28T12:47:28.719Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-admin",
-      "tokenHash": "77f4d287ff75de2b995d2507ae129221b8c73ad791337d543bd4fa9006f7a2ea",
-      "expiresAt": "2026-11-04T12:47:28.719Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "2aea0f88-ab02-404b-ac58-38e5efdf79f3",
-      "createdAt": "2026-10-28T12:47:32.497Z",
-      "updatedAt": "2026-10-28T12:47:32.508Z",
-      "revokedAt": "2026-10-28T12:47:32.507Z",
-      "userId": "user-techcorp-mgr1",
-      "tokenHash": "60d263a8b371874359bd80e9c2339828681cb6b23a6d209f2fbace5f3d8d1bb0",
-      "expiresAt": "2026-11-04T12:47:32.496Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "2c828394-8655-4542-af54-61f09271cfab",
-      "createdAt": "2026-10-28T12:47:32.509Z",
-      "updatedAt": "2026-10-28T12:47:32.509Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-mgr1",
-      "tokenHash": "b1f2460a6c6b034ae7a30a7f103ed0a1dda9b8b22a9ea2b8d8eb76320a61e9e2",
-      "expiresAt": "2026-11-04T12:47:32.508Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "3df6a369-dbb6-4c02-b7b6-0f63fdc40935",
-      "createdAt": "2026-10-28T12:47:32.515Z",
-      "updatedAt": "2026-10-28T12:47:32.515Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-mgr1",
-      "tokenHash": "cbe51482b0c942618c5dd44fc70baa5a355a61f0d4fffec187038fb995b93541",
-      "expiresAt": "2026-11-04T12:47:32.515Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "b926943f-61d5-4c11-bd51-e95903c79506",
-      "createdAt": "2026-10-28T12:47:32.520Z",
-      "updatedAt": "2026-10-28T12:47:32.520Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-mgr1",
-      "tokenHash": "431fefc6263308b1a158fc09a480cd52ee89f57d68a2c658bcfd390d7429d7a9",
-      "expiresAt": "2026-11-04T12:47:32.520Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "4627e43b-e64b-48a2-b71f-782f67f66738",
-      "createdAt": "2026-10-28T12:47:32.526Z",
-      "updatedAt": "2026-10-28T12:47:32.526Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-mgr1",
-      "tokenHash": "4a182cee74ecfe27e5433b67057241224c6dcf29f10908ab33948896522230c0",
-      "expiresAt": "2026-11-04T12:47:32.526Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "ae27ed27-337e-4d19-bbbc-74aa56a832cb",
-      "createdAt": "2026-10-28T12:47:32.531Z",
-      "updatedAt": "2026-10-28T12:47:32.531Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-mgr1",
-      "tokenHash": "5f24777aea1a8c660ed68f8be6fc01db665fbcce1afe8b862fd4a48670fb96e1",
-      "expiresAt": "2026-11-04T12:47:32.531Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "07663e18-6eb2-4f6b-b995-da1d5aca5463",
-      "createdAt": "2026-10-28T12:47:34.353Z",
-      "updatedAt": "2026-10-28T12:47:34.353Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-admin",
-      "tokenHash": "361a70cb9f7fee0cf7028f411c722997064d7f916e0e1df2006120fa72f5b503",
-      "expiresAt": "2026-11-04T12:47:34.353Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "8a55b4f1-d813-4aae-b6bc-997daa5ca9ce",
-      "createdAt": "2026-10-28T12:47:34.501Z",
-      "updatedAt": "2026-10-28T12:47:34.519Z",
-      "revokedAt": "2026-10-28T12:47:34.518Z",
-      "userId": "user-techcorp-admin",
-      "tokenHash": "0070eb15f5c010a733b2189d4e76c1de139aed480582da0c7d758ec60a365e38",
-      "expiresAt": "2026-11-04T12:47:34.501Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "9e4e57e9-078e-4e8b-aef7-80af278ae90c",
-      "createdAt": "2026-10-28T12:47:34.520Z",
-      "updatedAt": "2026-10-28T12:47:34.529Z",
-      "revokedAt": "2026-10-28T12:47:34.529Z",
-      "userId": "user-techcorp-admin",
-      "tokenHash": "700810199a4f61ccc66931cc59351f0a6ec547add97513fe86ad517d97667225",
-      "expiresAt": "2026-11-04T12:47:34.519Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "0e8cd037-2881-48ba-88ff-2f2c0e6b5742",
-      "createdAt": "2026-10-28T12:47:34.530Z",
-      "updatedAt": "2026-10-28T12:47:34.538Z",
-      "revokedAt": "2026-10-28T12:47:34.538Z",
-      "userId": "user-techcorp-admin",
-      "tokenHash": "38b21212d2015e093f8604bc2bb02a920b1453e5835a96582636bba4bf2d845b",
-      "expiresAt": "2026-11-04T12:47:34.529Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "232db536-7d2d-4a8b-88ec-b99dc48e300e",
-      "createdAt": "2026-10-28T12:47:34.539Z",
-      "updatedAt": "2026-10-28T12:47:34.539Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-admin",
-      "tokenHash": "091428790017c69e70013abcf066624086f3af7f85678a7d7b78a0c458579eab",
-      "expiresAt": "2026-11-04T12:47:34.538Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "51798283-07d2-4467-9cbb-bac7cfd93812",
-      "createdAt": "2026-10-28T12:47:34.652Z",
-      "updatedAt": "2026-10-28T12:47:34.662Z",
-      "revokedAt": "2026-10-28T12:47:34.662Z",
-      "userId": "user-techcorp-admin",
-      "tokenHash": "0d6b1fa438e15a93217ddbbaa8c9fbdf857f9cf22bbead91528d79cf0abcf8d9",
-      "expiresAt": "2026-11-04T12:47:34.652Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "3eebdef0-4ef9-4896-abc8-43a78809fbef",
-      "createdAt": "2026-10-28T12:47:34.663Z",
-      "updatedAt": "2026-10-28T12:47:34.669Z",
-      "revokedAt": "2026-10-28T12:47:34.669Z",
-      "userId": "user-techcorp-admin",
-      "tokenHash": "40f858d620cffde8bc8e71d3b6b10ca805151fcbf8966d6c833f7df3e56de33b",
-      "expiresAt": "2026-11-04T12:47:34.662Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "56198b61-2a11-4569-9b56-4ded7abb0307",
-      "createdAt": "2026-10-28T12:47:34.672Z",
-      "updatedAt": "2026-10-28T12:47:34.672Z",
-      "revokedAt": null,
-      "userId": "user-techcorp-admin",
-      "tokenHash": "50d0fc63bda6126885926b512176c6c2734ac3fd4f6f576bf10c866c960b146f",
-      "expiresAt": "2026-11-04T12:47:34.669Z",
-      "ipAddress": "127.0.0.1"
-    },
-    {
-      "id": "ea35ab75-2244-4c1c-91d8-4c6d1b708087",
-      "createdAt": "2026-10-28T12:47:34.807Z",
-      "updatedAt": "2026-10-28T12:47:34.819Z",
-      "revokedAt": "2026-10-28T12:47:34.819Z",
-      "userId": "user-techcorp-admin",
-      "tokenHash": "5da6b668723da60b5a60373dc87ad03b4ed41f33dbfc864a7b33564198c8c220",
-      "expiresAt": "2026-11-04T12:47:34.807Z",
+      "userId": "user-karthik-admin",
+      "tokenHash": "5e3d65b5b3a3e4640e25733f08eaba384bd05a6a10b6b0bd55cd187a12eb7962",
+      "expiresAt": "2026-11-04T19:21:40.961Z",
+      "userAgent": "curl/7.88.1",
       "ipAddress": "127.0.0.1"
     }
   ],
   "assetTags": [],
-  "assetlicense": [],
-  "licenserenewal": [],
-  "assetaccesslog": []
+  "failedLoginAttempts": [
+    {
+      "key": "qwerty@gmail.com#169.254.169.126",
+      "email": "qwerty@gmail.com#169.254.169.126",
+      "ip_address": "169.254.169.126",
+      "count": 3,
+      "first_attempt_at": "2026-10-28T18:57:59.329Z",
+      "last_attempt_at": "2026-10-28T19:00:25.942Z",
+      "locked_until": null
+    }
+  ]
 }

@@ -1193,8 +1193,8 @@ export const AssetDetailPage: React.FC = () => {
                 onChange={(e) => setCompareV1(parseInt(e.target.value))}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
               >
-                {versions.map((v) => (
-                  <option key={v.id} value={v.versionNo}>
+                {versions.map((v, idx) => (
+                  <option key={v.id || `v1-${v.versionNo ?? idx}-${idx}`} value={v.versionNo}>
                     v{v.versionNo} ({formatBytes(v.fileSizeBytes)})
                   </option>
                 ))}
@@ -1207,8 +1207,8 @@ export const AssetDetailPage: React.FC = () => {
                 onChange={(e) => setCompareV2(parseInt(e.target.value))}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
               >
-                {versions.map((v) => (
-                  <option key={v.id} value={v.versionNo}>
+                {versions.map((v, idx) => (
+                  <option key={v.id || `v2-${v.versionNo ?? idx}-${idx}`} value={v.versionNo}>
                     v{v.versionNo} ({formatBytes(v.fileSizeBytes)})
                   </option>
                 ))}

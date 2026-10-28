@@ -99,9 +99,43 @@ export function createInitialState(): MockStoreState {
       createdAt: new Date('2026-01-14T00:00:00Z'),
       updatedAt: new Date('2026-01-14T00:00:00Z'),
     },
+    {
+      id: 'tenant-karthik',
+      name: 'Karthik Enterprise Workspace',
+      slug: 'karthik-org',
+      contactEmail: 'karthikeyan.s050607@gmail.com',
+      status: 'ACTIVE',
+      planId: 3,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+    },
   ];
 
   const users = [
+    {
+      id: 'user-karthik-admin',
+      email: 'karthikeyan.s050607@gmail.com',
+      fullName: 'Karthikeyan S',
+      roleId: 2,
+      tenantId: 'tenant-karthik',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Executive Leadership',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+    },
+    {
+      id: 'user-karthik-admin-alt',
+      email: 'karthiksmrk7377@gmail.com',
+      fullName: 'Karthikeyan S',
+      roleId: 2,
+      tenantId: 'tenant-karthik',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Executive Leadership',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+    },
     {
       id: 'user-super-admin',
       email: 'superadmin@assetvault.io',
@@ -208,6 +242,18 @@ export function createInitialState(): MockStoreState {
       passwordHash: BCRYPT_PASSWORD_HASH,
       isActive: true,
       department: 'Design',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      updatedAt: new Date('2026-01-10T00:00:00Z'),
+    },
+    {
+      id: 'user-techcorp-dev3',
+      email: 'techcorp.dev3@techcorp.io',
+      fullName: 'TechCorp Dynamics Security Auditor',
+      roleId: 4,
+      tenantId: 'tenant-techcorp',
+      passwordHash: BCRYPT_PASSWORD_HASH,
+      isActive: true,
+      department: 'Security',
       createdAt: new Date('2026-01-10T00:00:00Z'),
       updatedAt: new Date('2026-01-10T00:00:00Z'),
     },
@@ -458,13 +504,36 @@ export function createInitialState(): MockStoreState {
     {
       id: 'ver-1',
       assetId: 'asset-1',
+      versionNo: 1,
       versionNumber: '2026.1',
       storageUrl: 'https://download.jetbrains.com/idea/ideaIU-2026.1.tar.gz',
+      fileUrl: 'https://download.jetbrains.com/idea/ideaIU-2026.1.tar.gz',
       fileSize: 1048576000,
+      fileSizeBytes: 1048576000,
       mimeType: 'application/gzip',
       checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
       changelog: 'Initial 2026 release with JDK 25 support',
+      changeNotes: 'Initial 2026 release with JDK 25 support',
+      uploadedBy: 'user-tenant-admin',
       createdAt: new Date('2026-01-16T00:00:00Z'),
+    },
+    {
+      id: 'ver-2',
+      assetId: 'asset-1',
+      versionNo: 2,
+      versionNumber: '2026.2',
+      storageUrl: 'https://download.jetbrains.com/idea/ideaIU-2026.2.tar.gz',
+      fileUrl: 'https://download.jetbrains.com/idea/ideaIU-2026.2.tar.gz',
+      fileSize: 1059061760,
+      fileSizeBytes: 1059061760,
+      mimeType: 'application/gzip',
+      checksum: 'f4c1d55309fd2d250bgafbf5d5a007fc38bf52f5750ca045da06002c8963c966',
+      checksumSha256: 'f4c1d55309fd2d250bgafbf5d5a007fc38bf52f5750ca045da06002c8963c966',
+      changelog: 'Maintenance release with updated language servers',
+      changeNotes: 'Maintenance release with updated language servers',
+      uploadedBy: 'user-tenant-admin',
+      createdAt: new Date('2026-02-20T00:00:00Z'),
     },
   ];
 
@@ -803,30 +872,40 @@ export class MockPrismaStore {
     const initial = createInitialState();
     try {
       const fs = require('fs');
-      if (fs.existsSync(this.persistPath)) {
-        const raw = fs.readFileSync(this.persistPath, 'utf-8');
-        const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.users) && Array.isArray(parsed.tenants)) {
-          const mergeById = (baseArr: any[], savedArr: any[]) => {
-            const map = new Map<string, any>();
-            for (const item of baseArr) map.set(String(item.id), item);
-            for (const item of savedArr) map.set(String(item.id), item);
-            return Array.from(map.values());
-          };
-          return {
-            ...initial,
-            ...parsed,
-            roles: initial.roles,
-            plans: initial.plans,
-            licenseTypes: initial.licenseTypes,
-            tenants: mergeById(initial.tenants, parsed.tenants),
-            users: mergeById(initial.users, parsed.users),
-            vendors: mergeById(initial.vendors, parsed.vendors || []),
-            assets: mergeById(initial.assets, parsed.assets || []),
-            licenses: mergeById(initial.licenses, parsed.licenses || []),
-            notifications: mergeById(initial.notifications, parsed.notifications || []),
-            emailDeliveries: mergeById(initial.emailDeliveries, parsed.emailDeliveries || []),
-          };
+      const path = require('path');
+      const candidatePaths = [
+        this.persistPath,
+        path.resolve(process.cwd(), 'backend/.mock-store-state.json'),
+        path.resolve(process.cwd(), '../.mock-store-state.json'),
+      ];
+
+      for (const p of candidatePaths) {
+        if (fs.existsSync(p)) {
+          const raw = fs.readFileSync(p, 'utf-8');
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.users) && Array.isArray(parsed.tenants)) {
+            const mergeById = (baseArr: any[], savedArr: any[]) => {
+              const map = new Map<string, any>();
+              for (const item of baseArr) map.set(String(item.id), item);
+              for (const item of savedArr) map.set(String(item.id), item);
+              return Array.from(map.values());
+            };
+            return {
+              ...initial,
+              ...parsed,
+              roles: initial.roles,
+              plans: initial.plans,
+              licenseTypes: initial.licenseTypes,
+              tenants: mergeById(initial.tenants, parsed.tenants),
+              users: mergeById(initial.users, parsed.users),
+              vendors: mergeById(initial.vendors, parsed.vendors || []),
+              assets: mergeById(initial.assets, parsed.assets || []),
+              licenses: mergeById(initial.licenses, parsed.licenses || []),
+              assetVersions: mergeById(initial.assetVersions, parsed.assetVersions || []),
+              notifications: mergeById(initial.notifications, parsed.notifications || []),
+              emailDeliveries: mergeById(initial.emailDeliveries, parsed.emailDeliveries || []),
+            };
+          }
         }
       }
     } catch {
@@ -838,15 +917,17 @@ export class MockPrismaStore {
   public saveState(): void {
     try {
       const fs = require('fs');
-      fs.writeFileSync(
-        this.persistPath,
-        JSON.stringify(
-          this.state,
-          (_k, v) => (typeof v === 'bigint' ? Number(v) : v),
-          2
-        ),
-        'utf-8'
+      const path = require('path');
+      const serialized = JSON.stringify(
+        this.state,
+        (_k, v) => (typeof v === 'bigint' ? Number(v) : v),
+        2
       );
+      fs.writeFileSync(this.persistPath, serialized, 'utf-8');
+      const altPath = path.resolve(process.cwd(), 'backend/.mock-store-state.json');
+      if (altPath !== this.persistPath && fs.existsSync(path.dirname(altPath))) {
+        fs.writeFileSync(altPath, serialized, 'utf-8');
+      }
     } catch {
       // Ignore write errors
     }
@@ -933,6 +1014,9 @@ export class MockPrismaStore {
       } else if (key === 'role' && value && typeof value === 'object' && 'name' in (value as any)) {
         const userRole = this.state.roles.find((r) => r.id === item.roleId);
         if (!userRole || userRole.name !== (value as any).name) return false;
+      } else if (key === 'assetId_versionNo' && value && typeof value === 'object') {
+        const itemVer = item.versionNo ?? (parseInt(String(item.versionNumber || '1'), 10) || 1);
+        if (item.assetId !== (value as any).assetId || itemVer !== (value as any).versionNo) return false;
       } else if (value && typeof value === 'object' && !(value instanceof Date)) {
         const valObj = value as any;
         if ('equals' in valObj) {
@@ -977,7 +1061,14 @@ export class MockPrismaStore {
           }
         } else {
           for (const [subKey, subVal] of Object.entries(valObj)) {
-            if (subVal !== undefined && item[subKey] !== subVal) return false;
+            if (subVal !== undefined) {
+              if (subKey === 'versionNo') {
+                const itemVer = item.versionNo ?? (parseInt(String(item.versionNumber || '1'), 10) || 1);
+                if (itemVer !== subVal) return false;
+              } else if (item[subKey] !== subVal) {
+                return false;
+              }
+            }
           }
         }
       } else {
@@ -1277,7 +1368,11 @@ export function createMockModelClient(modelName: string): any {
       const collection = mockStore.getCollection(modelName);
       const normalizedData = mockStore.normalizeWriteData(args.data);
       const newItem = {
-        id: normalizedData?.id || require('crypto').randomUUID(),
+        id:
+          normalizedData?.id ||
+          (modelName.toLowerCase() === 'auditlog'
+            ? String(Date.now() + Math.floor(Math.random() * 100000))
+            : require('crypto').randomUUID()),
         createdAt: new Date(),
         updatedAt: new Date(),
         ...(modelName.toLowerCase() === 'refreshtoken' ? { revokedAt: null } : {}),
@@ -1357,6 +1452,26 @@ export function createMockModelClient(modelName: string): any {
   };
 }
 
+function extractSqlAndValues(queryArg: any, restArgs: any[]): { sqlText: string; values: any[] } {
+  if (typeof queryArg === 'string') {
+    return { sqlText: queryArg, values: restArgs };
+  }
+  if (Array.isArray(queryArg)) {
+    return { sqlText: queryArg.join(' '), values: restArgs };
+  }
+  if (queryArg && typeof queryArg === 'object') {
+    const sqlText = Array.isArray(queryArg.strings)
+      ? queryArg.strings.join(' ')
+      : String(queryArg.text || queryArg.sql || '');
+    const values =
+      Array.isArray(queryArg.values) && queryArg.values.length > 0
+        ? queryArg.values
+        : restArgs;
+    return { sqlText, values };
+  }
+  return { sqlText: String(queryArg || ''), values: restArgs };
+}
+
 export function createMockPrismaClient(): any {
   const handler: ProxyHandler<any> = {
     get(_target, prop: string | symbol) {
@@ -1376,13 +1491,8 @@ export function createMockPrismaClient(): any {
         };
       }
       if (prop === '$queryRaw') {
-        return async (queryObj: any) => {
-          const sqlText =
-            typeof queryObj === 'string'
-              ? queryObj
-              : Array.isArray(queryObj?.strings)
-              ? queryObj.strings.join(' ')
-              : String(queryObj || '');
+        return async (...rawArgs: any[]) => {
+          const { sqlText, values } = extractSqlAndValues(rawArgs[0], rawArgs.slice(1));
 
           if (sqlText.includes('fn_tenant_dashboard_stats')) {
             const totalAssets = mockStore.state.assets.length;
@@ -1451,7 +1561,6 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('sp_allocate_license_seat')) {
-            const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
             const [licenseId, userId, allocatedBy] = values;
             const lic = mockStore.state.licenses.find((l) => l.id === licenseId);
             if (!lic) {
@@ -1490,7 +1599,6 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('sp_release_license_seat')) {
-            const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
             const [allocationId, revokedBy, reason] = values;
             const alloc = mockStore.state.allocations.find((a) => a.id === allocationId);
             if (alloc && alloc.status === 'ACTIVE') {
@@ -1512,7 +1620,6 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('sp_renew_license')) {
-            const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
             const [licenseId, newEndDate, cost, performedBy, notes] = values;
             const lic = mockStore.state.licenses.find((l) => l.id === licenseId);
             const renewalId = require('crypto').randomUUID();
@@ -1731,7 +1838,6 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('fn_generate_expiry_notifications')) {
-            const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
             const targetTenantId = values[0] || 'tenant-acme-corp';
             const lookaheadDays = Number(values[1] || 30);
 
@@ -1849,6 +1955,14 @@ export function createMockPrismaClient(): any {
               });
           }
 
+          if (sqlText.includes('failed_login_attempts')) {
+            const key = values.find((v: any) => typeof v === 'string' && v.includes('#')) || values[0];
+            if (!key) return [];
+            const list = ((mockStore.state as any).failedLoginAttempts = (mockStore.state as any).failedLoginAttempts || []);
+            const found = list.find((r: any) => r.key === key);
+            return found ? [found] : [];
+          }
+
           if (sqlText.includes('SELECT 1')) {
             return [{ '?column?': 1, '1': 1 }];
           }
@@ -1857,16 +1971,75 @@ export function createMockPrismaClient(): any {
         };
       }
       if (prop === '$executeRaw') {
-        return async (queryObj: any) => {
-          const sqlText =
-            typeof queryObj === 'string'
-              ? queryObj
-              : Array.isArray(queryObj?.strings)
-              ? queryObj.strings.join(' ')
-              : String(queryObj || '');
+        return async (...rawArgs: any[]) => {
+          const { sqlText, values } = extractSqlAndValues(rawArgs[0], rawArgs.slice(1));
+
+          if (sqlText.includes('DELETE FROM failed_login_attempts')) {
+            const key = values.find((v: any) => typeof v === 'string' && v.includes('#')) || values[0];
+            if (key) {
+              (mockStore.state as any).failedLoginAttempts = ((mockStore.state as any).failedLoginAttempts || []).filter(
+                (r: any) => r.key !== key
+              );
+            } else {
+              (mockStore.state as any).failedLoginAttempts = [];
+            }
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-var-requires
+              const { memoryFallbackMap } = require('../services/accountProtection.service');
+              if (key) {
+                memoryFallbackMap.delete(key);
+              } else {
+                memoryFallbackMap.clear();
+              }
+            } catch {
+              // ignore
+            }
+            mockStore.saveState();
+            return 1;
+          }
+
+          if (sqlText.includes('failed_login_attempts') && sqlText.includes('UPDATE failed_login_attempts SET locked_until')) {
+            const key = values.find((v: any) => typeof v === 'string' && v.includes('#')) || values[1];
+            const lockedUntil = values.find((v: any) => v instanceof Date) || new Date(Date.now() + 15 * 60 * 1000);
+            const list = ((mockStore.state as any).failedLoginAttempts = (mockStore.state as any).failedLoginAttempts || []);
+            const existing = list.find((r: any) => r.key === key);
+            if (existing) {
+              existing.locked_until = lockedUntil;
+              mockStore.saveState();
+            }
+            return 1;
+          }
+
+          if (sqlText.includes('failed_login_attempts')) {
+            const key = values.find((v: any) => typeof v === 'string' && v.includes('#')) || values[0];
+            if (!key) return 1;
+            const email = values.find((v: any) => typeof v === 'string' && v.includes('@')) || key.split('#')[0] || '';
+            const ip = values.find((v: any) => typeof v === 'string' && /^\d+\.\d+\.\d+\.\d+$/.test(v)) || key.split('#')[1] || '127.0.0.1';
+            const list = ((mockStore.state as any).failedLoginAttempts = (mockStore.state as any).failedLoginAttempts || []);
+            const existing = list.find((r: any) => r.key === key);
+            const now = new Date();
+            if (existing) {
+              existing.count = (existing.count || 0) + 1;
+              existing.last_attempt_at = now;
+              if (existing.count >= 5) {
+                existing.locked_until = new Date(now.getTime() + 15 * 60 * 1000);
+              }
+            } else {
+              list.push({
+                key,
+                email,
+                ip_address: ip,
+                count: 1,
+                first_attempt_at: now,
+                last_attempt_at: now,
+                locked_until: null,
+              });
+            }
+            mockStore.saveState();
+            return 1;
+          }
 
           if (sqlText.includes('UPDATE notifications SET email_sent = TRUE')) {
-            const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
             const notifId = values[0];
             const notif = mockStore.state.notifications.find((n) => n.id === notifId);
             if (notif) {
@@ -1877,7 +2050,6 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('sp_release_license_seat')) {
-            const values = Array.isArray(queryObj?.values) ? queryObj.values : [];
             const [allocationId, revokedBy, reason] = values;
             const alloc = mockStore.state.allocations.find((a) => a.id === allocationId);
             if (alloc && alloc.status === 'ACTIVE') {

@@ -7,6 +7,20 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+
+// Ensure mime v1/v3 compatibility when superagent/supertest shares hoisted mime@1.6.0 with express/send
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mimePkg = require('mime');
+  if (mimePkg && typeof mimePkg.getType !== 'function' && typeof mimePkg.lookup === 'function') {
+    mimePkg.getType = mimePkg.lookup.bind(mimePkg);
+  }
+  if (mimePkg && typeof mimePkg.getExtension !== 'function' && typeof mimePkg.extension === 'function') {
+    mimePkg.getExtension = mimePkg.extension.bind(mimePkg);
+  }
+} catch {
+  // Ignore if mime is not directly resolvable
+}
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import hpp from 'hpp';

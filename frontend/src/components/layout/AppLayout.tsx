@@ -37,7 +37,7 @@ export const AppLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen flex bg-[#030712] text-slate-100 selection:bg-indigo-500 selection:text-white transition-colors">
       {/* Sidebar: 64px collapsed, 240px expanded */}
       <Sidebar
         isCollapsed={isCollapsed}

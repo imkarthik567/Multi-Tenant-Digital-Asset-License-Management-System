@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://assetvault-api.onrender.com/api/$1"
+      "destination": "/api"
     },
     {
       "source": "/(.*)",

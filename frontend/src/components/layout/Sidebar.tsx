@@ -288,21 +288,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isExpanded ? 'px-3.5 gap-3 rounded-lg mx-2' : 'justify-center mx-2 rounded-lg'
         } ${
           isActive
-            ? 'bg-indigo-950/60 text-white font-medium border-l-4 border-l-[var(--av-color-primary,#6366f1)] shadow-sm'
-            : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border-l-4 border-l-transparent'
+            ? 'bg-indigo-950/60 text-white font-medium border-l-4 border-l-indigo-500 shadow-sm shadow-indigo-500/10'
+            : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border-l-4 border-l-transparent'
         }`}
       >
         <span
           className={`relative flex items-center justify-center shrink-0 transition-colors ${
             isActive
-              ? 'text-[var(--av-color-primary,#6366f1)]'
+              ? 'text-indigo-400'
               : 'text-slate-400 group-hover:text-slate-200'
           }`}
         >
           {item.icon}
-          {/* Notification red dot when collapsed */}
+          {/* Notification dot when collapsed */}
           {isBell && unreadCount > 0 && !isExpanded && (
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-slate-950 animate-pulse" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-cyan-400 ring-2 ring-[#030712] animate-pulse" />
           )}
         </span>
 
@@ -312,7 +312,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Unread count badge when expanded */}
         {isBell && unreadCount > 0 && isExpanded && (
-          <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-full leading-none">
+          <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-indigo-600 text-white rounded-full leading-none">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -332,17 +332,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const navContent = (
-    <div className="flex flex-col h-full bg-[var(--av-color-bg,#020617)] border-r border-[var(--av-color-border,#1e293b)] select-none">
+    <div className="flex flex-col h-full bg-[#030712] border-r border-slate-800/80 select-none">
       {/* Brand Header */}
-      <div className="h-14 flex items-center justify-between px-3.5 border-b border-[var(--av-color-border,#1e293b)] shrink-0">
+      <div className="h-14 flex items-center justify-between px-3.5 border-b border-slate-800/80 shrink-0">
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[var(--av-color-primary-hover,#4f46e5)] to-[var(--av-color-primary,#6366f1)] flex items-center justify-center text-white font-black text-sm shadow-sm shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4f46e5] to-[#3730a3] flex items-center justify-center text-white font-black text-sm shadow-sm shadow-indigo-500/25 shrink-0">
             AV
           </div>
           {isExpanded && (
             <div className="flex flex-col truncate">
-              <span className="font-bold text-sm tracking-tight text-slate-100">
-                AssetVault
+              <span className="font-bold text-sm tracking-tight text-white">
+                Asset<span className="text-indigo-400">Vault</span>
               </span>
               <span className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">
                 Enterprise

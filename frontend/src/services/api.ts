@@ -226,7 +226,12 @@ export const handleApiError = (err: unknown): never => {
     let message =
       errorData?.message ||
       (typeof data?.message === 'string' ? data.message : undefined) ||
-      (typeof data === 'string' ? data : undefined) ||
+      (typeof data === 'string' && !data.trim().startsWith('<') ? data : undefined) ||
+      (typeof data === 'string' && data.trim().startsWith('<')
+        ? status === 502
+          ? 'Backend gateway unavailable (502 Bad Gateway)'
+          : `Server returned HTTP ${status}`
+        : undefined) ||
       err.message ||
       'An unexpected error occurred';
 

@@ -321,11 +321,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     const isSelected = itemIndex === selectedIndex;
 
     const iconMap = {
-      asset: { icon: Package, style: 'text-sky-400 bg-sky-950/70 border-sky-800/40' },
-      license: { icon: KeyRound, style: 'text-emerald-400 bg-emerald-950/70 border-emerald-800/40' },
-      vendor: { icon: Building2, style: 'text-purple-400 bg-purple-950/70 border-purple-800/40' },
-      tag: { icon: TagIcon, style: 'text-amber-400 bg-amber-950/70 border-amber-800/40' },
-      page: { icon: Compass, style: 'text-indigo-400 bg-indigo-950/70 border-indigo-800/40' },
+      asset: { icon: Package, style: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/40' },
+      license: { icon: KeyRound, style: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40' },
+      vendor: { icon: Building2, style: 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40' },
+      tag: { icon: TagIcon, style: 'text-amber-400 bg-amber-950/60 border-amber-800/40' },
+      page: { icon: Compass, style: 'text-indigo-300 bg-[#131c31] border-slate-700/60' },
     };
 
     const iconEntry = iconMap[item.type] || iconMap.page;
@@ -335,7 +335,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
       asset: { variant: 'info', label: 'Asset' },
       license: { variant: 'success', label: 'License' },
       vendor: { variant: 'outline', label: 'Vendor' },
-      tag: { variant: 'warning', label: 'Tag' },
+      tag: { variant: 'default', label: 'Tag' },
       page: { variant: 'default', label: isQueryEmpty && recentPages.length > 0 ? 'Recent' : 'Page' },
     };
 
@@ -354,8 +354,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
         className={cn(
           'group flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer transition-all duration-150',
           isSelected
-            ? 'bg-indigo-950/60 text-white border-l-4 border-l-[var(--av-color-primary,#6366f1)] shadow-sm'
-            : 'hover:bg-slate-800/50 text-slate-300 border-l-4 border-l-transparent'
+            ? 'bg-indigo-950/70 text-white border-l-2 border-l-indigo-500 shadow-sm'
+            : 'hover:bg-[#131c31]/80 text-slate-300 border-l-2 border-l-transparent'
         )}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -363,7 +363,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
             <IconComponent className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold truncate text-slate-100 group-hover:text-white">
+            <div className="text-sm font-semibold truncate text-white group-hover:text-white">
               {item.title}
             </div>
             <div className="text-xs text-slate-400 truncate">
@@ -402,7 +402,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-start justify-center pt-[10vh] sm:pt-[14vh] px-4 bg-slate-950/75 backdrop-blur-md transition-opacity duration-200',
+        'fixed inset-0 z-50 flex items-start justify-center pt-[10vh] sm:pt-[14vh] px-4 bg-[#030712]/80 backdrop-blur-md transition-opacity duration-200',
         isClosing ? 'opacity-0' : 'opacity-100 animate-spotlight-backdrop'
       )}
     >
@@ -416,12 +416,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
       {/* Centered Spotlight Modal (Max-width 600px) */}
       <div
         className={cn(
-          'relative w-full max-w-[600px] bg-slate-900 border border-slate-700/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[75vh] z-10 transition-all duration-200',
+          'relative w-full max-w-[600px] bg-[#0b1120] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[75vh] z-10 transition-all duration-200',
           isClosing ? 'opacity-0 scale-95 -translate-y-2' : 'opacity-100 scale-100 translate-y-0 animate-spotlight-modal'
         )}
       >
         {/* Top Search Input Bar with Icon and Escape badge */}
-        <div className="flex items-center px-4 py-3.5 border-b border-slate-800 gap-3 bg-slate-900/95 shrink-0">
+        <div className="flex items-center px-4 py-3.5 border-b border-slate-800 gap-3 bg-[#0b1120] shrink-0">
           <Search className="w-5 h-5 text-[var(--av-color-primary,#6366f1)] shrink-0" />
           <input
             ref={inputRef}
@@ -529,11 +529,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
               {results.assets.length > 0 && (
                 <div className="space-y-1">
                   <div className="px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sky-400">
-                      <Package className="w-4 h-4 text-sky-400" />
+                    <div className="flex items-center gap-2 text-white">
+                      <Package className="w-4 h-4 text-white" />
                       <span>Assets</span>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-500">
+                    <span className="text-[11px] font-mono text-zinc-400">
                       {results.assets.length}
                     </span>
                   </div>
@@ -550,11 +550,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
               {results.licenses.length > 0 && (
                 <div className="space-y-1">
                   <div className="px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-emerald-400">
-                      <KeyRound className="w-4 h-4 text-emerald-400" />
+                    <div className="flex items-center gap-2 text-white">
+                      <KeyRound className="w-4 h-4 text-white" />
                       <span>Licenses</span>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-500">
+                    <span className="text-[11px] font-mono text-zinc-400">
                       {results.licenses.length}
                     </span>
                   </div>
@@ -571,11 +571,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
               {results.vendors.length > 0 && (
                 <div className="space-y-1">
                   <div className="px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-purple-400">
-                      <Building2 className="w-4 h-4 text-purple-400" />
+                    <div className="flex items-center gap-2 text-white">
+                      <Building2 className="w-4 h-4 text-white" />
                       <span>Vendors</span>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-500">
+                    <span className="text-[11px] font-mono text-zinc-400">
                       {results.vendors.length}
                     </span>
                   </div>
@@ -592,11 +592,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
               {results.tags.length > 0 && (
                 <div className="space-y-1">
                   <div className="px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-amber-400">
-                      <TagIcon className="w-4 h-4 text-amber-400" />
+                    <div className="flex items-center gap-2 text-white">
+                      <TagIcon className="w-4 h-4 text-white" />
                       <span>Tags</span>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-500">
+                    <span className="text-[11px] font-mono text-zinc-400">
                       {results.tags.length}
                     </span>
                   </div>
