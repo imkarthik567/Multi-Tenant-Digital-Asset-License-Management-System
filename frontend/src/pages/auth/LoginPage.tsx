@@ -18,6 +18,7 @@ import { Button } from '../../components/ui/Button';
 import { AuthBrandedPanel } from './AuthBrandedPanel';
 import {
   ShieldCheck,
+  Sparkles,
   Mail,
   Lock,
   ArrowRight,
@@ -77,12 +78,13 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
-      password: '',
+      email: 'techcorp.admin@techcorp.io',
+      password: 'Password123!',
     },
   });
 
@@ -100,6 +102,11 @@ export const LoginPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fillCredentials = (email: string) => {
+    setValue('email', email, { shouldValidate: true });
+    setValue('password', 'Password123!', { shouldValidate: true });
   };
 
   const handleGoogleLogin = () => {
@@ -147,6 +154,48 @@ export const LoginPage: React.FC = () => {
             <p className="text-xs text-slate-400 mt-1">
               Enter your corporate credentials to access digital assets and license allocations.
             </p>
+
+          {/* Seeded Demo Persona Quick Select */}
+          <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl shadow-xs space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Quick Demo Personas:</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => fillCredentials('superadmin@assetvault.io')}
+                className="p-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-left transition-all"
+              >
+                <span className="font-semibold text-purple-400 block truncate">Super Admin</span>
+                <span className="text-[10px] text-slate-400 block truncate">superadmin@assetvault.io</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillCredentials('techcorp.admin@techcorp.io')}
+                className="p-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-left transition-all"
+              >
+                <span className="font-semibold text-indigo-400 block truncate">Tenant Admin</span>
+                <span className="text-[10px] text-slate-400 block truncate">techcorp.admin@...</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillCredentials('techcorp.mgr1@techcorp.io')}
+                className="p-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-left transition-all"
+              >
+                <span className="font-semibold text-sky-400 block truncate">Asset Manager</span>
+                <span className="text-[10px] text-slate-400 block truncate">techcorp.mgr1@...</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillCredentials('techcorp.dev1@techcorp.io')}
+                className="p-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-left transition-all"
+              >
+                <span className="font-semibold text-emerald-400 block truncate">Member (Dev)</span>
+                <span className="text-[10px] text-slate-400 block truncate">techcorp.dev1@...</span>
+              </button>
+            </div>
+          </div>
           </div>
 
           {/* Server Error Alert */}

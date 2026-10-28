@@ -614,7 +614,7 @@ export const UserListPage: React.FC = () => {
             setIsInviteDrawerOpen(true);
           }}
         >
-          Create / Invite User
+          Invite Team Member
         </Button>
       </div>
 

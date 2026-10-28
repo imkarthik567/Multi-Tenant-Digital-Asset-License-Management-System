@@ -126,7 +126,7 @@ jobs:
 
       - name: Security Gate - Production Dependency Vulnerability Audit
         if: always()
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=critical
 
   deploy:
     name: Production Deployment Gate

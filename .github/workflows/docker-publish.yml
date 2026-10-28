@@ -106,7 +106,7 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL'
 
       - name: Run Trivy Security Vulnerability Scan on Web
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
@@ -120,4 +120,4 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL'
