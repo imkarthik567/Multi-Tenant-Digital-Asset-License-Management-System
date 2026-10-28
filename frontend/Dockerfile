@@ -12,6 +12,7 @@ RUN apk upgrade --no-cache && apk add --no-cache libc6-compat
 COPY package*.json ./
 COPY backend/package*.json ./backend/
 COPY frontend/package*.json ./frontend/
+COPY firebase-applet-config.json* ./
 
 # Install build dependencies
 RUN npm ci --workspace=@assetvault/web
