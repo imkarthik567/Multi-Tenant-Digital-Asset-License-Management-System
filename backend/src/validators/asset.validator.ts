@@ -7,11 +7,28 @@
 import { z } from 'zod';
 import { AssetType, AssetStatus } from '@prisma/client';
 
+const AssetTypeEnum = (AssetType || {
+  FONT: 'FONT',
+  IMAGE: 'IMAGE',
+  VIDEO: 'VIDEO',
+  AUDIO: 'AUDIO',
+  SOFTWARE: 'SOFTWARE',
+  DATASET: 'DATASET',
+  DOCUMENT: 'DOCUMENT',
+  OTHER: 'OTHER',
+}) as typeof AssetType;
+
+const AssetStatusEnum = (AssetStatus || {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  ARCHIVED: 'ARCHIVED',
+}) as typeof AssetStatus;
+
 export const createAssetSchema = z
   .object({
     name: z.string().min(2).max(200).trim(),
     assetCode: z.string().min(2).max(50).trim(),
-    assetType: z.nativeEnum(AssetType),
+    assetType: z.nativeEnum(AssetTypeEnum),
     description: z.string().max(1000).optional().nullable(),
     categoryId: z.preprocess((v) => (v === '' ? null : v), z.string().min(1).optional().nullable()),
     fileUrl: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
@@ -24,10 +41,10 @@ export const createAssetSchema = z
 export const updateAssetSchema = z
   .object({
     name: z.string().min(2).max(200).trim().optional(),
-    assetType: z.nativeEnum(AssetType).optional(),
+    assetType: z.nativeEnum(AssetTypeEnum).optional(),
     description: z.string().max(1000).optional().nullable(),
     categoryId: z.preprocess((v) => (v === '' ? null : v), z.string().min(1).optional().nullable()),
-    status: z.nativeEnum(AssetStatus).optional(),
+    status: z.nativeEnum(AssetStatusEnum).optional(),
   })
   .strip();
 
@@ -45,8 +62,8 @@ export const queryAssetSchema = z
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).optional(),
     categoryId: z.string().min(1).optional(),
-    assetType: z.nativeEnum(AssetType).optional(),
-    status: z.nativeEnum(AssetStatus).optional(),
+    assetType: z.nativeEnum(AssetTypeEnum).optional(),
+    status: z.nativeEnum(AssetStatusEnum).optional(),
     tag: z.string().optional(),
     ownerId: z.string().min(1).optional(),
     complianceStatus: z.enum(['COMPLIANT', 'EXPIRED_LICENSE', 'UNLICENSED']).optional(),

@@ -6,6 +6,13 @@
 import { z } from 'zod';
 import { AccessAction } from '@prisma/client';
 
+const AccessActionEnum = (AccessAction || {
+  VIEW: 'VIEW',
+  DOWNLOAD: 'DOWNLOAD',
+  CHECKOUT: 'CHECKOUT',
+  CHECKIN: 'CHECKIN',
+}) as typeof AccessAction;
+
 export const isoDateStringSchema = z
   .string()
   .refine(
@@ -53,7 +60,7 @@ export const queryAccessLogSchema = z
     page: pageQuerySchema.optional(),
     limit: limitQuerySchema.optional(),
     cursor: numericCursorSchema.optional(),
-    action: z.nativeEnum(AccessAction).optional(),
+    action: z.nativeEnum(AccessActionEnum).optional(),
     userId: z.string().min(1).optional(),
     assetId: z.string().min(1).optional(),
     dateFrom: isoDateStringSchema.optional(),

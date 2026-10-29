@@ -4,6 +4,11 @@
 // Ensures zero-downtime, fully interactive local applet operation
 // ==============================================================================
 
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import os from 'os';
+
 const BCRYPT_PASSWORD_HASH = '$2a$10$Wdkk2P5XbxNUKMged8lf.ec4X3KILgM4XYxy8hBQ1.8jeYMuvlBIi'; // Password123!
 
 export interface MockStoreState {
@@ -862,18 +867,19 @@ export function createInitialState(): MockStoreState {
 export class MockPrismaStore {
   public state: MockStoreState;
   private persistPath: string;
+  private tmpPersistPath: string;
 
   constructor() {
-    this.persistPath = require('path').resolve(process.cwd(), '.mock-store-state.json');
+    this.persistPath = path.resolve(process.cwd(), '.mock-store-state.json');
+    this.tmpPersistPath = path.resolve(os.tmpdir(), '.mock-store-state.json');
     this.state = this.loadState();
   }
 
   private loadState(): MockStoreState {
     const initial = createInitialState();
     try {
-      const fs = require('fs');
-      const path = require('path');
       const candidatePaths = [
+        this.tmpPersistPath,
         this.persistPath,
         path.resolve(process.cwd(), 'backend/.mock-store-state.json'),
         path.resolve(process.cwd(), '../.mock-store-state.json'),
@@ -916,20 +922,31 @@ export class MockPrismaStore {
 
   public saveState(): void {
     try {
-      const fs = require('fs');
-      const path = require('path');
       const serialized = JSON.stringify(
         this.state,
         (_k, v) => (typeof v === 'bigint' ? Number(v) : v),
         2
       );
-      fs.writeFileSync(this.persistPath, serialized, 'utf-8');
-      const altPath = path.resolve(process.cwd(), 'backend/.mock-store-state.json');
-      if (altPath !== this.persistPath && fs.existsSync(path.dirname(altPath))) {
-        fs.writeFileSync(altPath, serialized, 'utf-8');
+      try {
+        fs.writeFileSync(this.tmpPersistPath, serialized, 'utf-8');
+      } catch {
+        // Ignore tmp write errors
+      }
+      try {
+        fs.writeFileSync(this.persistPath, serialized, 'utf-8');
+      } catch {
+        // Ignore read-only cwd write errors in serverless environments
+      }
+      try {
+        const altPath = path.resolve(process.cwd(), 'backend/.mock-store-state.json');
+        if (altPath !== this.persistPath && fs.existsSync(path.dirname(altPath))) {
+          fs.writeFileSync(altPath, serialized, 'utf-8');
+        }
+      } catch {
+        // Ignore altPath write errors
       }
     } catch {
-      // Ignore write errors
+      // Ignore serialization errors
     }
   }
 
@@ -1372,7 +1389,7 @@ export function createMockModelClient(modelName: string): any {
           normalizedData?.id ||
           (modelName.toLowerCase() === 'auditlog'
             ? String(Date.now() + Math.floor(Math.random() * 100000))
-            : require('crypto').randomUUID()),
+            : crypto.randomUUID()),
         createdAt: new Date(),
         updatedAt: new Date(),
         ...(modelName.toLowerCase() === 'refreshtoken' ? { revokedAt: null } : {}),
@@ -1578,7 +1595,7 @@ export function createMockPrismaClient(): any {
               throw new Error('User already holds an active seat for this license');
             }
             const newAlloc = {
-              id: require('crypto').randomUUID(),
+              id: crypto.randomUUID(),
               tenantId: lic.tenantId || 'tenant-acme-corp',
               licenseId,
               userId,
@@ -1622,7 +1639,7 @@ export function createMockPrismaClient(): any {
           if (sqlText.includes('sp_renew_license')) {
             const [licenseId, newEndDate, cost, performedBy, notes] = values;
             const lic = mockStore.state.licenses.find((l) => l.id === licenseId);
-            const renewalId = require('crypto').randomUUID();
+            const renewalId = crypto.randomUUID();
             if (lic) {
               const previousEndDate = lic.endDate || lic.expiresAt || new Date();
               lic.endDate = new Date(newEndDate);
@@ -1909,7 +1926,7 @@ export function createMockPrismaClient(): any {
 
                 if (!existingPending) {
                   mockStore.state.notifications.unshift({
-                    id: require('crypto').randomUUID(),
+                    id: crypto.randomUUID(),
                     tenantId: targetTenantId,
                     userId: recipient.id,
                     licenseId: lic.id,

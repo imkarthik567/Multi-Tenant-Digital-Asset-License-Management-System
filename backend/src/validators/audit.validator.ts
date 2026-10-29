@@ -6,12 +6,18 @@
 import { z } from 'zod';
 import { AuditAction } from '@prisma/client';
 
+const AuditActionEnum = (AuditAction || {
+  INSERT: 'INSERT',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE',
+}) as typeof AuditAction;
+
 export const queryAuditLogSchema = z
   .object({
     page: z.string().optional(),
     limit: z.string().optional(),
     tableName: z.string().optional(),
-    action: z.nativeEnum(AuditAction).optional(),
+    action: z.nativeEnum(AuditActionEnum).optional(),
     userId: z.string().min(1).optional(),
     dateFrom: z.string().optional(),
     dateTo: z.string().optional(),

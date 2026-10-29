@@ -37,6 +37,7 @@ class NotificationStreamService extends EventEmitter {
         }
       }
     }, 25000);
+    this.heartbeatTimer.unref?.();
   }
 
   /**

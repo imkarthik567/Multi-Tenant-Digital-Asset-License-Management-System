@@ -6,6 +6,12 @@
 import { z } from 'zod';
 import { TenantStatus } from '@prisma/client';
 
+const TenantStatusEnum = (TenantStatus || {
+  TRIAL: 'TRIAL',
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+}) as typeof TenantStatus;
+
 export const createTenantSchema = z
   .object({
     name: z.string().min(2).max(100).trim(),
@@ -25,13 +31,13 @@ export const updateTenantSchema = z
     name: z.string().min(2).max(100).trim().optional(),
     contactEmail: z.string().email().toLowerCase().trim().optional(),
     planId: z.number().int().positive().optional(),
-    status: z.nativeEnum(TenantStatus).optional(),
+    status: z.nativeEnum(TenantStatusEnum).optional(),
   })
   .strip();
 
 export const updateTenantStatusSchema = z
   .object({
-    status: z.nativeEnum(TenantStatus),
+    status: z.nativeEnum(TenantStatusEnum),
   })
   .strip();
 
@@ -48,7 +54,7 @@ export const queryTenantSchema = z
     q: z.string().optional(),
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).optional(),
-    status: z.nativeEnum(TenantStatus).optional(),
+    status: z.nativeEnum(TenantStatusEnum).optional(),
     planId: z.string().optional(),
   })
   .strip();

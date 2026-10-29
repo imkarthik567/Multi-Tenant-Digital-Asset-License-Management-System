@@ -12,13 +12,22 @@ import {
   pageQuerySchema,
 } from './access.validator';
 
+const NotificationTypeEnum = (NotificationType || {
+  EXPIRY_30: 'EXPIRY_30',
+  EXPIRY_15: 'EXPIRY_15',
+  EXPIRY_7: 'EXPIRY_7',
+  EXPIRED: 'EXPIRED',
+  OVER_ALLOCATION: 'OVER_ALLOCATION',
+  SYSTEM: 'SYSTEM',
+}) as typeof NotificationType;
+
 export const queryNotificationSchema = z
   .object({
     page: pageQuerySchema.optional(),
     limit: limitQuerySchema.optional(),
     cursor: numericCursorSchema.optional(),
     isRead: z.enum(['true', 'false']).optional(),
-    type: z.nativeEnum(NotificationType).optional(),
+    type: z.nativeEnum(NotificationTypeEnum).optional(),
     dateFrom: isoDateStringSchema.optional(),
     dateTo: isoDateStringSchema.optional(),
     sort: z.enum(['createdAt', 'isRead', 'type', 'id']).optional(),

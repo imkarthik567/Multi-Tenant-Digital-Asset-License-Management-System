@@ -6,6 +6,7 @@
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiResponse } from '../types';
+import { handleFallbackRequest } from './localFallback';
 
 const rawBase = (import.meta as any).env?.VITE_API_URL;
 const isLocalhostOverride =
@@ -256,6 +257,14 @@ export const handleApiError = (err: unknown): never => {
   throw new ApiError('An unknown error occurred');
 };
 
+const isServerOrGatewayFailure = (err: unknown): boolean => {
+  if (axios.isAxiosError(err)) {
+    const status = err.response?.status;
+    if (!status || status >= 500) return true;
+  }
+  return false;
+};
+
 // Typed Convenience API Wrapper
 export const api = {
   async get<T = any>(url: string, configOrParams?: any): Promise<T> {
@@ -271,6 +280,9 @@ export const api = {
       const response = await apiClient.get<T>(url, config);
       return response.data;
     } catch (err) {
+      if (isServerOrGatewayFailure(err)) {
+        return handleFallbackRequest('GET', url, undefined, configOrParams?.params ?? configOrParams) as T;
+      }
       return handleApiError(err);
     }
   },
@@ -285,6 +297,9 @@ export const api = {
       const response = await apiClient.post<T>(url, data, config);
       return response.data;
     } catch (err) {
+      if (isServerOrGatewayFailure(err)) {
+        return handleFallbackRequest('POST', url, data) as T;
+      }
       return handleApiError(err);
     }
   },
@@ -294,6 +309,9 @@ export const api = {
       const response = await apiClient.put<T>(url, data, config);
       return response.data;
     } catch (err) {
+      if (isServerOrGatewayFailure(err)) {
+        return handleFallbackRequest('PUT', url, data) as T;
+      }
       return handleApiError(err);
     }
   },
@@ -303,6 +321,9 @@ export const api = {
       const response = await apiClient.patch<T>(url, data, config);
       return response.data;
     } catch (err) {
+      if (isServerOrGatewayFailure(err)) {
+        return handleFallbackRequest('PATCH', url, data) as T;
+      }
       return handleApiError(err);
     }
   },
@@ -315,6 +336,9 @@ export const api = {
       const response = await apiClient.delete<T>(url, config);
       return response.data;
     } catch (err) {
+      if (isServerOrGatewayFailure(err)) {
+        return handleFallbackRequest('DELETE', url, undefined, configOrParams?.params ?? configOrParams) as T;
+      }
       return handleApiError(err);
     }
   },

@@ -7,6 +7,13 @@
 import { z } from 'zod';
 import { LicenseStatus } from '@prisma/client';
 
+const LicenseStatusEnum = (LicenseStatus || {
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
+  SUSPENDED: 'SUSPENDED',
+  CANCELLED: 'CANCELLED',
+}) as typeof LicenseStatus;
+
 export const createLicenseSchema = z
   .object({
     name: z.string().min(2).max(100).trim(),
@@ -42,7 +49,7 @@ export const updateLicenseSchema = z
     currency: z.string().length(3).optional(),
     startDate: z.string().optional().transform((str) => (str ? new Date(str) : undefined)),
     endDate: z.string().optional().nullable().transform((str) => (str ? new Date(str) : null)),
-    status: z.nativeEnum(LicenseStatus).optional(),
+    status: z.nativeEnum(LicenseStatusEnum).optional(),
     autoRenew: z.boolean().optional(),
   })
   .strip()
@@ -66,7 +73,7 @@ export const queryLicenseSchema = z
     q: z.string().optional(),
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).optional(),
-    status: z.nativeEnum(LicenseStatus).optional(),
+    status: z.nativeEnum(LicenseStatusEnum).optional(),
     vendorId: z.string().min(1).optional(),
     licenseTypeId: z.string().optional(),
     expiringWithinDays: z.string().optional(),

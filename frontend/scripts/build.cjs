@@ -20,8 +20,19 @@ function resolveBinary(pkgName, binSubpath) {
 
 const tscPath = resolveBinary('typescript', 'bin/tsc');
 const vitePath = resolveBinary('vite', 'bin/vite.js');
+const prismaPath = resolveBinary('prisma', 'build/index.js');
 
 const frontendDir = path.resolve(__dirname, '..');
+const schemaPath = path.resolve(frontendDir, '..', 'backend', 'prisma', 'schema.prisma');
+
+// 0. Ensure Prisma Client is generated for serverless /api routes
+if (prismaPath && fs.existsSync(schemaPath)) {
+  console.log('Generating Prisma Client for backend API...');
+  spawnSync(process.execPath, [prismaPath, 'generate', `--schema=${schemaPath}`], {
+    cwd: path.resolve(frontendDir, '..'),
+    stdio: 'inherit',
+  });
+}
 
 // 1. Run TypeScript typecheck
 console.log('Running TypeScript typecheck...');
