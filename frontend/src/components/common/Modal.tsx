@@ -1,9 +1,3 @@
-// ==============================================================================
-// AssetVault: Accessible Modal Dialog Component
-// Course: BCSE307L Database Systems (Fall 2026-27)
-// Backdrop blur, ESC key dismiss, focus handling, and responsive width sizing
-// ==============================================================================
-
 import React, { useEffect, ReactNode } from 'react';
 import { X } from 'lucide-react';
 
@@ -26,7 +20,6 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   maxWidth = 'lg',
 }) => {
-  // Escape key listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -53,7 +46,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -65,19 +58,19 @@ export const Modal: React.FC<ModalProps> = ({
       />
 
       <div
-        className={`relative w-full ${maxWidthClass} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-10 my-8`}
+        className={`relative w-full ${maxWidthClass} bg-[#0b1120] border border-white/[0.08] rounded-xl shadow-2xl overflow-hidden z-10 my-8`}
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-start justify-between px-5 py-4 border-b border-white/[0.06]">
           <div>
             <h3
               id="modal-title"
-              className="text-lg font-bold text-slate-900 dark:text-slate-100"
+              className="text-sm font-semibold text-white"
             >
               {title}
             </h3>
             {description && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 {description}
               </p>
             )}
@@ -86,18 +79,18 @@ export const Modal: React.FC<ModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors"
+            className="p-1 text-slate-400 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-5 max-h-[75vh] overflow-y-auto">{children}</div>
+        <div className="p-5 max-h-[75vh] overflow-y-auto text-slate-200">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 p-4 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-white/[0.015] border-t border-white/[0.06]">
             {footer}
           </div>
         )}

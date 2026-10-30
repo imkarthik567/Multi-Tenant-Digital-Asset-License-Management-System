@@ -207,10 +207,23 @@ const safePrisma = new Proxy(basePrisma, {
       };
     }
     if (prop === '$transaction') {
-      return async (fnOrArray: any) => {
+      return async (fnOrArray: any, options?: any) => {
+        if (target === (mockFallbackClient as any)) {
+          return await (mockFallbackClient as any).$transaction(fnOrArray, options);
+        }
+        let callbackStarted = false;
         try {
-          return await (target as any).$transaction(fnOrArray);
-        } catch {
+          if (typeof fnOrArray === 'function') {
+            return await (target as any).$transaction(async (tx: any) => {
+              callbackStarted = true;
+              return await fnOrArray(tx);
+            }, options);
+          }
+          return await (target as any).$transaction(fnOrArray, options);
+        } catch (err) {
+          if (callbackStarted) {
+            throw err;
+          }
           if (typeof fnOrArray === 'function') {
             return await fnOrArray(mockFallbackClient);
           }

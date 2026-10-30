@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { signInWithGoogleAccount } from '../../services/gmailAuth';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { AuthAmbientBackground } from './AuthAmbientBackground';
@@ -94,7 +95,7 @@ export const slugify = (text: string): string => {
 // ==============================================================================
 
 export const RegisterPage: React.FC = () => {
-  const { register: registerAuth } = useAuth();
+  const { register: registerAuth, loginWithGoogle } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -102,6 +103,12 @@ export const RegisterPage: React.FC = () => {
   const [isSlugManual, setIsSlugManual] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [connectedGoogleProfile, setConnectedGoogleProfile] = useState<{
+    email: string;
+    fullName: string;
+    avatarUrl: string | null;
+  } | null>(null);
 
   const {
     register,
@@ -125,8 +132,10 @@ export const RegisterPage: React.FC = () => {
   });
 
   const tenantNameValue = watch('tenantName');
+  const slugValue = watch('slug');
   const passwordValue = watch('password') || '';
   const contactEmailValue = watch('contactEmail');
+  const adminFullNameValue = watch('adminFullName');
 
   // Auto-derive slug from tenantName unless user manually typed in slug
   useEffect(() => {
@@ -138,6 +147,14 @@ export const RegisterPage: React.FC = () => {
 
   // Sync contact email to admin email if admin email is empty
   const handleStep1Next = async () => {
+    if (connectedGoogleProfile) {
+      const isOrgValid = await trigger(['tenantName', 'slug']);
+      if (isOrgValid) {
+        await completeGoogleWorkspaceSetup(connectedGoogleProfile);
+      }
+      return;
+    }
+
     const isStep1Valid = await trigger(['tenantName', 'slug', 'contactEmail']);
     if (isStep1Valid) {
       const currentAdminEmail = watch('adminEmail');
@@ -146,6 +163,119 @@ export const RegisterPage: React.FC = () => {
       }
       setStep(2);
       setServerError(null);
+    }
+  };
+
+  const completeGoogleWorkspaceSetup = async (profile: {
+    email: string;
+    fullName: string;
+    avatarUrl: string | null;
+  }) => {
+    const trimmedOrg = (tenantNameValue || '').trim();
+    if (trimmedOrg.length < 2) {
+      setStep(1);
+      setServerError('Please enter your Organization / Company Name above to complete Google setup.');
+      return;
+    }
+
+    try {
+      setIsGoogleLoading(true);
+      setServerError(null);
+      const result = await loginWithGoogle({
+        email: profile.email,
+        fullName: (adminFullNameValue || '').trim() || profile.fullName,
+        avatarUrl: profile.avatarUrl,
+        tenantName: trimmedOrg,
+        slug: (slugValue || '').trim() || slugify(trimmedOrg),
+        contactEmail: (contactEmailValue || '').trim() || profile.email,
+      });
+
+      if (result.user) {
+        toast.success(
+          `Organization ${trimmedOrg} and Admin ${result.user.fullName} provisioned with Google!`,
+          'Welcome to AssetVault'
+        );
+        navigate('/', { replace: true });
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to register organization with Google.';
+      setServerError(msg);
+      toast.error(msg, 'Google Registration Failed');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setServerError(null);
+
+      const googleProfile = await signInWithGoogleAccount();
+      const trimmedOrg = (tenantNameValue || '').trim();
+
+      // If Organization Name is already entered, create workspace (or sign in existing user) immediately
+      if (trimmedOrg.length >= 2) {
+        const result = await loginWithGoogle({
+          email: googleProfile.email,
+          fullName: (adminFullNameValue || '').trim() || googleProfile.fullName,
+          avatarUrl: googleProfile.avatarUrl,
+          tenantName: trimmedOrg,
+          slug: (slugValue || '').trim() || slugify(trimmedOrg),
+          contactEmail: (contactEmailValue || '').trim() || googleProfile.email,
+        });
+
+        if (result.user) {
+          toast.success(
+            `Signed in as ${result.user.fullName}!`,
+            'Welcome to AssetVault'
+          );
+          navigate('/', { replace: true });
+          return;
+        }
+      }
+
+      // Otherwise check if user already belongs to an organization
+      const checkResult = await loginWithGoogle({
+        email: googleProfile.email,
+        fullName: googleProfile.fullName,
+        avatarUrl: googleProfile.avatarUrl,
+      });
+
+      if (!checkResult.requiresOnboarding && checkResult.user) {
+        toast.success(
+          `Welcome back, ${checkResult.user.fullName}!`,
+          'Signed In with Google'
+        );
+        navigate('/', { replace: true });
+        return;
+      }
+
+      // New Google user without Organization Name yet: pre-fill fields and ask for Organization Name
+      const profile = checkResult.profile || googleProfile;
+      setConnectedGoogleProfile(profile);
+      setValue('contactEmail', profile.email, { shouldValidate: true });
+      setValue('adminEmail', profile.email, { shouldValidate: true });
+      setValue('adminFullName', profile.fullName, { shouldValidate: true });
+      setStep(1);
+      toast.info(
+        'Google account connected! Enter your Organization Name to create your workspace.',
+        'Almost Done'
+      );
+    } catch (err: any) {
+      const code = err?.code || '';
+      const msg = err?.message || 'Google Sign-In could not be completed.';
+      if (
+        code === 'auth/popup-closed-by-user' ||
+        code === 'auth/cancelled-popup-request' ||
+        msg.toLowerCase().includes('popup')
+      ) {
+        return;
+      }
+      setServerError(msg);
+      toast.error(msg, 'Google Sign-In Failed');
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -242,7 +372,7 @@ export const RegisterPage: React.FC = () => {
       <AuthAmbientBackground />
 
       {/* Main Split-Card Container */}
-      <div className="relative z-10 w-full max-w-[1060px] min-h-[620px] rounded-[28px] bg-[#0b1120]/95 backdrop-blur-2xl border border-slate-800/80 shadow-[0_32px_120px_-24px_rgba(2,6,23,0.95)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 animate-fade-in items-stretch">
+      <div className="relative z-10 w-full max-w-[1060px] min-h-[620px] rounded-[28px] bg-[#080d1a]/80 backdrop-blur-2xl border border-white/[0.08] shadow-[0_32px_120px_-24px_rgba(2,6,23,0.95)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 animate-fade-in items-stretch">
         {/* LEFT COLUMN: 2-Step Registration Wizard (6 columns on desktop) */}
         <div className="lg:col-span-6 p-7 sm:p-10 lg:p-11 flex flex-col justify-between relative z-10">
           <div>
@@ -334,6 +464,30 @@ export const RegisterPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Connected Google Account Banner */}
+            {connectedGoogleProfile && (
+              <div className="mb-4 p-3 rounded-xl bg-indigo-950/35 border border-indigo-500/30 flex items-center justify-between gap-2 animate-fade-in">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">
+                      Google Verified: {connectedGoogleProfile.fullName}
+                    </p>
+                    <p className="text-[11px] text-indigo-300 font-mono truncate">
+                      {connectedGoogleProfile.email} &mdash; Enter Organization Name to finish
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setConnectedGoogleProfile(null)}
+                  className="text-[11px] font-semibold text-slate-400 hover:text-white shrink-0 cursor-pointer"
+                >
+                  Disconnect
+                </button>
+              </div>
+            )}
+
             {/* Server Error Alert */}
             {serverError && (
               <div className="mb-4 p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 flex items-start gap-2.5 animate-fade-in">
@@ -390,10 +544,14 @@ export const RegisterPage: React.FC = () => {
                   variant="primary"
                   size="md"
                   onClick={handleStep1Next}
+                  isLoading={isGoogleLoading}
+                  loadingText="Provisioning Workspace..."
                   className="w-full mt-2 font-semibold shadow-lg shadow-indigo-600/25"
                   iconRight={<ArrowRight className="w-4 h-4" />}
                 >
-                  Continue to Admin Setup
+                  {connectedGoogleProfile
+                    ? 'Create Organization with Google'
+                    : 'Continue to Admin Setup'}
                 </Button>
               </div>
 
@@ -508,6 +666,51 @@ export const RegisterPage: React.FC = () => {
                 </div>
               </div>
             </form>
+
+            {/* Google OAuth SSO Option */}
+            {!connectedGoogleProfile && (
+              <div className="space-y-3.5 pt-4">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-800" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2.5 bg-[#0b1120] text-slate-400 uppercase font-medium text-[10px] tracking-wider">
+                      Or Continue With SSO
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleSignUp}
+                  disabled={isGoogleLoading || isLoading}
+                  className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-[#131c31]/90 hover:bg-[#1e293b] active:bg-[#1e293b] border border-slate-800 hover:border-indigo-500/40 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>
+                    {isGoogleLoading ? 'Connecting to Google...' : 'Sign in with Google'}
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Footer Link to Sign In */}
@@ -522,78 +725,51 @@ export const RegisterPage: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Branded Project Introduction Panel (6 columns on desktop) */}
-        <div className="hidden lg:flex lg:col-span-6 relative m-3 rounded-[22px] overflow-hidden select-none border border-indigo-400/20 bg-gradient-to-br from-[#4f46e5] via-[#3730a3] to-[#1e1b4b] p-10 xl:p-12 flex-col justify-between shadow-inner">
-          {/* Subtle Top-Right Cyan Ambient Glow */}
-          <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-indigo-400/15 blur-3xl pointer-events-none" />
-
-          {/* Subtle Geometric Contour Lines SVG */}
+        {/* RIGHT COLUMN: Royal Blue-Indigo Brand Panel (6 columns on desktop) */}
+        <div className="hidden lg:flex lg:col-span-6 relative m-3 rounded-[20px] overflow-hidden select-none border border-indigo-400/20 bg-gradient-to-br from-[#2563eb] via-[#3730a3] to-[#1e1b4b] p-10 xl:p-12 flex-col justify-between">
+          {/* Geometric Wave Curves Overlay */}
           <svg
-            className="absolute inset-0 w-full h-full pointer-events-none opacity-25"
+            className="absolute inset-0 w-full h-full opacity-25 pointer-events-none"
             viewBox="0 0 600 700"
             fill="none"
+            xmlns="http://www.w3.org/2000/svg"
             preserveAspectRatio="none"
-            aria-hidden="true"
           >
+            <circle cx="520" cy="120" r="240" stroke="white" strokeOpacity="0.22" strokeWidth="1.5" />
+            <circle cx="520" cy="120" r="320" stroke="white" strokeOpacity="0.16" strokeWidth="1.5" />
+            <circle cx="520" cy="120" r="400" stroke="white" strokeOpacity="0.12" strokeWidth="1.5" />
             <path
-              d="M 180 -40 C 260 220, 320 440, 260 740"
-              stroke="#ffffff"
-              strokeOpacity="0.24"
-              strokeWidth="1.5"
+              d="M-60 560 C 140 440, 360 660, 660 480"
+              stroke="white"
+              strokeOpacity="0.2"
+              strokeWidth="2"
             />
             <path
-              d="M 310 -40 C 380 220, 430 440, 370 740"
-              stroke="#22d3ee"
-              strokeOpacity="0.28"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M 430 -40 C 490 220, 540 440, 480 740"
-              stroke="#ffffff"
-              strokeOpacity="0.22"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M -40 290 L 520 60 L 640 500"
-              stroke="#ffffff"
-              strokeOpacity="0.18"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M -40 420 L 570 175 L 660 560"
-              stroke="#22d3ee"
-              strokeOpacity="0.20"
+              d="M-60 620 C 160 500, 380 720, 660 540"
+              stroke="white"
+              strokeOpacity="0.14"
               strokeWidth="1.5"
             />
           </svg>
 
-          {/* Top Emblem Icon */}
+          {/* Top Geometric Star Icon */}
           <div className="relative z-10">
-            <svg
-              className="w-12 h-12 text-white"
-              viewBox="0 0 48 48"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M24 6V42M6 24H42M11.27 11.27L36.73 36.73M36.73 11.27L11.27 36.73"
-                stroke="currentColor"
-                strokeWidth="4.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg">
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18M3 12h18M5.636 5.636l12.728 12.728M18.364 5.636L5.636 18.364" />
+              </svg>
+            </div>
           </div>
 
-          {/* Center Hero Greeting & Project Explanation */}
+          {/* Center Hero Copy */}
           <div className="relative z-10 my-auto py-8">
-            <h2 className="text-4xl xl:text-5xl font-extrabold text-white tracking-tight leading-[1.15]">
+            <h2 className="text-3xl xl:text-4xl font-extrabold text-white tracking-tight leading-tight">
               Hello
               <br />
-              AssetVault! <span className="inline-block">👋</span>
+              AssetVault! 👋
             </h2>
-            <p className="mt-6 text-base xl:text-[17px] text-indigo-100/95 leading-relaxed max-w-[400px] font-normal">
-              Skip repetitive and manual asset-licensing spreadsheets. Centralize your digital assets, automate seat allocations, and stay audit-ready while saving tons of time!
+            <p className="mt-4 text-sm sm:text-base text-indigo-100/90 leading-relaxed max-w-[380px]">
+              Provision your multi-tenant workspace in seconds. Centralize software licenses, automate seat allocations, and govern digital assets effortlessly.
             </p>
           </div>
 

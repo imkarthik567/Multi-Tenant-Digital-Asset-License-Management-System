@@ -62,15 +62,27 @@ export class AiController {
       const history = Array.isArray(req.body?.history) ? req.body.history : [];
       const model = typeof req.body?.model === 'string' ? req.body.model : undefined;
       const persona = typeof req.body?.persona === 'string' ? req.body.persona : undefined;
+      const userId =
+        (req.user as any)?.userId ||
+        (req.user as any)?.id ||
+        (typeof req.body?.userId === 'string' ? req.body.userId.trim() : undefined);
+      const userEmail =
+        req.user?.email ||
+        (typeof req.body?.userEmail === 'string' ? req.body.userEmail.trim() : undefined);
       const userName =
         typeof req.body?.userName === 'string' && req.body.userName.trim()
           ? req.body.userName.trim()
-          : (req.user as any)?.fullName || req.user?.email?.split('@')[0];
+          : (req.user as any)?.fullName || userEmail?.split('@')[0];
+      const userRole =
+        formatUserRole((req.user as any)?.role || req.body?.userRole || 'MEMBER');
       const tenantId = req.user?.tenantId || null;
       const result = await aiService.askDatabaseCopilot(req.prisma, tenantId, prompt, history, {
         model,
         persona,
+        userId,
+        userEmail,
         userName,
+        userRole,
       });
       return sendResponse(res, 200, result);
     } catch (err: any) {

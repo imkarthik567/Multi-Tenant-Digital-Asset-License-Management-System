@@ -241,7 +241,8 @@
       "isActive": true,
       "department": "IT Operations",
       "createdAt": "2026-01-10T00:00:00.000Z",
-      "updatedAt": "2026-01-10T00:00:00.000Z"
+      "updatedAt": "2026-10-29T04:37:09.983Z",
+      "lastLoginAt": "2026-10-29T04:37:09.983Z"
     },
     {
       "id": "user-techcorp-mgr1",
@@ -662,7 +663,7 @@
       "type": "SEAT_BASED",
       "status": "ACTIVE",
       "totalSeats": 25,
-      "allocatedSeats": 2,
+      "allocatedSeats": 3,
       "cost": 750,
       "currency": "USD",
       "autoRenew": true,
@@ -670,7 +671,8 @@
       "endDate": "2026-11-22T16:59:46.521Z",
       "expiresAt": "2026-11-22T16:59:46.521Z",
       "createdAt": "2026-01-19T00:00:00.000Z",
-      "updatedAt": "2026-01-19T00:00:00.000Z"
+      "updatedAt": "2026-01-19T00:00:00.000Z",
+      "usedSeats": 3
     },
     {
       "id": "lic-techcorp-1",
@@ -716,6 +718,17 @@
     }
   ],
   "allocations": [
+    {
+      "id": "f7b6d177-f925-48ca-95dc-3a72d3f834e6",
+      "tenantId": "tenant-acme-corp",
+      "licenseId": "lic-4",
+      "userId": "user-karthik-admin-alt",
+      "allocatedBy": "user-karthik-admin",
+      "status": "ACTIVE",
+      "allocatedAt": "2026-10-29T04:23:04.167Z",
+      "revokedAt": null,
+      "notes": "Allocated via sp_allocate_license_seat"
+    },
     {
       "id": "alloc-1",
       "tenantId": "tenant-acme-corp",
@@ -801,6 +814,35 @@
       "emailSent": true,
       "recipientEmail": "member@acme.com",
       "createdAt": "2026-10-28T16:14:46.522Z"
+    },
+    {
+      "id": "1a8fca20-61fb-413e-a8dc-22848531f9f0",
+      "tenantId": "tenant-karthik",
+      "userId": "user-karthik-admin-alt",
+      "licenseId": "lic-4",
+      "type": "SYSTEM",
+      "title": "Your Seat for \"Figma Enterprise Organization\" is Active",
+      "message": "Automated email sent to karthiksmrk7377@gmail.com: Seat allocated for \"Figma Enterprise Organization\" (End Date: 2026-11-22).",
+      "isRead": false,
+      "emailSent": true,
+      "recipientEmail": "karthiksmrk7377@gmail.com",
+      "recipientName": "Karthikeyan S",
+      "createdAt": "2026-10-29T04:23:15.659Z"
+    },
+    {
+      "id": "5f7c96c2-aee8-43ba-8fd3-982338a02c79",
+      "tenantId": "tenant-karthik",
+      "userId": "user-karthik-admin",
+      "licenseId": "lic-4",
+      "type": "SYSTEM",
+      "title": "Seat Allocated: Karthikeyan S (karthiksmrk7377@gmail.com)",
+      "message": "Automated email sent to karthikeyan.s050607@gmail.com: Seat allocated for \"Figma Enterprise Organization\" (End Date: 2026-11-22).",
+      "isRead": true,
+      "emailSent": true,
+      "recipientEmail": "karthikeyan.s050607@gmail.com",
+      "recipientName": "Karthikeyan S",
+      "createdAt": "2026-10-29T04:23:10.449Z",
+      "updatedAt": "2026-10-29T04:27:13.660Z"
     }
   ],
   "emailDeliveries": [
@@ -867,6 +909,38 @@
       "bodyText": "Hello Acme Team Member,\n\nAn active software license seat for \"IntelliJ IDEA Ultimate Enterprise\" (JetBrains) has been allocated to your organization account (member@acme.com) in Acme Corporation.\n\nLicense Status: ACTIVE\nContract End Date: 2027-04-26\nNotes: Fullstack Core Dev seat",
       "status": "SENT",
       "sentAt": "2026-10-28T16:14:46.522Z"
+    },
+    {
+      "id": "email-9ae221d6-18b7-4e03-996d-3f69cbd8d022",
+      "tenantId": "tenant-karthik",
+      "tenantName": "Karthik Enterprise Workspace",
+      "recipientUserId": "user-karthik-admin-alt",
+      "recipientEmail": "karthiksmrk7377@gmail.com",
+      "recipientName": "Karthikeyan S",
+      "recipientRole": "TENANT_ADMIN",
+      "licenseId": "lic-4",
+      "licenseName": "Figma Enterprise Organization",
+      "eventType": "SEAT_ALLOCATED",
+      "subject": "[AssetVault] License Seat Allocated to You: Figma Enterprise Organization",
+      "bodyText": "Hello Karthikeyan S,\n\nAn active software license seat for \"Figma Enterprise Organization\" (Figma Inc.) has been allocated to your organization account (karthiksmrk7377@gmail.com) in Karthik Enterprise Workspace.\n\nContract End Date: 2026-11-22\nAllocation ID: f7b6d177-f925-48ca-95dc-3a72d3f834e6",
+      "status": "SENT",
+      "sentAt": "2026-10-29T04:23:15.658Z"
+    },
+    {
+      "id": "email-3cbbc396-6703-4d8c-a49e-7271b450872e",
+      "tenantId": "tenant-karthik",
+      "tenantName": "Karthik Enterprise Workspace",
+      "recipientUserId": "user-karthik-admin",
+      "recipientEmail": "karthikeyan.s050607@gmail.com",
+      "recipientName": "Karthikeyan S",
+      "recipientRole": "TENANT_ADMIN",
+      "licenseId": "lic-4",
+      "licenseName": "Figma Enterprise Organization",
+      "eventType": "SEAT_ALLOCATED",
+      "subject": "[AssetVault] Seat Allocated to Karthikeyan S: Figma Enterprise Organization",
+      "bodyText": "Hello Karthikeyan S,\n\nA software license seat for \"Figma Enterprise Organization\" (Figma Inc.) was allocated to organization member Karthikeyan S (karthiksmrk7377@gmail.com).\n\nContract End Date: 2026-11-22\nRemaining Seats: 22 / 25",
+      "status": "SENT",
+      "sentAt": "2026-10-29T04:23:10.448Z"
     }
   ],
   "auditLogs": [
@@ -976,6 +1050,39 @@
       "expiresAt": "2026-11-04T19:21:40.961Z",
       "userAgent": "curl/7.88.1",
       "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "8ea025c1-e576-43c6-bcb0-7d779c82f471",
+      "createdAt": "2026-10-29T04:35:29.354Z",
+      "updatedAt": "2026-10-29T04:35:29.354Z",
+      "revokedAt": null,
+      "userId": "user-techcorp-admin",
+      "tokenHash": "5b920f18312f0caffb3daff2d65797e0bede799aa44b31869b346bd6680e434b",
+      "expiresAt": "2026-11-05T04:35:29.353Z",
+      "userAgent": "curl/7.88.1",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "bd4c8fc3-a51a-4f74-87e4-8394b9c4237c",
+      "createdAt": "2026-10-29T04:36:13.709Z",
+      "updatedAt": "2026-10-29T04:36:13.709Z",
+      "revokedAt": null,
+      "userId": "user-techcorp-admin",
+      "tokenHash": "2f9c078c4102297f509021dd88d299ce6114e57b463bdfcf1a730d4db73a8d09",
+      "expiresAt": "2026-11-05T04:36:13.708Z",
+      "userAgent": "node",
+      "ipAddress": "::ffff:127.0.0.1"
+    },
+    {
+      "id": "b8ba433a-56f0-458c-99a6-f02baeebb9c6",
+      "createdAt": "2026-10-29T04:37:09.982Z",
+      "updatedAt": "2026-10-29T04:37:09.982Z",
+      "revokedAt": null,
+      "userId": "user-techcorp-admin",
+      "tokenHash": "a52d19e5ce21ed6ee2c89605ae2975c9f1a7dc11957b52068129d809caacc1e0",
+      "expiresAt": "2026-11-05T04:37:09.982Z",
+      "userAgent": "node",
+      "ipAddress": "::ffff:127.0.0.1"
     }
   ],
   "assetTags": [],
@@ -988,6 +1095,16 @@
       "first_attempt_at": "2026-10-28T18:57:59.329Z",
       "last_attempt_at": "2026-10-28T19:00:25.942Z",
       "locked_until": null
+    },
+    {
+      "key": "admin@acmecorp.com#127.0.0.1",
+      "email": "admin@acmecorp.com#127.0.0.1",
+      "ip_address": "127.0.0.1",
+      "count": 1,
+      "first_attempt_at": "2026-10-29T04:35:18.833Z",
+      "last_attempt_at": "2026-10-29T04:35:18.833Z",
+      "locked_until": null
     }
-  ]
+  ],
+  "assetlicense": []
 }

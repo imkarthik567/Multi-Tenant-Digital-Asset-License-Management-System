@@ -122,11 +122,17 @@ const VOICE_OPTIONS = [
   { id: 'Charon', label: 'Charon (Calm & Analytical)' },
 ];
 
-const CHAT_HISTORY_STORAGE_KEY = 'assetvault_ai_chat_history_v2';
+const CHAT_HISTORY_STORAGE_PREFIX = 'assetvault_ai_chat_history_v3';
 
 export const AiAssistantPage: React.FC = () => {
   const toast = useToast();
   const { user, tenant } = useAuth();
+
+  const resolvedUserRole =
+    typeof user?.role === 'object' && user?.role !== null
+      ? String((user.role as any).name || 'MEMBER')
+      : String(user?.role || 'MEMBER');
+  const userStorageKey = `${CHAT_HISTORY_STORAGE_PREFIX}_${(user?.id || user?.email || 'anonymous').toLowerCase()}`;
 
   // Default to 'copilot' (Talk & Chat with AI Assistant) so user can immediately talk to the AI
   const [activeMode, setActiveMode] = useState<WorkspaceMode>('copilot');
@@ -135,27 +141,30 @@ export const AiAssistantPage: React.FC = () => {
   const [summary, setSummary] = useState<ContextSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState<boolean>(true);
 
+  const buildWelcomeMessage = useCallback((): CopilotMessage => {
+    const firstName = user?.fullName ? user.fullName.split(' ')[0] : 'there';
+    const emailTag = user?.email ? ` (\`${user.email}\` · \`${resolvedUserRole}\`)` : '';
+    return {
+      id: 'welcome-aria',
+      role: 'model',
+      text: `Hi ${firstName}${emailTag}! I'm Aria, your AssetVault AI Assistant. You can talk to me with your voice using the microphone button or type any question below.\n\nI'm connected to ${
+        tenant?.name || 'your organization'
+      }'s live database—ask me about your personal profile & allocated software keys, digital assets, seat utilization, vendors, or cost optimization!`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+  }, [user?.fullName, user?.email, resolvedUserRole, tenant?.name]);
+
   // Mode 1 (Primary): Conversational & Voice AI Assistant state
   const [copilotInput, setCopilotInput] = useState<string>('');
   const [messages, setMessages] = useState<CopilotMessage[]>(() => {
     try {
-      const saved = sessionStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
+      const saved = sessionStorage.getItem(userStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    const firstName = user?.fullName ? user.fullName.split(' ')[0] : 'there';
-    return [
-      {
-        id: 'welcome-aria',
-        role: 'model',
-        text: `Hi ${firstName}! I'm Aria, your AssetVault AI Assistant. You can talk to me with your voice using the microphone button or type any question below.\n\nI'm connected to ${
-          tenant?.name || 'your organization'
-        }'s live database—ask me about your software licenses, digital assets, seat utilization, vendors, team members, or cost optimization!`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ];
+    return [buildWelcomeMessage()];
   });
   const [loadingCopilot, setLoadingCopilot] = useState<boolean>(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
@@ -182,6 +191,7 @@ export const AiAssistantPage: React.FC = () => {
   const handsFreeRef = useRef<boolean>(true);
   const autoSpeakRef = useRef<boolean>(true);
   const messagesRef = useRef<CopilotMessage[]>(messages);
+  const activeStorageKeyRef = useRef<string>(userStorageKey);
 
   useEffect(() => {
     liveCallActiveRef.current = liveCallActive;
@@ -196,11 +206,28 @@ export const AiAssistantPage: React.FC = () => {
   }, [autoSpeakReplies]);
 
   useEffect(() => {
+    if (activeStorageKeyRef.current !== userStorageKey) {
+      activeStorageKeyRef.current = userStorageKey;
+      try {
+        const saved = sessionStorage.getItem(userStorageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+            return;
+          }
+        }
+      } catch {}
+      setMessages([buildWelcomeMessage()]);
+    }
+  }, [userStorageKey, buildWelcomeMessage]);
+
+  useEffect(() => {
     messagesRef.current = messages;
     try {
-      sessionStorage.setItem(CHAT_HISTORY_STORAGE_KEY, JSON.stringify(messages.slice(-30)));
+      sessionStorage.setItem(userStorageKey, JSON.stringify(messages.slice(-30)));
     } catch {}
-  }, [messages]);
+  }, [messages, userStorageKey]);
 
   // Mode 2: License Optimization state
   const [focusArea, setFocusArea] = useState<string>(
@@ -390,7 +417,10 @@ export const AiAssistantPage: React.FC = () => {
           };
         }>('/ai/copilot', {
           prompt: query,
+          userId: user?.id,
           userName: user?.fullName,
+          userEmail: user?.email,
+          userRole: resolvedUserRole,
           history: currentHistory
             .filter((m) => !m.id.startsWith('welcome-') && !m.id.startsWith('err-'))
             .slice(-10)
@@ -440,7 +470,7 @@ export const AiAssistantPage: React.FC = () => {
         toast.error(msg);
       }
     },
-    [copilotInput, loadingCopilot, speakText, stopSpeaking, toast, user?.fullName]
+    [copilotInput, loadingCopilot, speakText, stopSpeaking, toast, user?.id, user?.fullName, user?.email, resolvedUserRole]
   );
 
   // Start microphone listening (Web Speech API with MediaRecorder + Gemini Transcribe fallback)
@@ -662,19 +692,10 @@ export const AiAssistantPage: React.FC = () => {
 
   const handleClearConversation = () => {
     stopAllVoiceActivity();
-    const firstName = user?.fullName ? user.fullName.split(' ')[0] : 'there';
-    const resetMessages: CopilotMessage[] = [
-      {
-        id: `welcome-${Date.now()}`,
-        role: 'model',
-        text: `Conversation cleared! Hi ${firstName}, I'm ready whenever you want to talk or ask about your organization's assets, licenses, vendors, or users.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ];
-    setMessages(resetMessages);
+    setMessages([buildWelcomeMessage()]);
     setSuggestedFollowUps(INITIAL_CONVERSATION_STARTERS);
     try {
-      sessionStorage.removeItem(CHAT_HISTORY_STORAGE_KEY);
+      sessionStorage.removeItem(userStorageKey);
     } catch {}
   };
 

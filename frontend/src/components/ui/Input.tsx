@@ -1,8 +1,3 @@
-// ==============================================================================
-// AssetVault Design System: Input Component
-// Label, helper text, error state, left icon slot, right action slot & password toggle
-// ==============================================================================
-
 import React, { forwardRef, useId, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../utils/cn';
@@ -19,9 +14,9 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
 }
 
 const sizeStyles = {
-  sm: 'text-xs h-8 px-2.5 rounded-[var(--av-radius-sm,6px)]',
-  md: 'text-sm h-10 px-3.5 rounded-[var(--av-radius-md,10px)]',
-  lg: 'text-base h-12 px-4 rounded-[var(--av-radius-md,10px)]',
+  sm: 'text-xs h-8 px-3 rounded-lg',
+  md: 'text-xs h-9 px-3.5 rounded-lg',
+  lg: 'text-sm h-11 px-4 rounded-lg',
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -62,7 +57,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <button
           type="button"
           onClick={() => setIsPasswordVisible((prev) => !prev)}
-          className="p-1 -mr-1 text-[var(--av-color-text-muted,#64748b)] hover:text-[var(--av-color-text-primary,#f8fafc)] focus:outline-none focus:text-[var(--av-color-primary,#6366f1)] rounded-md transition-colors"
+          className="p-1 -mr-1 text-slate-500 hover:text-slate-200 focus:outline-none rounded-md transition-colors cursor-pointer"
           title={isPasswordVisible ? 'Hide password' : 'Show password'}
           aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
           tabIndex={-1}
@@ -82,7 +77,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="text-xs font-medium text-[var(--av-color-text-secondary,#94a3b8)] select-none"
+            className="text-xs font-medium text-slate-300 select-none"
           >
             {label}
           </label>
@@ -90,7 +85,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
         <div className="relative flex items-center w-full">
           {iconLeft && (
-            <div className="absolute left-3 flex items-center pointer-events-none text-[var(--av-color-text-muted,#64748b)]">
+            <div className="absolute left-3 flex items-center pointer-events-none text-slate-500">
               {iconLeft}
             </div>
           )}
@@ -108,15 +103,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 : undefined
             }
             className={cn(
-              'w-full bg-[var(--av-color-bg,#020617)] text-[var(--av-color-text-primary,#f8fafc)] placeholder:text-[var(--av-color-text-muted,#64748b)] border transition-all duration-150',
-              'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--av-color-bg,#020617)]',
+              'w-full bg-[#030712] text-slate-100 placeholder:text-slate-500 border transition-colors duration-150',
+              'focus:outline-none focus:ring-1',
               hasError
-                ? 'border-[var(--av-color-danger,#f43f5e)] focus:border-[var(--av-color-danger,#f43f5e)] focus:ring-[var(--av-color-danger,#f43f5e)]'
-                : 'border-[var(--av-color-border,#1e293b)] hover:border-[var(--av-color-border-subtle,#334155)] focus:border-[var(--av-color-primary,#6366f1)] focus:ring-[var(--av-color-primary,#6366f1)]',
+                ? 'border-rose-500/60 focus:border-rose-500 focus:ring-rose-500/30'
+                : 'border-white/[0.08] hover:border-white/[0.15] focus:border-indigo-500 focus:ring-indigo-500/30',
               disabled && 'opacity-50 cursor-not-allowed bg-slate-900/50',
               sizeStyles[inputSize],
               iconLeft ? 'pl-9' : '',
-              rightSlot ? 'pr-10' : '',
+              rightSlot ? 'pr-9' : '',
               className
             )}
             type={effectiveType}
@@ -124,20 +119,20 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           />
 
           {rightSlot && (
-            <div className="absolute right-3 flex items-center text-[var(--av-color-text-muted,#64748b)]">
+            <div className="absolute right-2.5 flex items-center text-slate-500">
               {rightSlot}
             </div>
           )}
         </div>
 
         {hasError && (
-          <p id={`${inputId}-error`} className="text-xs text-[var(--av-color-danger,#f43f5e)] font-medium">
+          <p id={`${inputId}-error`} className="text-xs text-rose-400 font-medium">
             {error}
           </p>
         )}
 
         {!hasError && helperText && (
-          <p id={`${inputId}-helper`} className="text-xs text-[var(--av-color-text-muted,#64748b)]">
+          <p id={`${inputId}-helper`} className="text-xs text-slate-500">
             {helperText}
           </p>
         )}

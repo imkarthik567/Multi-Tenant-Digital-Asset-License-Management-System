@@ -10,13 +10,23 @@ export const TENANT_ASSIGNABLE_ROLES = ['TENANT_ADMIN', 'ASSET_MANAGER', 'MEMBER
 
 export const createUserSchema = z
   .object({
-    email: z.string().email().toLowerCase().trim(),
-    fullName: z.string().min(2).max(100).trim(),
-    password: z.string().min(6, 'Password must be at least 6 characters'),
-    roleName: z.enum(TENANT_ASSIGNABLE_ROLES, {
-      errorMap: () => ({ message: 'roleName must be TENANT_ADMIN, ASSET_MANAGER, or MEMBER' }),
-    }),
+    email: z.string().email('Valid email address is required').toLowerCase().trim(),
+    fullName: z.string().min(1).max(100).trim().optional(),
+    password: z.string().min(6, 'Password must be at least 6 characters').optional(),
+    roleName: z
+      .enum(TENANT_ASSIGNABLE_ROLES, {
+        errorMap: () => ({ message: 'roleName must be TENANT_ADMIN, ASSET_MANAGER, or MEMBER' }),
+      })
+      .optional(),
     avatarUrl: z.string().url().optional(),
+  })
+  .strip();
+
+export const bulkCreateUsersByEmailSchema = z
+  .object({
+    emails: z.union([z.array(z.string()), z.string()]).optional(),
+    rawText: z.string().optional(),
+    roleName: z.enum(TENANT_ASSIGNABLE_ROLES).optional(),
   })
   .strip();
 

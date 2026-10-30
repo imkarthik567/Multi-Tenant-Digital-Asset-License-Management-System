@@ -334,24 +334,131 @@ export class AiService {
   }
 
   /**
-   * Intent-aware, conversational responder that directly answers user greetings, vendor queries,
-   * license/seat lookups, asset inquiries, FinOps cost analyses, compliance checks, and entity-specific questions.
+   * Resolves the exact authenticated caller from the tenant snapshot and JWT claims,
+   * along with their personally allocated software seats.
+   */
+  private resolveCallerContext(
+    snapshot: TenantSnapshot,
+    caller?: {
+      userId?: string;
+      userEmail?: string;
+      userName?: string;
+      userRole?: string;
+    }
+  ) {
+    const emailNorm = caller?.userEmail?.trim().toLowerCase();
+    const idNorm = caller?.userId?.trim();
+    const nameNorm = caller?.userName?.trim().toLowerCase();
+
+    const matchedDbUser = snapshot.users.find((u) => {
+      if (idNorm && u.id === idNorm) return true;
+      if (emailNorm && String(u.email || '').trim().toLowerCase() === emailNorm) return true;
+      if (nameNorm && String(u.fullName || u.name || '').trim().toLowerCase() === nameNorm) return true;
+      return false;
+    });
+
+    const currentUser = matchedDbUser
+      ? {
+          id: matchedDbUser.id,
+          fullName: matchedDbUser.fullName || matchedDbUser.name || caller?.userName || matchedDbUser.email,
+          email: matchedDbUser.email || caller?.userEmail || 'user@workspace.com',
+          role: formatUserRole(matchedDbUser.role || caller?.userRole || 'MEMBER'),
+          department: matchedDbUser.department || 'Engineering',
+          status: matchedDbUser.isActive === false ? 'INACTIVE' : 'ACTIVE',
+        }
+      : caller?.userEmail || caller?.userName || caller?.userId
+      ? {
+          id: caller.userId || `user-${(caller.userEmail || 'active').split('@')[0]}`,
+          fullName:
+            caller.userName ||
+            (caller.userEmail ? caller.userEmail.split('@')[0] : 'Workspace Member') ||
+            'Workspace Member',
+          email: caller.userEmail || 'member@workspace.com',
+          role: formatUserRole(caller.userRole || 'MEMBER'),
+          department: 'Engineering',
+          status: 'ACTIVE',
+        }
+      : snapshot.users[0]
+      ? {
+          id: snapshot.users[0].id,
+          fullName: snapshot.users[0].fullName || snapshot.users[0].name || snapshot.users[0].email,
+          email: snapshot.users[0].email,
+          role: formatUserRole(snapshot.users[0].role),
+          department: snapshot.users[0].department || 'Engineering',
+          status: snapshot.users[0].isActive === false ? 'INACTIVE' : 'ACTIVE',
+        }
+      : {
+          id: 'user-active',
+          fullName: 'Workspace Member',
+          email: 'member@workspace.com',
+          role: 'MEMBER',
+          department: 'Engineering',
+          status: 'ACTIVE',
+        };
+
+    const userEmailLower = String(currentUser.email || '').trim().toLowerCase();
+    const userNameLower = String(currentUser.fullName || '').trim().toLowerCase();
+
+    const myAllocations = snapshot.allocations
+      .filter((al) => {
+        if (al.revokedAt || al.releasedAt) return false;
+        if (currentUser.id && al.userId === currentUser.id) return true;
+        if (userEmailLower && String(al.userEmail || '').trim().toLowerCase() === userEmailLower) {
+          return true;
+        }
+        if (userNameLower && String(al.userName || '').trim().toLowerCase() === userNameLower) {
+          return true;
+        }
+        return false;
+      })
+      .map((al) => {
+        const lic = snapshot.licenses.find((l) => l.id === al.licenseId);
+        const asset = lic ? snapshot.assets.find((a) => a.id === lic.assetId) : undefined;
+        const vendor = lic
+          ? snapshot.vendors.find(
+              (v) => v.id === lic.vendorId || (asset && v.id === asset.vendorId)
+            )
+          : undefined;
+        return {
+          allocationId: al.id,
+          licenseId: al.licenseId,
+          softwareName:
+            lic?.name || asset?.name || asset?.assetName || lic?.licenseKey || al.licenseId,
+          licenseKey: lic?.licenseKey || lic?.name || al.licenseId,
+          vendorName: vendor?.name || 'Enterprise Publisher',
+          department: al.department || currentUser.department,
+          allocatedAt: al.allocatedAt,
+          expiresAt: lic?.expiresAt || lic?.endDate || null,
+          status: 'ACTIVE',
+        };
+      });
+
+    return {
+      currentUser,
+      myAllocations,
+    };
+  }
+
+  /**
+   * Intent-aware, conversational responder that directly answers user greetings, personal profile/license queries,
+   * vendor queries, license/seat lookups, asset inquiries, FinOps cost analyses, and compliance checks.
    */
   private buildLocalCopilotFallback(
     prompt: string,
     snapshot: TenantSnapshot,
     personaKey: string = 'DB_COPILOT',
-    userName?: string
+    caller?: {
+      userId?: string;
+      userEmail?: string;
+      userName?: string;
+      userRole?: string;
+    }
   ): { text: string; suggestedFollowUps: string[] } {
     const rawPrompt = prompt.trim();
     const q = rawPrompt.toLowerCase();
 
-    const primaryUser = snapshot.users[0];
-    const displayUserName =
-      userName ||
-      primaryUser?.fullName ||
-      primaryUser?.name ||
-      (primaryUser?.email ? primaryUser.email.split('@')[0] : 'there');
+    const { currentUser, myAllocations } = this.resolveCallerContext(snapshot, caller);
+    const displayUserName = currentUser.fullName;
 
     const personaTitles: Record<string, string> = {
       DB_COPILOT: 'Database & Asset Copilot',
@@ -389,6 +496,50 @@ export class AiService {
       };
     });
 
+    // 0. Check for FIRST-PERSON / PERSONAL PROFILE & MY LICENSES queries
+    // ("summarize my details", "sumarise my details", "who am i", "my profile", "my details", "my licenses", "my email", "my role")
+    const isPersonalQuery =
+      /\b(my\s+(details|profile|info|information|account|email|role|department|status|id|licenses|lisences|allocations|seats|software|keys)|who\s+am\s+i|about\s+me|summ?ari[sz]e\s+my)\b/i.test(
+        rawPrompt
+      );
+
+    if (isPersonalQuery) {
+      const allocationLines =
+        myAllocations.length > 0
+          ? myAllocations.map(
+              (al) =>
+                `• **${al.softwareName}** (${al.vendorName}) — Software Key: \`${al.licenseKey}\` · Status: \`${al.status}\`${
+                  al.expiresAt ? ` · Expires: \`${new Date(al.expiresAt).toISOString().slice(0, 10)}\`` : ''
+                }`
+            )
+          : [
+              `• You currently have **0 personal seat allocations** linked to \`${currentUser.email}\`.`,
+            ];
+
+      const text = [
+        `Hello **${currentUser.fullName}**! As a **${currentUser.role}** in this workspace, here is a summary of your profile details and allocated software licenses:`,
+        ``,
+        `• **Full Name:** **${currentUser.fullName}**`,
+        `• **User ID:** \`${currentUser.id}\``,
+        `• **Email:** \`${currentUser.email}\``,
+        `• **Role:** \`${currentUser.role}\``,
+        `• **Department:** **${currentUser.department}**`,
+        `• **Status:** \`${currentUser.status}\``,
+        ``,
+        `### Your Allocated Software Licenses (${myAllocations.length})`,
+        ...allocationLines,
+      ].join('\n');
+
+      return {
+        text,
+        suggestedFollowUps: [
+          'What digital assets are covered by my allocated licenses?',
+          'List all software vendors in our workspace.',
+          'Which licenses have available seats right now?',
+        ],
+      };
+    }
+
     // 1. Check for conversational greetings, small talk, or "what can you do / help"
     const isGreetingOnly =
       /^(hi|hello|hey|greetings|howdy|yo|sup|good\s+(morning|afternoon|evening)|hi\s+there|hello\s+there|hey\s+there|hi\s+aria|hello\s+aria|how\s+are\s+you|what's\s+up|whats\s+up)[!.,?\s]*$/i.test(
@@ -401,23 +552,23 @@ export class AiService {
 
     if (isGreetingOnly || isHelpOrIntro) {
       const text = [
-        `Hi **${displayUserName}**! I'm your **AssetVault ${personaLabel}**.`,
+        `Hi **${displayUserName}** (\`${currentUser.email}\` · \`${currentUser.role}\`)! I'm your **AssetVault ${personaLabel}**.`,
         ``,
-        `I'm connected live to your workspace (**${snapshot.assetsCount} digital assets**, **${snapshot.licensesCount} active licenses**, and **${snapshot.vendors.length} vendors**). How can I help you today?`,
+        `You currently have **${myAllocations.length} personal software seat allocation(s)**, and our workspace has **${snapshot.assetsCount} digital assets**, **${snapshot.licensesCount} active licenses**, and **${snapshot.vendors.length} vendors**. How can I help you today?`,
         ``,
         `Here are a few things you can ask me right now:`,
+        `• **Your Profile & Seats:** \`"Summarize my details and allocated licenses"\``,
         `• **Vendors & Publishers:** \`"List all vendors and their contracts"\``,
         `• **License Utilization:** \`"Which licenses have the most available seats?"\``,
-        `• **FinOps & Cost Savings:** \`"Where can we cut annual software spend?"\``,
         `• **Assets & Team Members:** \`"List our digital assets"\` or \`"Who are our team members?"\``,
       ].join('\n');
 
       return {
         text,
         suggestedFollowUps: [
+          'Summarize my profile details and allocated software licenses.',
           'List all vendors and their associated license keys.',
           'Which licenses have the lowest seat utilization right now?',
-          'Where can we cut annual software spend by reclaiming idle seats?',
           'List all digital assets in our catalog.',
         ],
       };
@@ -426,10 +577,10 @@ export class AiService {
     // 2. Check for polite acknowledgments ("thanks", "thank you", "great", "awesome")
     if (/^(thanks|thank\s+you|thx|ty|awesome|great|cool|perfect|got\s+it|ok|okay)[!.,?\s]*$/i.test(rawPrompt)) {
       return {
-        text: `You're welcome, **${displayUserName}**! Let me know if you'd like to inspect any specific **vendors**, **license seat allocations**, **digital assets**, or **cost optimization** opportunities.`,
+        text: `You're welcome, **${displayUserName}**! Let me know if you'd like to inspect **your profile & allocated licenses**, **vendors**, **digital assets**, or **cost optimization** opportunities.`,
         suggestedFollowUps: [
+          'Summarize my profile details and allocated software licenses.',
           'List all vendors and their contact emails.',
-          'Show me our highest-cost software licenses.',
           'Are any licenses expiring soon?',
         ],
       };
@@ -676,8 +827,8 @@ export class AiService {
             ...allocLines,
           ].join('\n'),
           suggestedFollowUps: [
+            'Summarize my profile details and allocated software licenses.',
             'Which licenses have the most available seats right now?',
-            'Who are the active team members in my organization?',
           ],
         };
       }
@@ -724,14 +875,18 @@ export class AiService {
     ) {
       const userLines = snapshot.users.map(
         (u) =>
-          `• **${u.fullName || u.name || u.email}** (\`${u.email}\`) — Role: \`${formatUserRole(u.role)}\` · Department: **${u.department || 'Engineering'}**`
+          `• **${u.fullName || u.name || u.email}** (\`${u.email}\`) — Role: \`${formatUserRole(u.role)}\` · Department: **${u.department || 'Engineering'}**${
+            String(u.email || '').toLowerCase() === String(currentUser.email || '').toLowerCase()
+              ? ' *(You)*'
+              : ''
+          }`
       );
       return {
         text: `Your organization currently has **${snapshot.usersCount} active team member(s)** in AssetVault:\n\n${userLines.join('\n')}`,
         suggestedFollowUps: [
+          'Summarize my profile details and allocated software licenses.',
           'List all digital assets in our catalog.',
           'List all vendors and their associated license keys.',
-          'Summarize our active software assets and license seat usage.',
         ],
       };
     }
@@ -782,9 +937,9 @@ export class AiService {
           ...licenseLines,
         ].join('\n'),
         suggestedFollowUps: [
+          'Summarize my profile details and allocated software licenses.',
           'Which licenses have the most available seats right now?',
           'Where can we cut annual software spend by reclaiming idle seats?',
-          'List all vendors and their associated license keys.',
         ],
       };
     }
@@ -798,10 +953,7 @@ export class AiService {
       q.includes('notify') ||
       q.includes('notification')
     ) {
-      const primaryUser = snapshot.users[0];
-      const recipientLabel = primaryUser
-        ? `**${primaryUser.fullName || 'Team Member'}** (\`${primaryUser.email}\`)`
-        : `**${userName || 'Team Member'}**`;
+      const recipientLabel = `**${currentUser.fullName}** (\`${currentUser.email}\`)`;
       return {
         text: [
           `You can send real emails directly from AssetVault using the **Google Workspace Gmail integration** (\`gmail.send\`):`,
@@ -812,7 +964,7 @@ export class AiService {
           `• **AI Polish Draft:** Inside the Gmail modal, click **AI Polish Draft** to auto-generate a personalized subject & body for ${recipientLabel}, then click **Review & Confirm Send**.`,
         ].join('\n'),
         suggestedFollowUps: [
-          'Draft a license seat allocation email for our team.',
+          'Summarize my profile details and allocated software licenses.',
           'Which licenses have upcoming renewals or compliance risks?',
           'List all vendors and their contact emails.',
         ],
@@ -830,25 +982,23 @@ export class AiService {
       .join(', ');
 
     const text = [
-      `Here is a tailored overview for your query (**"${rawPrompt}"**):`,
+      `Here is a tailored overview for **${currentUser.fullName}** (\`${currentUser.email}\` · \`${currentUser.role}\`):`,
       ``,
+      `• **Your Allocated Licenses:** **${myAllocations.length}** active software seat(s)`,
       `• **Digital Assets (${snapshot.assetsCount}):** ${topAssets}${snapshot.assetsCount > 5 ? ` (+${snapshot.assetsCount - 5} more)` : ''}`,
       `• **Registered Vendors (${snapshot.vendors.length}):** ${topVendors || 'JetBrains, Monotype, Adobe, Figma'}`,
-      `• **Active Licenses (${snapshot.licensesCount}):** **${snapshot.allocatedSeats} / ${snapshot.totalSeats} seats allocated (${snapshot.utilizationPct}%)** with **${snapshot.unallocatedSeats} available seats**`,
+      `• **Workspace Licenses (${snapshot.licensesCount}):** **${snapshot.allocatedSeats} / ${snapshot.totalSeats} seats allocated (${snapshot.utilizationPct}%)** with **${snapshot.unallocatedSeats} available seats**`,
       `• **Annual License Spend:** **$${snapshot.totalAnnualSpend.toLocaleString()} USD/yr**`,
-      `• **Team Members (${snapshot.usersCount}):** ${snapshot.users
-        .map((u) => `**${u.fullName || u.email}** (\`${formatUserRole(u.role)}\`)`)
-        .join(', ')}`,
       ``,
-      `Ask me about any specific **vendor**, **asset**, **license key**, or **cost-saving opportunity** for a deeper breakdown!`,
+      `Ask me about **your profile & allocated licenses**, or any specific **vendor**, **asset**, or **license key**!`,
     ].join('\n');
 
     return {
       text,
       suggestedFollowUps: [
+        'Summarize my profile details and allocated software licenses.',
         'List all vendors and their associated license keys.',
         'Which licenses have the most available seats right now?',
-        'Where can we cut annual software spend by reclaiming idle seats?',
       ],
     };
   }
@@ -866,10 +1016,14 @@ export class AiService {
     options?: {
       model?: string;
       persona?: string;
+      userId?: string;
+      userEmail?: string;
       userName?: string;
+      userRole?: string;
     }
   ) {
     const snapshot = await this.getTenantSnapshot(prismaClient, tenantId);
+    const { currentUser, myAllocations } = this.resolveCallerContext(snapshot, options);
     const ai = getGeminiClient();
 
     const allowedModels = ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
@@ -881,7 +1035,7 @@ export class AiService {
     const personaKey = options?.persona || 'DB_COPILOT';
     const personaInstructions: Record<string, string> = {
       DB_COPILOT:
-        'You are the AssetVault Database & License Copilot. Your role is to answer questions about digital assets, software licenses, seat allocations, team members/users, and vendors using the live tenant database records.',
+        'You are the AssetVault Database & License Copilot. Your role is to answer questions about the currently logged-in user profile, their allocated software seats, digital assets, software licenses, team members/users, and vendors using the live tenant database records.',
       SAM_AUDITOR:
         'You are the Principal FinOps & Software Asset Management (SAM) Auditor for AssetVault. Your role is to analyze license utilization, identify wasted spend, recommend seat reclamation, and optimize annual software costs.',
       COMPLIANCE_OFFICER:
@@ -892,6 +1046,16 @@ export class AiService {
 
     const dbContext = JSON.stringify(
       {
+        currentAuthenticatedUser: {
+          id: currentUser.id,
+          fullName: currentUser.fullName,
+          email: currentUser.email,
+          role: currentUser.role,
+          department: currentUser.department,
+          status: currentUser.status,
+          myAllocatedLicensesCount: myAllocations.length,
+          myAllocatedLicenses: myAllocations,
+        },
         summary: {
           assetsCount: snapshot.assetsCount,
           licensesCount: snapshot.licensesCount,
@@ -910,6 +1074,8 @@ export class AiService {
           role: formatUserRole(u.role),
           department: u.department || 'Engineering',
           status: u.isActive === false ? 'INACTIVE' : 'ACTIVE',
+          isCurrentLoggedInUser:
+            String(u.email || '').toLowerCase() === String(currentUser.email || '').toLowerCase(),
         })),
         vendors: snapshot.vendors.map((v) => ({
           id: v.id,
@@ -963,10 +1129,23 @@ export class AiService {
 
     const systemInstruction = [
       roleInstruction,
-      'CRITICAL CONVERSATION RULES:',
-      '1. Respond directly and conversationally to the exact message the user sent.',
-      '2. If the user greets you (e.g., "hi", "hello", "hi there"), greet them warmly by name, briefly mention how you can help with their workspace, and DO NOT dump an unrequested database snapshot.',
-      '3. If the user asks a specific question (e.g., "list the vendors", "which licenses have idle seats", "how much do we spend"), answer that specific question directly using the live database records below.',
+      `CURRENT AUTHENTICATED USER (THE PERSON CHATTING WITH YOU RIGHT NOW):`,
+      `• Full Name: ${currentUser.fullName}`,
+      `• User ID: ${currentUser.id}`,
+      `• Email: ${currentUser.email}`,
+      `• Role: ${currentUser.role}`,
+      `• Department: ${currentUser.department}`,
+      `• Status: ${currentUser.status}`,
+      `• Personal Allocated Licenses (${myAllocations.length}): ${
+        myAllocations.length > 0
+          ? myAllocations.map((a) => `${a.softwareName} (${a.licenseKey})`).join(', ')
+          : 'None'
+      }`,
+      '',
+      'CRITICAL CONVERSATION & IDENTITY RULES:',
+      `1. You are speaking directly with ${currentUser.fullName} (${currentUser.email}, Role: ${currentUser.role}).`,
+      `2. Whenever the user says "me", "my", "I", "summarize my details", "who am I", "my profile", "my email", "my role", or "my licenses", you MUST report the exact profile details and personal license allocations of ${currentUser.fullName} (${currentUser.email}, User ID: ${currentUser.id}, Role: ${currentUser.role}) from currentAuthenticatedUser — NEVER report another user from the users array as the caller!`,
+      '3. Respond directly and conversationally to the exact message the user sent.',
       '4. Format key labels with **bold**, license keys/emails/roles with `inline code`, and lists with `• ` bullet points.',
       '',
       `LIVE TENANT DATABASE SNAPSHOT:\n${dbContext}`,
@@ -1054,7 +1233,7 @@ export class AiService {
       prompt,
       snapshot,
       personaKey,
-      options?.userName
+      options
     );
 
     // Only attempt remote call if GEMINI_API_KEY is configured

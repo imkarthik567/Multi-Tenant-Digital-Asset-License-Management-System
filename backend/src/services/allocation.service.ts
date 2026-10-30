@@ -11,21 +11,49 @@ import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
 import { licenseAllocationFailuresTotal } from '../middleware/observability.middleware';
 import { emailService } from './email.service';
+import { userService } from './user.service';
 
 export class AllocationService {
   /**
-   * Allocates a seat via stored procedure sp_allocate_license_seat
+   * Allocates a seat via stored procedure sp_allocate_license_seat.
+   * Supports direct member email input: if the email is not yet registered,
+   * automatically provisions the member account and sends welcome + seat emails.
    */
   public async allocateSeat(
     tenantId: string,
     licenseId: string,
     targetUserId: string,
     callerUserId: string,
-    callerRole: string
+    callerRole: string,
+    targetUserEmail?: string,
+    prismaClient?: any,
+    targetUserFullName?: string,
+    notes?: string
   ) {
     try {
+      let resolvedUserId = targetUserId;
+      let resolvedEmail = targetUserEmail;
+
+      // If caller passed an email inside targetUserId or via targetUserEmail, auto-resolve or auto-provision the member
+      if (!resolvedEmail && resolvedUserId && resolvedUserId.includes('@')) {
+        resolvedEmail = resolvedUserId.trim().toLowerCase();
+        resolvedUserId = '';
+      }
+
+      if (resolvedEmail && !resolvedUserId) {
+        const client = prismaClient || prisma;
+        const member = await userService.findOrCreateMemberByEmail(
+          client,
+          tenantId,
+          resolvedEmail,
+          callerUserId,
+          targetUserFullName
+        );
+        resolvedUserId = member.id;
+      }
+
       // MEMBER role constraint: can only allocate to self
-      if (callerRole === 'MEMBER' && targetUserId !== callerUserId) {
+      if (callerRole === 'MEMBER' && resolvedUserId !== callerUserId) {
         licenseAllocationFailuresTotal.inc({ reason: 'forbidden_member_cross_allocation' });
         throw new ForbiddenError('Standard members can only allocate license seats to themselves.');
       }
@@ -41,23 +69,34 @@ export class AllocationService {
         const allocationId = await allocationRepository.allocateSeat(
           tx,
           licenseId,
-          targetUserId,
+          resolvedUserId,
           callerUserId
         );
+
+        if (notes && allocationId) {
+          try {
+            await tx.licenseAllocation.update({
+              where: { id: allocationId },
+              data: { notes: notes.trim() },
+            });
+          } catch {
+            // Ignore optional notes update failure
+          }
+        }
 
         return {
           success: true,
           message: 'License seat allocated and automated confirmation email sent to member',
           allocationId,
           licenseId,
-          userId: targetUserId,
+          userId: resolvedUserId,
         };
       });
 
       await emailService.dispatchSeatAllocationEmails({
         tenantId,
         licenseId,
-        targetUserId,
+        targetUserId: resolvedUserId,
         allocationId: result.allocationId,
       });
 

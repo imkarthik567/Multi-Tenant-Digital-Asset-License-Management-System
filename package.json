@@ -5,8 +5,8 @@
   "description": "AssetVault - Multi-Tenant Digital Asset & License Management System",
   "scripts": {
     "postinstall": "prisma generate --schema=backend/prisma/schema.prisma || true",
-    "dev": "prisma generate --schema=backend/prisma/schema.prisma && tsx server.ts",
-    "start": "prisma generate --schema=backend/prisma/schema.prisma && tsx server.ts",
+    "dev": "tsx server.ts",
+    "start": "node server.ts",
     "build": "prisma generate --schema=backend/prisma/schema.prisma && node frontend/scripts/build.cjs",
     "lint": "tsc -p backend/tsconfig.json --noEmit && tsc -p frontend/tsconfig.json --noEmit"
   },

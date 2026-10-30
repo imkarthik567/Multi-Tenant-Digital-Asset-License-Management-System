@@ -25,6 +25,22 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<User>;
+  loginWithGoogle: (payload: {
+    email: string;
+    fullName?: string;
+    avatarUrl?: string | null;
+    tenantName?: string;
+    slug?: string;
+    contactEmail?: string;
+  }) => Promise<{
+    requiresOnboarding: boolean;
+    user?: User;
+    profile?: {
+      email: string;
+      fullName: string;
+      avatarUrl: string | null;
+    };
+  }>;
   register: (payload: {
     tenantName: string;
     tenantSlug?: string;
@@ -40,6 +56,27 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const clearAiChatSessionStorage = () => {
+  try {
+    const cleanStorage = (storage: Storage) => {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (
+          key &&
+          (key.startsWith('assetvault_gemini_chat_history') ||
+            key.startsWith('assetvault_ai_chat_history'))
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => storage.removeItem(k));
+    };
+    cleanStorage(sessionStorage);
+    cleanStorage(localStorage);
+  } catch {}
+};
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const initialSession = (getAccessToken() || getStoredRefreshToken()) ? getStoredSession() : null;
@@ -105,6 +142,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAccessToken(null);
       setStoredRefreshToken(null);
       setStoredSession(null);
+      clearAiChatSessionStorage();
       setUser(null);
       setTenant(null);
       setPermissions([]);
@@ -129,12 +167,65 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if ((res.data as any).refreshToken) {
       setStoredRefreshToken((res.data as any).refreshToken);
     }
+    clearAiChatSessionStorage();
     const session = parseAuthProfile(res);
     setUser(session.user);
     setTenant(session.tenant);
     setPermissions(session.permissions);
     setStoredSession(session);
     return session.user;
+  };
+
+  const loginWithGoogle = async (payload: {
+    email: string;
+    fullName?: string;
+    avatarUrl?: string | null;
+    tenantName?: string;
+    slug?: string;
+    contactEmail?: string;
+  }) => {
+    const res = await api.post<{
+      data: {
+        requiresOnboarding?: boolean;
+        profile?: {
+          email: string;
+          fullName: string;
+          avatarUrl: string | null;
+        };
+        user?: User;
+        accessToken?: string;
+        refreshToken?: string;
+        tenant?: Tenant | null;
+      };
+    }>('/auth/google-sso', payload);
+
+    if (res.data.requiresOnboarding) {
+      return {
+        requiresOnboarding: true,
+        profile: res.data.profile || {
+          email: payload.email,
+          fullName: payload.fullName || payload.email.split('@')[0],
+          avatarUrl: payload.avatarUrl || null,
+        },
+      };
+    }
+
+    if (res.data.accessToken) {
+      setAccessToken(res.data.accessToken);
+    }
+    if (res.data.refreshToken) {
+      setStoredRefreshToken(res.data.refreshToken);
+    }
+    clearAiChatSessionStorage();
+    const session = parseAuthProfile(res);
+    setUser(session.user);
+    setTenant(session.tenant);
+    setPermissions(session.permissions);
+    setStoredSession(session);
+    return {
+      requiresOnboarding: false,
+      user: session.user,
+    };
   };
 
   const register = async (payload: {
@@ -171,6 +262,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if ((res.data as any).refreshToken) {
       setStoredRefreshToken((res.data as any).refreshToken);
     }
+    clearAiChatSessionStorage();
     const session = parseAuthProfile(res);
     setUser(session.user);
     setTenant(session.tenant);
@@ -188,6 +280,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAccessToken(null);
       setStoredRefreshToken(null);
       setStoredSession(null);
+      clearAiChatSessionStorage();
       try {
         sessionStorage.removeItem('assetvault_last_route');
         localStorage.removeItem('assetvault_last_route');
@@ -229,6 +322,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWithGoogle,
         register,
         logout,
         refreshProfile,

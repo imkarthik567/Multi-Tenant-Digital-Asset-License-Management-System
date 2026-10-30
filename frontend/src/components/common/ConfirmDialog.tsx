@@ -1,9 +1,3 @@
-// ==============================================================================
-// AssetVault: ConfirmDialog Component
-// Course: BCSE307L Database Systems (Fall 2026-27)
-// High-stakes confirmation modal with destructive or warning color theming
-// ==============================================================================
-
 import React from 'react';
 import { Modal } from './Modal';
 import { AlertTriangle, Info } from 'lucide-react';
@@ -40,19 +34,19 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const iconConfig = {
     danger: {
-      icon: <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400" />,
-      bg: 'bg-rose-100 dark:bg-rose-950/60',
-      button: 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white focus:ring-rose-500',
+      icon: <AlertTriangle className="w-5 h-5 text-rose-400" />,
+      bg: 'bg-rose-500/10 border border-rose-500/20',
+      button: 'bg-rose-600 hover:bg-rose-500 text-white',
     },
     warning: {
-      icon: <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />,
-      bg: 'bg-amber-100 dark:bg-amber-950/60',
-      button: 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white focus:ring-amber-500',
+      icon: <AlertTriangle className="w-5 h-5 text-amber-400" />,
+      bg: 'bg-amber-500/10 border border-amber-500/20',
+      button: 'bg-amber-600 hover:bg-amber-500 text-white',
     },
     info: {
-      icon: <Info className="w-6 h-6 text-primary-600 dark:text-primary-400" />,
-      bg: 'bg-primary-100 dark:bg-primary-950/60',
-      button: 'bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white focus:ring-primary-500',
+      icon: <Info className="w-5 h-5 text-indigo-400" />,
+      bg: 'bg-indigo-500/10 border border-indigo-500/20',
+      button: 'bg-indigo-600 hover:bg-indigo-500 text-white',
     },
   }[variant];
 
@@ -68,7 +62,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"
+            className="px-3.5 py-2 text-xs font-medium text-slate-300 bg-white/[0.04] border border-white/[0.08] rounded-lg hover:bg-white/[0.08] transition-colors cursor-pointer"
           >
             {finalCancelLabel}
           </button>
@@ -76,18 +70,18 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${iconConfig.button}`}
+            className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${iconConfig.button}`}
           >
             {isLoading ? 'Processing...' : finalConfirmLabel}
           </button>
         </>
       }
     >
-      <div className="flex items-start gap-4 py-2">
-        <div className={`p-3 rounded-full shrink-0 ${iconConfig.bg}`}>
+      <div className="flex items-start gap-3.5 py-1">
+        <div className={`p-2.5 rounded-lg shrink-0 ${iconConfig.bg}`}>
           {iconConfig.icon}
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
+        <p className="text-xs text-slate-300 leading-relaxed pt-0.5">
           {message}
         </p>
       </div>

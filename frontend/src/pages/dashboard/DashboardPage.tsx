@@ -19,11 +19,7 @@ import { Modal } from '../../components/common/Modal';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { cn } from '../../utils/cn';
 import {
-  Package,
-  KeyRound,
   Users,
-  AlertTriangle,
-  TrendingUp,
   RefreshCw,
   ArrowRight,
   ShieldCheck,
@@ -37,7 +33,7 @@ import {
   Wrench,
   DownloadCloud,
 } from 'lucide-react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   ResponsiveContainer,
   BarChart,
@@ -50,63 +46,6 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-
-// ==============================================================================
-// Sparkline SVG Component for KPI Stat Cards
-// ==============================================================================
-interface SparklineProps {
-  data: number[];
-  color?: string;
-  height?: number;
-  id?: string;
-}
-
-const Sparkline: React.FC<SparklineProps> = ({
-  data,
-  color = '#6366f1',
-  height = 36,
-  id = 'kpi',
-}) => {
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const width = 110;
-  const padding = 3;
-  const h = height - padding * 2;
-
-  const points = data
-    .map((val, idx) => {
-      const x = padding + (idx / Math.max(1, data.length - 1)) * (width - padding * 2);
-      const y = height - padding - ((val - min) / range) * h;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-
-  const firstX = padding;
-  const lastX = width - padding;
-  const areaPoints = `${points} ${lastX},${height} ${firstX},${height}`;
-  const gradientId = `sparkline-grad-${id}-${color.replace('#', '')}`;
-
-  return (
-    <svg width={width} height={height} className="overflow-visible shrink-0" aria-hidden="true">
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.3} />
-          <stop offset="100%" stopColor={color} stopOpacity={0.0} />
-        </linearGradient>
-      </defs>
-      <polygon points={areaPoints} fill={`url(#${gradientId})`} />
-      <polyline
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={points}
-      />
-    </svg>
-  );
-};
 
 // ==============================================================================
 // Main Dashboard Page Component
@@ -132,6 +71,44 @@ export const DashboardPage: React.FC = () => {
       ? (user.role as any).name
       : user?.role;
   const isMember = roleName === 'MEMBER';
+
+  // Member-specific queries for Personal Workspace Dashboard
+  const {
+    data: memberAllocationsRes,
+    isLoading: isMemberAllocLoading,
+    refetch: refetchMemberAllocations,
+  } = useQuery({
+    queryKey: ['my-allocations', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { data: [] };
+      return api.get<any>(`/users/${user.id}/allocations`);
+    },
+    enabled: isMember && !!user?.id,
+  });
+
+  const {
+    data: memberAssetsRes,
+    isLoading: isMemberAssetsLoading,
+    refetch: refetchMemberAssets,
+  } = useQuery({
+    queryKey: ['member-dashboard-assets'],
+    queryFn: async () => {
+      return api.get<any>('/assets?limit=6');
+    },
+    enabled: isMember,
+  });
+
+  const {
+    data: memberNotificationsRes,
+    isLoading: isMemberNotifLoading,
+    refetch: refetchMemberNotifications,
+  } = useQuery({
+    queryKey: ['member-dashboard-notifications', user?.id],
+    queryFn: async () => {
+      return api.get<any>('/notifications?limit=6');
+    },
+    enabled: isMember,
+  });
 
   // 1. Fetch Dashboard KPI Stats (fn_tenant_dashboard_stats)
   const {
@@ -273,50 +250,6 @@ export const DashboardPage: React.FC = () => {
     }));
   }, [accessTrendData]);
 
-  // Sparkline synthetic trend series for KPI cards
-  const assetSparkline = useMemo(
-    () => [
-      Math.max(1, stats.asset_count - 8),
-      Math.max(1, stats.asset_count - 6),
-      Math.max(1, stats.asset_count - 5),
-      Math.max(1, stats.asset_count - 3),
-      Math.max(1, stats.asset_count - 2),
-      Math.max(1, stats.asset_count - 1),
-      stats.asset_count,
-    ],
-    [stats.asset_count]
-  );
-
-  const licenseSparkline = useMemo(
-    () => [
-      Math.max(1, stats.license_count - 4),
-      Math.max(1, stats.license_count - 3),
-      Math.max(1, stats.license_count - 2),
-      Math.max(1, stats.license_count - 1),
-      stats.license_count,
-      stats.license_count,
-      stats.license_count,
-    ],
-    [stats.license_count]
-  );
-
-  const seatsSparkline = useMemo(
-    () => [
-      Math.max(1, stats.active_allocated_seats - 12),
-      Math.max(1, stats.active_allocated_seats - 9),
-      Math.max(1, stats.active_allocated_seats - 7),
-      Math.max(1, stats.active_allocated_seats - 5),
-      Math.max(1, stats.active_allocated_seats - 3),
-      Math.max(1, stats.active_allocated_seats - 1),
-      stats.active_allocated_seats,
-    ],
-    [stats.active_allocated_seats]
-  );
-
-  const expiringSparkline = useMemo(
-    () => [3, 4, 3, 2, 2, 1, stats.expiring_licenses_30d],
-    [stats.expiring_licenses_30d]
-  );
 
   // Handler: Invalidate All Dashboard Queries
   const handleRefreshAll = async () => {
@@ -347,8 +280,365 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  // ----------------------------------------------------------------------------
+  // Render Personal Member Workspace Dashboard (when signed in as MEMBER)
+  // ----------------------------------------------------------------------------
   if (isMember) {
-    return <Navigate to="/my-licenses" replace />;
+    const memberAllocations: any[] = Array.isArray(memberAllocationsRes?.data)
+      ? memberAllocationsRes.data
+      : Array.isArray(memberAllocationsRes)
+      ? memberAllocationsRes
+      : [];
+    const activeMemberAllocations = memberAllocations.filter((a) => a.status === 'ACTIVE');
+
+    const expiringMemberAllocations = activeMemberAllocations.filter((a) => {
+      if (!a.license?.endDate) return false;
+      const days = Math.ceil(
+        (new Date(a.license.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      );
+      return days >= 0 && days <= 30;
+    });
+
+    // Collect distinct covered assets across member's active licenses
+    const coveredAssetsMap = new Map<string, any>();
+    activeMemberAllocations.forEach((alloc) => {
+      const assetLinks = alloc.license?.assetLicenses || [];
+      assetLinks.forEach((al: any) => {
+        if (al?.asset?.id) {
+          coveredAssetsMap.set(al.asset.id, {
+            ...al.asset,
+            licenseName: alloc.license?.name,
+          });
+        }
+      });
+    });
+    const coveredAssets = Array.from(coveredAssetsMap.values());
+
+    const catalogAssets: any[] = Array.isArray(memberAssetsRes?.data)
+      ? memberAssetsRes.data
+      : Array.isArray(memberAssetsRes)
+      ? memberAssetsRes
+      : [];
+    const totalCatalogCount = Number(memberAssetsRes?.meta?.total ?? catalogAssets.length);
+
+    const memberNotifications: any[] = Array.isArray(memberNotificationsRes?.data)
+      ? memberNotificationsRes.data
+      : Array.isArray(memberNotificationsRes)
+      ? memberNotificationsRes
+      : [];
+    const unreadNotificationsCount = memberNotifications.filter((n) => !n.isRead).length;
+
+    const handleMemberRefresh = async () => {
+      setIsRefreshing(true);
+      try {
+        await Promise.all([
+          refetchMemberAllocations(),
+          refetchMemberAssets(),
+          refetchMemberNotifications(),
+        ]);
+      } finally {
+        setIsRefreshing(false);
+      }
+    };
+
+    const handleMarkNotificationRead = async (notifId: string) => {
+      try {
+        await api.patch(`/notifications/${notifId}/read`, {});
+        refetchMemberNotifications();
+      } catch {
+        // Ignore
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Minimalist Member Workspace Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              Welcome back, {user?.fullName || 'Member'}
+            </h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Overview of your assigned software seats, workspace assets, and notifications.
+            </p>
+          </div>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleMemberRefresh}
+            isLoading={isRefreshing}
+            iconLeft={<RefreshCw className="w-3.5 h-3.5" />}
+          >
+            Refresh
+          </Button>
+        </div>
+
+        {/* 4 Clean KPI Summary Cards (Zero status chip clutter) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5">
+            <p className="text-xs font-medium text-slate-400">Assigned Seats</p>
+            <p className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
+              {activeMemberAllocations.length}
+            </p>
+            <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs">
+              <span className="text-slate-500">Active entitlements</span>
+              <Link
+                to="/my-licenses"
+                className="text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1"
+              >
+                <span>View keys</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <p className="text-xs font-medium text-slate-400">Workspace Assets</p>
+            <p className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
+              {totalCatalogCount}
+            </p>
+            <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs">
+              <span className="text-slate-500">{coveredAssets.length} linked to seats</span>
+              <Link
+                to="/assets"
+                className="text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1"
+              >
+                <span>Catalog</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <p className="text-xs font-medium text-slate-400">Expiring in 30 Days</p>
+            <p className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
+              {expiringMemberAllocations.length}
+            </p>
+            <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs">
+              <span className="text-slate-500">Upcoming renewals</span>
+              <Link
+                to="/my-licenses"
+                className="text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1"
+              >
+                <span>Schedule</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <p className="text-xs font-medium text-slate-400">Unread Notifications</p>
+            <p className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
+              {unreadNotificationsCount}
+            </p>
+            <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs">
+              <span className="text-slate-500">{memberNotifications.length} total alerts</span>
+              <Link
+                to="/notifications"
+                className="text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1"
+              >
+                <span>Activity</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </Card>
+        </div>
+
+        {/* Clean 2-Column Member Workspace Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column (7 cols): Provisioned Software Summary */}
+          <div className="lg:col-span-7 space-y-6">
+            <Card>
+              <CardHeader
+                action={
+                  <Link
+                    to="/my-licenses"
+                    className="text-xs font-medium text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1"
+                  >
+                    <span>Manage Keys</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                }
+              >
+                <h3 className="text-sm font-semibold text-white">
+                  Provisioned Software
+                </h3>
+              </CardHeader>
+              <CardBody className="p-0">
+                {isMemberAllocLoading ? (
+                  <div className="p-5 space-y-3">
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                  </div>
+                ) : activeMemberAllocations.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    No active software seats assigned to your account.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/[0.06]">
+                    {activeMemberAllocations.map((alloc: any, idx: number) => {
+                      const allocKey = alloc.id || alloc.allocation_id || `alloc-${idx}`;
+                      const lic = alloc.license;
+                      const licId = lic?.id || lic?.license_id || alloc.licenseId;
+
+                      return (
+                        <div
+                          key={allocKey}
+                          className="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-white truncate">
+                              {lic?.name || 'Software License'}
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                              {lic?.vendor?.name || 'Vendor'} &bull;{' '}
+                              {lic?.endDate
+                                ? `Expires ${new Date(lic.endDate).toLocaleDateString()}`
+                                : 'Perpetual'}
+                            </p>
+                          </div>
+
+                          <Link
+                            to={`/licenses/${licId}`}
+                            className="text-xs font-medium text-slate-300 hover:text-white shrink-0"
+                          >
+                            View
+                          </Link>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          </div>
+
+          {/* Right Column (5 cols): Digital Assets + Recent Notifications */}
+          <div className="lg:col-span-5 space-y-6">
+            <Card>
+              <CardHeader
+                action={
+                  <Link
+                    to="/assets"
+                    className="text-xs font-medium text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1"
+                  >
+                    <span>All Assets</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                }
+              >
+                <h3 className="text-sm font-semibold text-white">
+                  Digital Assets
+                </h3>
+              </CardHeader>
+              <CardBody className="p-0">
+                {isMemberAssetsLoading ? (
+                  <div className="p-5 space-y-3">
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                  </div>
+                ) : catalogAssets.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    No digital assets published yet.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/[0.06]">
+                    {catalogAssets.slice(0, 5).map((asset: any, idx: number) => {
+                      const assetId = asset.asset_id || asset.id || `asset-${idx}`;
+                      const assetType = asset.asset_type || asset.assetType || 'Asset';
+                      const assetName = asset.asset_name || asset.name || 'Digital Asset';
+
+                      return (
+                        <div
+                          key={assetId}
+                          className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-white truncate">
+                              {assetName}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {assetType}
+                            </p>
+                          </div>
+
+                          <Link
+                            to={`/assets/${assetId}`}
+                            className="text-xs font-medium text-slate-400 hover:text-white shrink-0"
+                          >
+                            Open
+                          </Link>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                action={
+                  <Link
+                    to="/notifications"
+                    className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+                  >
+                    View All
+                  </Link>
+                }
+              >
+                <h3 className="text-sm font-semibold text-white">
+                  Recent Notifications
+                </h3>
+              </CardHeader>
+              <CardBody className="p-0">
+                {isMemberNotifLoading ? (
+                  <div className="p-5 space-y-3">
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                  </div>
+                ) : memberNotifications.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    No recent notifications.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/[0.06]">
+                    {memberNotifications.slice(0, 4).map((notif: any, idx: number) => {
+                      const notifId = notif.id || notif.notification_id || `notif-${idx}`;
+                      return (
+                        <div
+                          key={notifId}
+                          className="px-5 py-3 flex items-start justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-white truncate">
+                              {notif.title || notif.type}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
+                              {notif.message}
+                            </p>
+                          </div>
+
+                          {!notif.isRead && (
+                            <button
+                              type="button"
+                              onClick={() => handleMarkNotificationRead(notifId)}
+                              className="text-[11px] text-indigo-400 hover:text-indigo-300 shrink-0"
+                            >
+                              Dismiss
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // ----------------------------------------------------------------------------
@@ -493,8 +783,8 @@ export const DashboardPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                {tenants.map((t: any) => (
-                  <tr key={t.tenant_id} className="hover:bg-slate-800/30 transition-colors">
+                {tenants.map((t: any, idx: number) => (
+                  <tr key={t.tenant_id || t.id || `tenant-${idx}`} className="hover:bg-slate-800/30 transition-colors">
                     <td className="py-3 px-4 font-bold text-slate-100">
                       {t.tenant_name}
                       <span className="block text-[10px] text-slate-500 font-normal">{t.slug}</span>
@@ -553,15 +843,14 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Header: Title, Description & Refresh Action */}
+      {/* Top Header: Clean Title & Refresh Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight flex items-center gap-2.5">
-            <span>Operational Analytics</span>
-            <Badge variant="outline" size="sm" dot>Live Sync</Badge>
+          <h1 className="text-xl font-bold text-white tracking-tight">
+            Overview
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time license capacity matrix, compliance tracking, and asset access telemetry
+            License capacity, compliance rating, and workspace asset telemetry.
           </p>
         </div>
 
@@ -593,142 +882,51 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* ========================================================================
-       * ROW 1: 4 KPI Stat Cards with Icon, Value, Chip, and Sparkline
+       * ROW 1: 4 Minimalist KPI Stat Cards (No synthetic percentage chips)
        * ======================================================================== */}
       {isDashboardLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="p-5 space-y-3">
-              <div className="flex justify-between items-center">
-                <Skeleton className="w-24 h-3.5 rounded" />
-                <Skeleton variant="avatar" className="w-9 h-9 rounded-xl" />
-              </div>
+              <Skeleton className="w-24 h-3.5 rounded" />
               <Skeleton className="w-20 h-7 rounded" />
-              <div className="pt-2 flex justify-between items-center">
-                <Skeleton className="w-28 h-3 rounded" />
-                <Skeleton className="w-16 h-6 rounded" />
-              </div>
+              <Skeleton className="w-28 h-3 rounded" />
             </Card>
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* KPI 1: Total Assets */}
-          <Card hoverElevation className="p-5 flex flex-col justify-between bg-[#0b1120]/90 backdrop-blur-xl border border-slate-800">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Total Assets
-                </span>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 shadow-sm shadow-indigo-500/10">
-                  <Package className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between gap-2">
-                <div className="text-2xl font-black text-slate-100 tracking-tight">
-                  {stats.asset_count.toLocaleString()}
-                </div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-indigo-950/50 text-indigo-300 border border-indigo-500/30">
-                  <TrendingUp className="w-3 h-3 text-indigo-400" />
-                  +12.4%
-                </span>
-              </div>
+          <Card className="p-5 bg-[#0b1120] border border-white/[0.07]">
+            <span className="text-xs font-medium text-slate-400">Total Assets</span>
+            <div className="mt-2 text-2xl font-bold font-mono tabular-nums text-white">
+              {stats.asset_count.toLocaleString()}
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Tracked in vault</span>
-              <Sparkline data={assetSparkline} color="#6366f1" id="assets" />
-            </div>
+            <p className="mt-2 text-[11px] text-slate-500">Tracked in workspace catalog</p>
           </Card>
 
-          {/* KPI 2: Active Licenses */}
-          <Card hoverElevation className="p-5 flex flex-col justify-between bg-[#0b1120]/90 backdrop-blur-xl border border-slate-800">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Active Licenses
-                </span>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 shadow-sm shadow-cyan-500/10">
-                  <KeyRound className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between gap-2">
-                <div className="text-2xl font-black text-slate-100 tracking-tight">
-                  {stats.license_count.toLocaleString()}
-                </div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-cyan-950/50 text-cyan-300 border border-cyan-500/30">
-                  <TrendingUp className="w-3 h-3 text-cyan-400" />
-                  +8.5%
-                </span>
-              </div>
+          <Card className="p-5 bg-[#0b1120] border border-white/[0.07]">
+            <span className="text-xs font-medium text-slate-400">Active Licenses</span>
+            <div className="mt-2 text-2xl font-bold font-mono tabular-nums text-white">
+              {stats.license_count.toLocaleString()}
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Supplier contracts</span>
-              <Sparkline data={licenseSparkline} color="#06b6d4" id="licenses" />
-            </div>
+            <p className="mt-2 text-[11px] text-slate-500">Vendor contracts</p>
           </Card>
 
-          {/* KPI 3: Seats Used */}
-          <Card hoverElevation className="p-5 flex flex-col justify-between bg-[#0b1120]/90 backdrop-blur-xl border border-slate-800">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Seats Used
-                </span>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 shadow-sm shadow-emerald-500/10">
-                  <Users className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between gap-2">
-                <div className="text-2xl font-black text-slate-100 tracking-tight">
-                  {stats.active_allocated_seats}{' '}
-                  <span className="text-sm font-normal text-slate-400">/ {stats.total_contracted_seats}</span>
-                </div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-950/50 text-emerald-300 border border-emerald-500/30">
-                  {capacityPct}% cap
-                </span>
-              </div>
+          <Card className="p-5 bg-[#0b1120] border border-white/[0.07]">
+            <span className="text-xs font-medium text-slate-400">Seats Used</span>
+            <div className="mt-2 text-2xl font-bold font-mono tabular-nums text-white">
+              {stats.active_allocated_seats}{' '}
+              <span className="text-sm font-normal text-slate-500">/ {stats.total_contracted_seats}</span>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Active allocations</span>
-              <Sparkline data={seatsSparkline} color="#10b981" id="seats" />
-            </div>
+            <p className="mt-2 text-[11px] text-slate-500">{capacityPct}% capacity utilized</p>
           </Card>
 
-          {/* KPI 4: Expiring in 30d */}
-          <Card hoverElevation className="p-5 flex flex-col justify-between bg-[#0b1120]/90 backdrop-blur-xl border border-slate-800">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Expiring in 30d
-                </span>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-amber-950/60 border border-amber-800/40 text-amber-400 shadow-sm shadow-amber-500/10">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between gap-2">
-                <div className="text-2xl font-black text-slate-100 tracking-tight">
-                  {stats.expiring_licenses_30d}
-                </div>
-                {stats.expiring_licenses_30d > 0 ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-950/50 text-amber-300 border border-amber-500/30">
-                    Action req
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-950/50 text-emerald-300 border border-emerald-500/30">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                    Healthy
-                  </span>
-                )}
-              </div>
+          <Card className="p-5 bg-[#0b1120] border border-white/[0.07]">
+            <span className="text-xs font-medium text-slate-400">Expiring in 30 Days</span>
+            <div className="mt-2 text-2xl font-bold font-mono tabular-nums text-white">
+              {stats.expiring_licenses_30d}
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Urgent renewal alert</span>
-              <Sparkline
-                data={expiringSparkline}
-                color="#f59e0b"
-                id="expiring"
-              />
-            </div>
+            <p className="mt-2 text-[11px] text-slate-500">Upcoming renewals</p>
           </Card>
         </div>
       )}
@@ -784,9 +982,10 @@ export const DashboardPage: React.FC = () => {
                         tickLine={false}
                       />
                       <Tooltip
+                        cursor={false}
                         contentStyle={{
                           backgroundColor: '#0b1120',
-                          borderColor: '#1e293b',
+                          borderColor: 'rgba(255, 255, 255, 0.08)',
                           borderRadius: '8px',
                           color: '#f8fafc',
                           fontSize: '12px',
@@ -882,8 +1081,8 @@ export const DashboardPage: React.FC = () => {
 
                   {/* Factors Mini Breakdown */}
                   <div className="w-full mt-4 pt-3 border-t border-slate-800/60 space-y-2">
-                    {(complianceReport?.factors || []).slice(0, 3).map((f: any) => (
-                      <div key={f.name} className="flex items-center justify-between text-xs">
+                    {(complianceReport?.factors || []).slice(0, 3).map((f: any, idx: number) => (
+                      <div key={f.name || `factor-${idx}`} className="flex items-center justify-between text-xs">
                         <span className="text-slate-400 truncate max-w-[170px]" title={f.name}>
                           {f.name}
                         </span>
@@ -955,18 +1154,19 @@ export const DashboardPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                    {expiringList.map((lic: any) => {
+                    {expiringList.map((lic: any, idx: number) => {
+                      const licId = lic.license_id || lic.id || `exp-${idx}`;
                       const daysLeft = Number(lic.days_left);
                       const urgencyVariant: 'danger' | 'warning' | 'info' =
                         daysLeft <= 7 ? 'danger' : daysLeft <= 30 ? 'warning' : 'info';
                       const isAutoRenew = Boolean(lic.auto_renew);
-                      const isToggling = togglingLicenseId === lic.license_id;
+                      const isToggling = togglingLicenseId === licId;
 
                       return (
-                        <tr key={lic.license_id} className="hover:bg-slate-800/30 transition-colors">
+                        <tr key={licId} className="hover:bg-slate-800/30 transition-colors">
                           <td className="py-3 px-4 font-semibold text-slate-100">
                             <Link
-                              to={`/licenses/${lic.license_id}`}
+                              to={`/licenses/${licId}`}
                               className="hover:text-indigo-400 hover:underline"
                             >
                               {lic.license_name}
@@ -985,7 +1185,7 @@ export const DashboardPage: React.FC = () => {
                             <button
                               type="button"
                               disabled={isToggling}
-                              onClick={() => handleToggleAutoRenew(lic.license_id, !isAutoRenew)}
+                              onClick={() => handleToggleAutoRenew(licId, !isAutoRenew)}
                               className={cn(
                                 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer',
                                 isAutoRenew
@@ -1007,7 +1207,7 @@ export const DashboardPage: React.FC = () => {
                           </td>
                           <td className="py-3 px-4 text-right">
                             <Link
-                              to={`/licenses/${lic.license_id}`}
+                              to={`/licenses/${licId}`}
                               className="px-2.5 py-1 text-[11px] font-semibold text-indigo-400 bg-indigo-950/50 border border-indigo-800/40 rounded-lg hover:bg-indigo-900/60 transition-colors inline-block"
                             >
                               Renew
@@ -1074,9 +1274,10 @@ export const DashboardPage: React.FC = () => {
                       <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} />
                       <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} />
                       <Tooltip
+                        cursor={false}
                         contentStyle={{
                           backgroundColor: '#0b1120',
-                          borderColor: '#1e293b',
+                          borderColor: 'rgba(255, 255, 255, 0.08)',
                           borderRadius: '8px',
                           color: '#f8fafc',
                           fontSize: '12px',
@@ -1131,7 +1332,7 @@ export const DashboardPage: React.FC = () => {
               </p>
             </div>
           ) : (
-            complianceReport.remediationItems.map((item: any) => {
+            complianceReport.remediationItems.map((item: any, idx: number) => {
               const priorityVariant: 'danger' | 'warning' | 'info' | 'default' =
                 item.priority === 'CRITICAL'
                   ? 'danger'
@@ -1143,7 +1344,7 @@ export const DashboardPage: React.FC = () => {
 
               return (
                 <div
-                  key={item.id}
+                  key={item.id || `remediation-${idx}`}
                   className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700 transition-colors"
                 >
                   <div className="space-y-1">

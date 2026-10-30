@@ -1,7 +1,3 @@
-// ==============================================================================
-// AssetVault Design System: Button Component
-// ==============================================================================
-
 import React, { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
@@ -20,19 +16,19 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--av-color-primary,#6366f1)] hover:bg-[var(--av-color-primary-hover,#4f46e5)] text-white font-medium shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/30 active:scale-[0.98]',
+    'bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-xs active:scale-[0.99]',
   secondary:
-    'bg-[var(--av-color-card,#0f172a)] hover:bg-[var(--av-color-card-hover,#1e293b)] text-[var(--av-color-text-primary,#f8fafc)] border border-[var(--av-color-border,#1e293b)] hover:border-indigo-500/40 shadow-sm active:scale-[0.98]',
+    'bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border border-white/[0.08] hover:border-white/[0.14] active:scale-[0.99]',
   ghost:
-    'bg-transparent hover:bg-white/[0.06] text-[var(--av-color-text-secondary,#94a3b8)] hover:text-[var(--av-color-text-primary,#f8fafc)] active:scale-[0.98]',
+    'bg-transparent hover:bg-white/[0.05] text-slate-400 hover:text-slate-100 active:scale-[0.99]',
   danger:
-    'bg-[var(--av-color-danger,#f43f5e)] hover:bg-[var(--av-color-danger-hover,#e11d48)] text-white font-medium shadow-md shadow-rose-500/20 active:scale-[0.98]',
+    'bg-rose-600 hover:bg-rose-500 text-white font-medium shadow-xs active:scale-[0.99]',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'text-xs px-2.5 py-1.5 rounded-[var(--av-radius-sm,6px)] gap-1.5 min-h-[32px]',
-  md: 'text-sm px-4 py-2 rounded-[var(--av-radius-md,10px)] gap-2 min-h-[40px]',
-  lg: 'text-base px-5 py-2.5 rounded-[var(--av-radius-md,10px)] gap-2.5 min-h-[48px]',
+  sm: 'text-xs px-3 py-1.5 rounded-lg gap-1.5 min-h-[32px]',
+  md: 'text-xs px-3.5 py-2 rounded-lg gap-2 min-h-[36px]',
+  lg: 'text-sm px-4 py-2.5 rounded-lg gap-2 min-h-[42px]',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -60,7 +56,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={isDisabled}
         className={cn(
-          'inline-flex items-center justify-center font-medium transition-all duration-150 select-none focus:outline-none focus:ring-2 focus:ring-[var(--av-color-primary,#6366f1)] focus:ring-offset-2 focus:ring-offset-[var(--av-color-bg,#020617)] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none',
+          'inline-flex items-center justify-center font-medium transition-colors duration-150 select-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
           variantStyles[variant],
           sizeStyles[size],
           className

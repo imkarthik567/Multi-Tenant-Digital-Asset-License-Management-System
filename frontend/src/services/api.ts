@@ -7,6 +7,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiResponse } from '../types';
 import { handleFallbackRequest } from './localFallback';
+import { getCachedGmailToken } from './gmailAuth';
 
 const rawBase = (import.meta as any).env?.VITE_API_URL;
 const isLocalhostOverride =
@@ -144,10 +145,11 @@ export const refreshAccessToken = async (): Promise<string> => {
   return inFlightRefreshPromise;
 };
 
-// Request Interceptor: Attach Access Token
+// Request Interceptor: Attach Access Token & In-Memory Gmail OAuth Token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
+    const gmailToken = getCachedGmailToken();
     if (token) {
       if (config.headers && typeof config.headers.set === 'function') {
         if (!config.headers.has('Authorization') && !config.headers.has('authorization')) {
@@ -158,6 +160,14 @@ apiClient.interceptors.request.use(
         if (!config.headers.Authorization && !config.headers.authorization) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+      }
+    }
+    if (gmailToken) {
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set('X-Gmail-Access-Token', gmailToken);
+      } else {
+        config.headers = config.headers || {};
+        config.headers['X-Gmail-Access-Token'] = gmailToken;
       }
     }
     return config;

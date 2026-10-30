@@ -234,6 +234,7 @@ export interface AutomatedEmailLog {
   licenseId?: string;
   licenseName: string;
   eventType:
+    | 'MEMBER_ONBOARDED'
     | 'EXPIRY_30'
     | 'EXPIRY_15'
     | 'EXPIRY_7'
@@ -246,7 +247,18 @@ export interface AutomatedEmailLog {
   subject: string;
   bodyText: string;
   status: 'SENT' | 'FAILED';
+  deliveryChannel?: 'GMAIL_API' | 'SMTP' | 'SANDBOX';
+  realGmailSent?: boolean;
   sentAt: string;
+}
+
+export interface GmailConnectionStatus {
+  connected: boolean;
+  mode?: 'GMAIL_API' | 'GMAIL_SMTP' | 'SANDBOX';
+  senderEmail?: string | null;
+  smtpConfigured?: boolean;
+  oauthConnected?: boolean;
+  pendingSandboxCount: number;
 }
 
 export interface AuditLog {

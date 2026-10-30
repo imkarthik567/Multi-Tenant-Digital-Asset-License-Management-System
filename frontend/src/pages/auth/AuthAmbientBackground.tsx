@@ -1,14 +1,245 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
+
+interface Orb {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  color: string;
+  phase: number;
+  speed: number;
+}
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  alpha: number;
+  hue: string;
+}
 
 export const AuthAmbientBackground: React.FC = () => {
-  const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    const pointer = {
+      x: width * 0.5,
+      y: height * 0.45,
+      targetX: width * 0.5,
+      targetY: height * 0.45,
+      active: false,
     };
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      pointer.targetX = e.clientX;
+      pointer.targetY = e.clientY;
+      pointer.active = true;
+    };
+
+    window.addEventListener('resize', handleResize, { passive: true });
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+
+    // 1. Dynamic Volumetric Aurora Orbs (Canva / YouTube Ambient style)
+    const orbColors = [
+      'rgba(79, 70, 229, 0.24)',   // Royal Indigo
+      'rgba(6, 182, 212, 0.18)',   // Cyber Cyan
+      'rgba(124, 58, 237, 0.20)',  // Electric Violet
+      'rgba(37, 99, 235, 0.18)',   // Deep Sapphire
+      'rgba(16, 185, 129, 0.10)',  // Subtle Emerald Accent
+    ];
+
+    const orbs: Orb[] = orbColors.map((color, idx) => ({
+      x: width * (0.18 + idx * 0.16),
+      y: height * (0.25 + (idx % 2) * 0.45),
+      vx: (idx % 2 === 0 ? 1 : -1) * (0.35 + idx * 0.08),
+      vy: (idx % 3 === 0 ? -1 : 1) * (0.28 + idx * 0.06),
+      radius: Math.min(width, height) * (0.32 + (idx % 3) * 0.08),
+      color,
+      phase: idx * 1.3,
+      speed: 0.008 + idx * 0.002,
+    }));
+
+    // 2. Interactive Constellation Particles
+    const particleCount = Math.min(65, Math.max(36, Math.floor((width * height) / 26000)));
+    const particles: Particle[] = Array.from({ length: particleCount }, (_, i) => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.48,
+      vy: (Math.random() - 0.5) * 0.48,
+      size: 1.2 + (i % 3) * 0.65,
+      alpha: 0.25 + Math.random() * 0.55,
+      hue: i % 3 === 0 ? '#38bdf8' : i % 2 === 0 ? '#818cf8' : '#c084fc',
+    }));
+
+    let tick = 0;
+
+    const render = () => {
+      tick += 1;
+
+      // Smooth spring interpolation for cursor spotlight
+      pointer.x += (pointer.targetX - pointer.x) * 0.06;
+      pointer.y += (pointer.targetY - pointer.y) * 0.06;
+
+      // Base Obsidian Canvas Fill
+      ctx.fillStyle = '#030712';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw Drifting Volumetric Aurora Orbs
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+
+      for (const orb of orbs) {
+        orb.phase += orb.speed;
+        orb.x += orb.vx + Math.sin(orb.phase) * 0.35;
+        orb.y += orb.vy + Math.cos(orb.phase * 0.8) * 0.35;
+
+        if (orb.x < -orb.radius * 0.4) orb.vx = Math.abs(orb.vx);
+        if (orb.x > width + orb.radius * 0.4) orb.vx = -Math.abs(orb.vx);
+        if (orb.y < -orb.radius * 0.4) orb.vy = Math.abs(orb.vy);
+        if (orb.y > height + orb.radius * 0.4) orb.vy = -Math.abs(orb.vy);
+
+        const pulseRadius = orb.radius * (1 + Math.sin(orb.phase) * 0.08);
+        const grad = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, pulseRadius);
+        grad.addColorStop(0, orb.color);
+        grad.addColorStop(0.55, orb.color.replace(/[\d.]+\)$/g, '0.06)'));
+        grad.addColorStop(1, 'rgba(3, 7, 18, 0)');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, pulseRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Cursor-Tracking Interactive Ambient Spotlight
+      const cursorGrad = ctx.createRadialGradient(
+        pointer.x,
+        pointer.y,
+        0,
+        pointer.x,
+        pointer.y,
+        Math.min(width, height) * 0.48
+      );
+      cursorGrad.addColorStop(0, 'rgba(99, 102, 241, 0.22)');
+      cursorGrad.addColorStop(0.4, 'rgba(6, 182, 212, 0.09)');
+      cursorGrad.addColorStop(1, 'rgba(3, 7, 18, 0)');
+      ctx.fillStyle = cursorGrad;
+      ctx.beginPath();
+      ctx.arc(pointer.x, pointer.y, Math.min(width, height) * 0.48, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dynamic Flowing Sine Wave Ribbon across the canvas horizon
+      ctx.beginPath();
+      for (let x = 0; x <= width; x += 24) {
+        const waveY =
+          height * 0.52 +
+          Math.sin(x * 0.0028 + tick * 0.015) * 65 +
+          Math.cos(x * 0.0014 - tick * 0.01) * 40;
+        if (x === 0) ctx.moveTo(x, waveY);
+        else ctx.lineTo(x, waveY);
+      }
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.14)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      for (let x = 0; x <= width; x += 24) {
+        const waveY =
+          height * 0.48 +
+          Math.cos(x * 0.0024 + tick * 0.012) * 75 +
+          Math.sin(x * 0.0018 + tick * 0.009) * 35;
+        if (x === 0) ctx.moveTo(x, waveY);
+        else ctx.lineTo(x, waveY);
+      }
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.11)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.restore();
+
+      // Update & Draw Interactive Constellation Nodes + Connecting Filaments
+      const connectionDist = 145;
+      const cursorDist = 210;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
+
+        // Subtle attraction/repulsion to cursor
+        const dxCursor = pointer.x - p.x;
+        const dyCursor = pointer.y - p.y;
+        const distCursor = Math.sqrt(dxCursor * dxCursor + dyCursor * dyCursor);
+
+        if (distCursor < cursorDist) {
+          const opacity = (1 - distCursor / cursorDist) * 0.32;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(pointer.x, pointer.y);
+          ctx.strokeStyle = `rgba(56, 189, 248, ${opacity.toFixed(3)})`;
+          ctx.lineWidth = 0.9;
+          ctx.stroke();
+        }
+
+        // Connect neighboring particles
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < connectionDist) {
+            const lineAlpha = (1 - dist / connectionDist) * 0.16;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(129, 140, 248, ${lineAlpha.toFixed(3)})`;
+            ctx.lineWidth = 0.75;
+            ctx.stroke();
+          }
+        }
+
+        // Draw glowing node
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.hue;
+        ctx.globalAlpha = p.alpha;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      animationFrameId = window.requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, []);
 
   return (
@@ -16,187 +247,22 @@ export const AuthAmbientBackground: React.FC = () => {
       className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0 bg-[#030712]"
       aria-hidden="true"
     >
-      {/* Interactive Cursor Spotlight */}
-      <div
-        className="absolute inset-0 transition-opacity duration-300"
-        style={{
-          background: `radial-gradient(650px circle at ${mousePos.x}px ${mousePos.y}px, rgba(79, 70, 229, 0.14), rgba(6, 182, 212, 0.05) 40%, transparent 70%)`,
-        }}
-      />
+      {/* 60fps Interactive HTML5 Canvas Engine */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
 
-      {/* Deep Navy Slate Aurora & Volumetric Royal Indigo / Cyan Light Cones */}
-      <div className="absolute -top-48 left-1/2 -translate-x-1/2 w-[1100px] h-[520px] rounded-full bg-gradient-to-b from-indigo-600/18 via-indigo-500/8 to-transparent blur-[130px] animate-float-slow" />
-      <div className="absolute -bottom-56 left-1/4 w-[700px] h-[420px] rounded-full bg-cyan-500/10 blur-[140px] animate-float-reverse" />
-      <div className="absolute top-1/4 -right-32 w-[550px] h-[550px] rounded-full bg-indigo-500/12 blur-[130px] animate-float-medium" />
-
-      {/* Angled Top-Down Architectural Light Rays */}
+      {/* Precision Architectural Grid Overlay with Radial Vignette */}
       <div
-        className="absolute inset-0 opacity-40"
+        className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.035)_1px,transparent_1px)] bg-[size:56px_56px]"
         style={{
-          backgroundImage:
-            'conic-gradient(from 180deg at 50% -10%, transparent 140deg, rgba(79, 70, 229, 0.10) 168deg, rgba(255, 255, 255, 0.04) 180deg, rgba(6, 182, 212, 0.08) 192deg, transparent 220deg)',
-        }}
-      />
-
-      {/* Fine Isometric / Architectural Coordinate Grid with Radial Vignette */}
-      <div
-        className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.04)_1px,transparent_1px)] bg-[size:48px_48px]"
-        style={{
-          maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, #000 35%, transparent 100%)',
+          maskImage: 'radial-gradient(ellipse 85% 75% at 50% 50%, #000 30%, transparent 100%)',
           WebkitMaskImage:
-            'radial-gradient(ellipse 80% 75% at 50% 50%, #000 35%, transparent 100%)',
+            'radial-gradient(ellipse 85% 75% at 50% 50%, #000 30%, transparent 100%)',
         }}
       />
 
-      {/* Sub-grid precision hairlines */}
-      <div
-        className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.025)_1px,transparent_1px)] bg-[size:192px_192px]"
-        style={{
-          maskImage: 'radial-gradient(ellipse 70% 70% at 50% 50%, #000 40%, transparent 100%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse 70% 70% at 50% 50%, #000 40%, transparent 100%)',
-        }}
-      />
-
-      {/* Centered Geometric Vault Rings & Animated Circuit Light Beams */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <svg
-          className="w-[1200px] h-[1200px] max-w-none opacity-65"
-          viewBox="0 0 1200 1200"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <linearGradient id="vaultRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.45" />
-              <stop offset="50%" stopColor="#4f46e5" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.38" />
-            </linearGradient>
-            <linearGradient id="beamGradIndigo" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#4f46e5" stopOpacity="0" />
-              <stop offset="50%" stopColor="#818cf8" stopOpacity="0.95" />
-              <stop offset="100%" stopColor="#4f46e5" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="beamGradCyan" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0" />
-              <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-
-          {/* Outer Static Horizon Ring */}
-          <circle
-            cx="600"
-            cy="600"
-            r="520"
-            stroke="url(#vaultRingGrad)"
-            strokeWidth="1"
-            strokeOpacity="0.3"
-          />
-
-          {/* Slowly Rotating Precision Dashed Vault Ring */}
-          <g className="origin-center animate-spin-slow" style={{ transformOrigin: '600px 600px' }}>
-            <circle
-              cx="600"
-              cy="600"
-              r="430"
-              stroke="url(#vaultRingGrad)"
-              strokeWidth="1.2"
-              strokeDasharray="6 14 24 14"
-            />
-            <circle cx="600" cy="170" r="3.5" fill="#818cf8" fillOpacity="0.85" />
-            <circle cx="1030" cy="600" r="3.5" fill="#22d3ee" fillOpacity="0.85" />
-            <circle cx="600" cy="1030" r="3.5" fill="#818cf8" fillOpacity="0.85" />
-            <circle cx="170" cy="600" r="3.5" fill="#22d3ee" fillOpacity="0.85" />
-          </g>
-
-          {/* Counter-Rotating Inner Security Ring */}
-          <g
-            className="origin-center animate-spin-reverse-slow"
-            style={{ transformOrigin: '600px 600px' }}
-          >
-            <circle
-              cx="600"
-              cy="600"
-              r="335"
-              stroke="url(#vaultRingGrad)"
-              strokeWidth="1"
-              strokeDasharray="2 10"
-            />
-            <circle
-              cx="600"
-              cy="600"
-              r="310"
-              stroke="#818cf8"
-              strokeOpacity="0.22"
-              strokeWidth="1"
-              strokeDasharray="80 180"
-            />
-          </g>
-
-          {/* Animated Data Traces Converging Toward the Vault Center */}
-          <path
-            d="M 60 360 L 340 360 L 440 460"
-            stroke="rgba(148, 163, 184, 0.14)"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M 60 360 L 340 360 L 440 460"
-            stroke="url(#beamGradIndigo)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            className="animate-beam-1"
-          />
-
-          <path
-            d="M 1140 380 L 860 380 L 760 480"
-            stroke="rgba(148, 163, 184, 0.14)"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M 1140 380 L 860 380 L 760 480"
-            stroke="url(#beamGradCyan)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            className="animate-beam-2"
-          />
-
-          <path
-            d="M 100 840 L 360 840 L 450 750"
-            stroke="rgba(148, 163, 184, 0.12)"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M 100 840 L 360 840 L 450 750"
-            stroke="url(#beamGradCyan)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            className="animate-beam-3"
-          />
-
-          <path
-            d="M 1100 820 L 840 820 L 750 730"
-            stroke="rgba(148, 163, 184, 0.12)"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M 1100 820 L 840 820 L 750 730"
-            stroke="url(#beamGradIndigo)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            className="animate-beam-1"
-          />
-
-          {/* Glowing Intersection Nodes */}
-          <circle cx="340" cy="360" r="3" fill="#818cf8" fillOpacity="0.7" />
-          <circle cx="860" cy="380" r="3" fill="#22d3ee" fillOpacity="0.7" />
-          <circle cx="360" cy="840" r="3" fill="#22d3ee" fillOpacity="0.7" />
-          <circle cx="840" cy="820" r="3" fill="#818cf8" fillOpacity="0.7" />
-        </svg>
-      </div>
-
-      {/* Bottom Horizon Glow */}
-      <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+      {/* Top & Bottom Subtle Horizon Light Hairlines */}
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/35 to-transparent" />
+      <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500/35 to-transparent" />
     </div>
   );
 };

@@ -34,6 +34,7 @@ import { errorHandler } from './errors/errorHandler';
 import { NotFoundError } from './errors/AppError';
 import apiRoutes from './routes';
 import { getHealth } from './controllers/health.controller';
+import { emailService } from './services/email.service';
 import {
   requestIdMiddleware,
   getMetricsHandler,
@@ -90,9 +91,18 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Gmail-Access-Token'],
   })
 );
+
+// 3B. Sync in-memory Google Gmail OAuth Access Token from request header
+app.use((req, _res, next) => {
+  const gmailHeader = req.headers['x-gmail-access-token'];
+  if (typeof gmailHeader === 'string' && gmailHeader.trim().length > 0) {
+    emailService.setGmailAccessToken(gmailHeader.trim());
+  }
+  next();
+});
 
 // 4. HTTP Parameter Pollution Defense
 app.use(hpp());

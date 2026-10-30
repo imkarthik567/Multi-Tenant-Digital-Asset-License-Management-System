@@ -1,8 +1,3 @@
-// ==============================================================================
-// AssetVault Design System: Select Component
-// Styled native select with custom chevron icon, label, helperText & error
-// ==============================================================================
-
 import React, { forwardRef, useId } from 'react';
 import { cn } from '../../utils/cn';
 
@@ -21,9 +16,9 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
 }
 
 const sizeStyles = {
-  sm: 'text-xs h-8 pl-2.5 pr-8 rounded-[var(--av-radius-sm,6px)]',
-  md: 'text-sm h-10 pl-3.5 pr-10 rounded-[var(--av-radius-md,10px)]',
-  lg: 'text-base h-12 pl-4 pr-12 rounded-[var(--av-radius-md,10px)]',
+  sm: 'text-xs h-8 pl-2.5 pr-8 rounded-lg',
+  md: 'text-xs h-9 pl-3 pr-9 rounded-lg',
+  lg: 'text-sm h-11 pl-3.5 pr-10 rounded-lg',
 };
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
@@ -47,17 +42,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     const hasError = Boolean(error);
 
     return (
-      <div className="w-full flex flex-col gap-1.5">
+      <div className={cn('flex flex-col gap-1.5', label ? 'w-full' : 'w-full sm:w-auto')}>
         {label && (
           <label
             htmlFor={selectId}
-            className="text-xs font-medium text-[var(--av-color-text-secondary,#94a3b8)] select-none"
+            className="text-xs font-medium text-slate-400 select-none"
           >
             {label}
           </label>
         )}
 
-        <div className="relative flex items-center w-full">
+        <div className="relative inline-flex items-center w-full">
           <select
             ref={ref}
             id={selectId}
@@ -71,11 +66,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 : undefined
             }
             className={cn(
-              'w-full appearance-none cursor-pointer bg-[var(--av-color-bg,#020617)] text-[var(--av-color-text-primary,#f8fafc)] border transition-all duration-150',
-              'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--av-color-bg,#020617)]',
+              'w-full appearance-none cursor-pointer bg-[#0b1120] text-slate-100 border transition-colors',
+              'focus:outline-none focus:border-indigo-500/70',
               hasError
-                ? 'border-[var(--av-color-danger,#f43f5e)] focus:border-[var(--av-color-danger,#f43f5e)] focus:ring-[var(--av-color-danger,#f43f5e)]'
-                : 'border-[var(--av-color-border,#1e293b)] hover:border-[var(--av-color-border-subtle,#334155)] focus:border-[var(--av-color-primary,#6366f1)] focus:ring-[var(--av-color-primary,#6366f1)]',
+                ? 'border-rose-500/70 focus:border-rose-500'
+                : 'border-white/[0.08] hover:border-white/[0.15]',
               disabled && 'opacity-50 cursor-not-allowed bg-slate-900/50',
               sizeStyles[selectSize],
               className
@@ -88,7 +83,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     key={opt.value}
                     value={opt.value}
                     disabled={opt.disabled}
-                    className="bg-slate-900 text-slate-100 py-1"
+                    className="bg-[#0b1120] text-slate-100 py-1"
                   >
                     {opt.label}
                   </option>
@@ -96,10 +91,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               : children}
           </select>
 
-          {/* Styled Chevron Icon */}
-          <div className="absolute right-3 pointer-events-none flex items-center text-[var(--av-color-text-muted,#64748b)]">
+          <div className="absolute right-2.5 pointer-events-none flex items-center text-slate-400">
             <svg
-              className="w-4 h-4 text-current"
+              className="w-3.5 h-3.5 text-current"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -113,13 +107,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         </div>
 
         {hasError && (
-          <p id={`${selectId}-error`} className="text-xs text-[var(--av-color-danger,#f43f5e)] font-medium">
+          <p id={`${selectId}-error`} className="text-xs text-rose-400 font-medium">
             {error}
           </p>
         )}
 
         {!hasError && helperText && (
-          <p id={`${selectId}-helper`} className="text-xs text-[var(--av-color-text-muted,#64748b)]">
+          <p id={`${selectId}-helper`} className="text-xs text-slate-500">
             {helperText}
           </p>
         )}

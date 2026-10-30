@@ -1,8 +1,3 @@
-// ==============================================================================
-// AssetVault Design System: Card Component
-// Base card with header, body, footer slots, hover elevation & glass-morphism
-// ==============================================================================
-
 import React, { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
@@ -30,12 +25,11 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          'rounded-[var(--av-radius-md,10px)] border transition-all duration-200 overflow-hidden',
+          'rounded-xl border transition-colors duration-150 overflow-hidden',
           isGlass
-            ? 'bg-slate-900/60 backdrop-blur-md border-slate-700/50 shadow-[var(--av-shadow-elevation-2)]'
-            : 'bg-[var(--av-color-card,#0f172a)] border-[var(--av-color-border,#1e293b)] shadow-[var(--av-shadow-elevation-1)]',
-          hoverElevation &&
-            'hover:-translate-y-0.5 hover:shadow-[var(--av-shadow-elevation-2)] hover:border-[var(--av-color-border-subtle,#334155)] cursor-pointer',
+            ? 'bg-[#0b1120]/85 backdrop-blur-md border-white/[0.08]'
+            : 'bg-[#0b1120] border-white/[0.07]',
+          hoverElevation && 'hover:border-white/[0.14]',
           className
         )}
         {...props}
@@ -58,7 +52,7 @@ export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
       <div
         ref={ref}
         className={cn(
-          'flex items-center justify-between px-5 py-4 border-b border-[var(--av-color-border,#1e293b)]',
+          'flex items-center justify-between px-5 py-4 border-b border-white/[0.06]',
           className
         )}
         {...props}
@@ -86,7 +80,6 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(
 
 CardBody.displayName = 'CardBody';
 
-// Alias for flexibility
 export const CardContent = CardBody;
 
 export interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {}
@@ -97,7 +90,7 @@ export const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(
       <div
         ref={ref}
         className={cn(
-          'flex items-center justify-between px-5 py-3.5 bg-slate-950/30 border-t border-[var(--av-color-border,#1e293b)] text-xs text-[var(--av-color-text-secondary,#94a3b8)]',
+          'flex items-center justify-between px-5 py-3.5 bg-white/[0.015] border-t border-white/[0.06] text-xs text-slate-400',
           className
         )}
         {...props}

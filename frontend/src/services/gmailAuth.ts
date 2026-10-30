@@ -1,7 +1,10 @@
 // ==============================================================================
 // AssetVault: Google Workspace Gmail OAuth & Direct Email Service
 // Uses Firebase Authentication (GoogleAuthProvider) with gmail.send scope
-// Access tokens are strictly cached in memory only (never localStorage/sessionStorage)
+// Follows workspace-integration skill pattern:
+// - Module-level GoogleAuthProvider with gmail.send scope
+// - In-memory access token cache (never localStorage/sessionStorage)
+// - isSigningIn flag to prevent onAuthStateChanged race conditions during popup
 // ==============================================================================
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -21,54 +24,138 @@ export const auth = getAuth(app);
 // Define the required Google Workspace scopes
 const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
 
+// Configure GoogleAuthProvider at module level with Workspace scopes
+const provider = new GoogleAuthProvider();
+SCOPES.forEach((scope) => provider.addScope(scope));
+
+// Flag to indicate if we are in the middle of a sign-in flow
+let isSigningIn = false;
+
 // Memory-only cache for the Google OAuth access token (never persisted to storage)
 let cachedAccessToken: string | null = null;
+let connectedGoogleEmail: string | null = null;
+const authListeners = new Set<() => void>();
+
+const notifyGmailAuthListeners = () => {
+  authListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {}
+  });
+};
+
+export const subscribeGmailAuthChange = (listener: () => void): (() => void) => {
+  authListeners.add(listener);
+  return () => {
+    authListeners.delete(listener);
+  };
+};
+
+/**
+ * Synchronous getter for the in-memory Google OAuth access token.
+ * Strictly stored in memory only.
+ */
+export const getCachedGmailToken = (): string | null => {
+  return cachedAccessToken;
+};
+
+/**
+ * Synchronous getter for the currently connected Google account email.
+ */
+export const getConnectedGoogleEmail = (): string | null => {
+  return connectedGoogleEmail || auth.currentUser?.email || null;
+};
 
 /**
  * Initializes the authentication state listener.
- * Must be called on application or modal startup.
+ * Uses isSigningIn guard so mid-popup state transitions do not clear the token.
  */
 export const initAuth = (
   callback: (user: User | null, needsAuth: boolean) => void
 ) => {
-  return onAuthStateChanged(auth, (user) => {
+  return onAuthStateChanged(auth, (user: User | null) => {
     if (user) {
-      // If user is signed in to Firebase, check if we have the API token in memory
-      callback(user, !cachedAccessToken);
-    } else {
+      connectedGoogleEmail = user.email || connectedGoogleEmail;
+      if (cachedAccessToken) {
+        callback(user, false);
+      } else if (!isSigningIn) {
+        cachedAccessToken = null;
+        callback(user, true);
+      }
+    } else if (!isSigningIn) {
       cachedAccessToken = null;
+      connectedGoogleEmail = null;
       callback(null, true);
     }
+    notifyGmailAuthListeners();
   });
 };
 
 /**
- * Triggers the Google Sign-In popup to authenticate the user and request API scopes.
- * Also used to refresh the access token if it expires or is lost on page reload.
+ * Triggers the Google Sign-In popup via Firebase Auth to authenticate the user
+ * and obtain a Google Workspace OAuth access token for gmail.send.
+ * Must be called directly from a button click handler.
  */
-export const googleSignIn = async (loginHint?: string): Promise<string> => {
-  const provider = new GoogleAuthProvider();
+export const googleSignIn = async (_loginHint?: string): Promise<string> => {
+  try {
+    isSigningIn = true;
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
 
-  SCOPES.forEach((scope) => provider.addScope(scope));
+    if (!credential?.accessToken) {
+      throw new Error('Failed to retrieve access token from Google Sign-In.');
+    }
 
-  // Always show the Google account selector so the user can choose the authorized project owner account
-  const customParams: Record<string, string> = {
-    prompt: 'select_account',
-  };
-  if (loginHint) {
-    customParams.login_hint = loginHint;
-  }
-  provider.setCustomParameters(customParams);
-
-  const result = await signInWithPopup(auth, provider);
-  const credential = GoogleAuthProvider.credentialFromResult(result);
-
-  if (credential?.accessToken) {
     cachedAccessToken = credential.accessToken;
+    connectedGoogleEmail = result.user?.email || null;
+    notifyGmailAuthListeners();
     return cachedAccessToken;
+  } finally {
+    isSigningIn = false;
   }
+};
 
-  throw new Error('Failed to retrieve access token from Google Sign-In.');
+export interface GoogleAccountProfile {
+  email: string;
+  fullName: string;
+  avatarUrl: string | null;
+  uid: string;
+}
+
+/**
+ * Triggers Firebase Google Sign-In for app login/registration (/login and /register)
+ * and returns the user's verified Google profile (email, fullName, avatarUrl).
+ */
+export const signInWithGoogleAccount = async (): Promise<GoogleAccountProfile> => {
+  try {
+    isSigningIn = true;
+    const loginProvider = new GoogleAuthProvider();
+    loginProvider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, loginProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      cachedAccessToken = credential.accessToken;
+    }
+    const email = (result.user?.email || '').trim().toLowerCase();
+    if (!email) {
+      throw new Error('Google account did not return a valid email address.');
+    }
+    connectedGoogleEmail = email;
+    notifyGmailAuthListeners();
+    return {
+      email,
+      fullName:
+        result.user?.displayName?.trim() ||
+        email
+          .split('@')[0]
+          .replace(/[._-]+/g, ' ')
+          .replace(/\b\w/g, (l) => l.toUpperCase()),
+      avatarUrl: result.user?.photoURL || null,
+      uid: result.user.uid,
+    };
+  } finally {
+    isSigningIn = false;
+  }
 };
 
 /**
@@ -89,10 +176,20 @@ export const hasActiveGmailToken = (): boolean => {
 };
 
 /**
+ * Clears the cached in-memory token (e.g., on 401/403 expiry).
+ */
+export const clearCachedGmailToken = (): void => {
+  cachedAccessToken = null;
+  notifyGmailAuthListeners();
+};
+
+/**
  * Signs the user out of Firebase and clears the cached token.
  */
 export const logout = async () => {
   cachedAccessToken = null;
+  connectedGoogleEmail = null;
+  notifyGmailAuthListeners();
   await signOut(auth);
 };
 
@@ -137,16 +234,21 @@ export const sendGmailMessage = async (params: {
   to: string;
   subject: string;
   body: string;
+  html?: string;
 }): Promise<SendGmailResult> => {
   const token = await getAccessToken();
 
+  const contentType = params.html
+    ? 'text/html; charset="UTF-8"'
+    : 'text/plain; charset="UTF-8"';
+
   const emailLines = [
     `To: ${params.to.trim()}`,
-    'Content-Type: text/plain; charset="UTF-8"',
+    `Content-Type: ${contentType}`,
     'MIME-Version: 1.0',
     `Subject: ${encodeMimeSubject(params.subject.trim())}`,
     '',
-    params.body,
+    params.html || params.body,
   ];
 
   const rawEmail = emailLines.join('\r\n');
@@ -167,8 +269,8 @@ export const sendGmailMessage = async (params: {
   );
 
   if (response.status === 401 || response.status === 403) {
-    // Clear expired token so the user can re-authorize cleanly
     cachedAccessToken = null;
+    notifyGmailAuthListeners();
     const errBody = await response.json().catch(() => ({}));
     throw new Error(
       errBody?.error?.message ||

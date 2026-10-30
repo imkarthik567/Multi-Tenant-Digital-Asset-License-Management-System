@@ -567,7 +567,7 @@ export const LicenseListPage: React.FC = () => {
 
     if (calculatedDays < 30) {
       return (
-        <Badge variant="danger" dot size="sm" className="font-semibold shadow-xs animate-pulse">
+        <Badge variant="danger" dot size="sm" className="font-semibold">
           Expires in {calculatedDays}d
         </Badge>
       );
@@ -596,13 +596,13 @@ export const LicenseListPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
-              Software & Asset Licenses
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              Licenses
             </h1>
-            {isFetching && <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />}
+            {isFetching && <RefreshCw className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />}
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Contract quotas, seat allocations, real-time utilization & auto-renewal schedules
+            Manage software contracts, seat quotas, and renewal schedules.
           </p>
         </div>
 
@@ -623,65 +623,50 @@ export const LicenseListPage: React.FC = () => {
       </div>
 
       {/* ====================================================================== */}
-      {/* Utilization Summary Banner: "X licenses at capacity · Y expiring"      */}
+      {/* Clean 3-Column License Summary Strip                                   */}
       {/* ====================================================================== */}
-      <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 p-5 shadow-lg relative overflow-hidden backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none" />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-sm font-extrabold uppercase tracking-wider text-indigo-300">
-                License Capacity & Renewals
-              </h2>
-            </div>
-            <p className="text-lg sm:text-xl font-bold text-slate-100">
-              <span className={licensesAtCapacity > 0 ? 'text-rose-400' : 'text-slate-100'}>
-                {licensesAtCapacity} {licensesAtCapacity === 1 ? 'license' : 'licenses'} at capacity
-              </span>
-              <span className="text-slate-500 mx-2">&bull;</span>
-              <span className={expiringThisMonth > 0 ? 'text-amber-400' : 'text-slate-100'}>
-                {expiringThisMonth} expiring this month
-              </span>
-            </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-xl bg-[#0b1120] border border-white/[0.07] p-4 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 block">
+              Active Contracts
+            </span>
+            <span className="text-xl font-bold text-white font-mono mt-1 block">
+              {totalActiveCount}
+            </span>
           </div>
+          <KeyRound className="w-4 h-4 text-slate-500" />
+        </div>
 
-          <div className="flex items-center gap-3">
-            <div className="px-3.5 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-center min-w-[100px]">
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-                Active Contracts
-              </span>
-              <span className="text-base font-bold text-slate-100 font-mono">
-                {totalActiveCount}
-              </span>
-            </div>
-
-            <div className="px-3.5 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-center min-w-[100px]">
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-                At Seat Limit
-              </span>
-              <span className="text-base font-bold text-rose-400 font-mono">
-                {licensesAtCapacity}
-              </span>
-            </div>
-
-            <div className="px-3.5 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-center min-w-[100px]">
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-                Expiring (30d)
-              </span>
-              <span className="text-base font-bold text-amber-400 font-mono">
-                {expiringThisMonth}
-              </span>
-            </div>
+        <div className="rounded-xl bg-[#0b1120] border border-white/[0.07] p-4 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 block">
+              At Seat Limit
+            </span>
+            <span className={`text-xl font-bold font-mono mt-1 block ${licensesAtCapacity > 0 ? 'text-rose-400' : 'text-white'}`}>
+              {licensesAtCapacity}
+            </span>
           </div>
+          <TrendingUp className="w-4 h-4 text-slate-500" />
+        </div>
+
+        <div className="rounded-xl bg-[#0b1120] border border-white/[0.07] p-4 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 block">
+              Expiring in 30 Days
+            </span>
+            <span className={`text-xl font-bold font-mono mt-1 block ${expiringThisMonth > 0 ? 'text-amber-400' : 'text-white'}`}>
+              {expiringThisMonth}
+            </span>
+          </div>
+          <RotateCcw className="w-4 h-4 text-slate-500" />
         </div>
       </div>
 
       {/* ====================================================================== */}
       {/* Filter and Sort Bar                                                    */}
       {/* ====================================================================== */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm backdrop-blur-xs">
+      <div className="bg-[#0b1120] border border-white/[0.07] rounded-xl p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
         {/* Search Input */}
         <div className="w-full md:w-64">
           <Input
@@ -880,7 +865,7 @@ export const LicenseListPage: React.FC = () => {
               <Card
                 key={licId}
                 hoverElevation
-                className="flex flex-col justify-between transition-all bg-slate-900/70 border-slate-800 hover:border-slate-700 relative overflow-visible"
+                className="flex flex-col justify-between transition-colors bg-[#0b1120] border-white/[0.07] hover:border-white/[0.14] relative overflow-visible"
               >
                 <div className="p-5 space-y-4">
                   {/* Card Header: Vendor Logo (colored initials), Name, Status Badge & Context Menu */}
@@ -1009,7 +994,7 @@ export const LicenseListPage: React.FC = () => {
                   </div>
 
                   {/* Masked Key Display (••••••••-XXXX) with Copy Button */}
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/80 border border-slate-800 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#030712] border border-white/[0.06] text-xs">
                     <div className="flex items-center gap-2 min-w-0">
                       <KeyRound className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                       <span className="font-mono text-slate-300 tracking-wider truncate">
@@ -1019,7 +1004,7 @@ export const LicenseListPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleCopyKey(rawKey || maskedKey, licId)}
-                      className="p-1 text-slate-500 hover:text-indigo-400 transition-colors rounded hover:bg-slate-800 shrink-0"
+                      className="p-1 text-slate-500 hover:text-indigo-400 transition-colors rounded hover:bg-white/[0.06] shrink-0"
                       title="Copy Key"
                     >
                       {copiedKeyId === licId ? (
@@ -1031,7 +1016,7 @@ export const LicenseListPage: React.FC = () => {
                   </div>
 
                   {/* Seat Utilization Progress Bar */}
-                  <div className="space-y-1.5 p-3 rounded-xl bg-slate-950/40 border border-slate-800/80">
+                  <div className="space-y-1.5 p-3 rounded-lg bg-[#030712] border border-white/[0.06]">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-400 font-medium">Seat Utilization</span>
                       <span className={`font-mono font-bold ${utilColor.text}`}>
@@ -1042,7 +1027,7 @@ export const LicenseListPage: React.FC = () => {
                     </div>
 
                     {!isUnlimited && (
-                      <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                         <div
                           style={{ width: `${pct}%` }}
                           className={`h-full rounded-full transition-all duration-300 ${utilColor.bar}`}
@@ -1053,7 +1038,7 @@ export const LicenseListPage: React.FC = () => {
                 </div>
 
                 {/* Card Bottom: Expiry Countdown Chip & Cost */}
-                <div className="px-5 py-3.5 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                <div className="px-5 py-3 bg-[#030712]/50 border-t border-white/[0.06] flex items-center justify-between text-xs">
                   {/* Expiry Countdown Chip (Red if <30 days) */}
                   <div className="flex items-center gap-1.5">
                     {renderExpiryCountdownChip(lic)}

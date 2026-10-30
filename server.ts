@@ -12,17 +12,24 @@ process.env.VITE_API_URL = '/api';
 
 import app from './backend/src/app';
 import { prisma } from './backend/src/config/prisma';
+import { emailService } from './backend/src/services/email.service';
 
 const PORT = 3000;
 const HOST = '0.0.0.0';
 
 async function bootstrap() {
-  try {
-    await prisma.$connect();
-    console.log('✅ Connected to PostgreSQL database.');
-  } catch (e) {
-    console.warn('⚠️ PostgreSQL offline or unconfigured. In-memory resilience layer active.');
-  }
+  // Connect to PostgreSQL non-blockingly so port 3000 binds immediately
+  prisma
+    .$connect()
+    .then(() => {
+      console.log('✅ Connected to PostgreSQL database.');
+    })
+    .catch(() => {
+      console.warn('⚠️ PostgreSQL offline or unconfigured. In-memory resilience layer active.');
+    });
+
+  // Start automated zero-touch background license expiry email scheduler
+  emailService.startAutomatedBackgroundScheduler();
 
   const isProduction = process.env.NODE_ENV === 'production';
 
@@ -33,25 +40,38 @@ async function bootstrap() {
       server: {
         middlewareMode: true,
         hmr: false,
+        ws: false,
       },
       appType: 'spa',
       root: path.resolve(process.cwd(), 'frontend'),
     });
 
-    app.use(vite.middlewares);
+    app.use((req, res, next) => {
+      if (res.headersSent || res.writableEnded || req.originalUrl.startsWith('/api')) {
+        return;
+      }
+      vite.middlewares(req, res, next);
+    });
 
     // Fallback for SPA HTML routing
     app.use('*', async (req, res, next) => {
+      if (res.headersSent || res.writableEnded || req.originalUrl.startsWith('/api')) {
+        return;
+      }
       const url = req.originalUrl;
       try {
         const fs = await import('fs/promises');
         const templatePath = path.resolve(process.cwd(), 'frontend/index.html');
         let template = await fs.readFile(templatePath, 'utf-8');
         template = await vite.transformIndexHtml(url, template);
-        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        if (!res.headersSent && !res.writableEnded) {
+          res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        }
       } catch (e) {
         vite.ssrFixStacktrace(e as Error);
-        next(e);
+        if (!res.headersSent && !res.writableEnded) {
+          next(e);
+        }
       }
     });
   } else {

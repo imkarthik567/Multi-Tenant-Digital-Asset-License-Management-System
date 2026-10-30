@@ -14,6 +14,10 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ): void => {
+  if (res.headersSent || res.writableEnded) {
+    return;
+  }
+
   // 1. Handled AppError instances
   if (err instanceof AppError) {
     res.status(err.statusCode).json({

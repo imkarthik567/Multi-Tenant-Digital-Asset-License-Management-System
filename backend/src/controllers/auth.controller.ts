@@ -217,6 +217,43 @@ export class AuthController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/auth/google-sso
+   */
+  public async googleSso(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await authService.googleSso(req.body, {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+      });
+
+      if (result.requiresOnboarding) {
+        res.status(200).json({
+          status: 'success',
+          data: {
+            requiresOnboarding: true,
+            profile: result.profile,
+          },
+        });
+        return;
+      }
+
+      setRefreshTokenCookie(res, result.rawRefreshToken);
+
+      res.status(200).json({
+        status: 'success',
+        data: {
+          requiresOnboarding: false,
+          accessToken: result.accessToken,
+          user: result.user,
+          refreshToken: result.rawRefreshToken,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const authController = new AuthController();

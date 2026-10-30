@@ -12,6 +12,9 @@ export default {
         mono: ['JetBrains Mono', 'monospace'],
       },
       colors: {
+        slate: {
+          850: '#131c31',
+        },
         obsidian: {
           950: '#030712',
           900: '#0b1120',

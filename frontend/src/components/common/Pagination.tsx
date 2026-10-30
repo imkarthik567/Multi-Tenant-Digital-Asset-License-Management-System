@@ -1,9 +1,3 @@
-// ==============================================================================
-// AssetVault: Pagination Component
-// Course: BCSE307L Database Systems (Fall 2026-27)
-// Responsive server-side pagination bar with limit selector and page jumping
-// ==============================================================================
-
 import React from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { PaginationMeta } from '../../types';
@@ -46,24 +40,24 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row items-center justify-between gap-4 py-3 px-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 ${className}`}
+      className={`flex flex-col sm:flex-row items-center justify-between gap-4 py-3 px-4 bg-[#0b1120] border-t border-white/[0.06] text-xs text-slate-400 ${className}`}
     >
       {/* Left: Summary and limit selector */}
       <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
         <span>
-          Showing <span className="font-semibold text-slate-900 dark:text-slate-100">{startItem}</span> to{' '}
-          <span className="font-semibold text-slate-900 dark:text-slate-100">{endItem}</span> of{' '}
-          <span className="font-semibold text-slate-900 dark:text-slate-100">{total}</span> results
+          Showing <span className="font-semibold text-slate-200">{startItem}</span> to{' '}
+          <span className="font-semibold text-slate-200">{endItem}</span> of{' '}
+          <span className="font-semibold text-slate-200">{total}</span>
         </span>
 
         {handleLimitChange && (
           <div className="flex items-center gap-1.5 ml-2">
-            <span className="hidden sm:inline">Rows:</span>
+            <span className="hidden sm:inline text-slate-500">Rows:</span>
             <select
               value={limit}
               onChange={(e) => handleLimitChange(Number(e.target.value))}
               aria-label="Rows per page"
-              className="py-1 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className="py-1 px-2 bg-[#030712] border border-white/[0.08] rounded-md text-slate-200 font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
               {limitOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -82,21 +76,21 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(1)}
           disabled={!hasPrev || page === 1}
           aria-label="First page"
-          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 rounded-lg border border-white/[0.07] hover:bg-white/[0.05] text-slate-400 hover:text-white disabled:opacity-35 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          <ChevronsLeft className="w-4 h-4" />
+          <ChevronsLeft className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={!hasPrev}
           aria-label="Previous page"
-          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 rounded-lg border border-white/[0.07] hover:bg-white/[0.05] text-slate-400 hover:text-white disabled:opacity-35 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-3.5 h-3.5" />
         </button>
 
-        <span className="px-3 py-1 font-medium text-slate-700 dark:text-slate-300">
+        <span className="px-2.5 py-1 font-medium text-slate-300">
           Page {page} of {Math.max(1, totalPages)}
         </span>
 
@@ -105,18 +99,18 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(page + 1)}
           disabled={!hasNext}
           aria-label="Next page"
-          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 rounded-lg border border-white/[0.07] hover:bg-white/[0.05] text-slate-400 hover:text-white disabled:opacity-35 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
           onClick={() => onPageChange(totalPages)}
           disabled={!hasNext || page === totalPages}
           aria-label="Last page"
-          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 rounded-lg border border-white/[0.07] hover:bg-white/[0.05] text-slate-400 hover:text-white disabled:opacity-35 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          <ChevronsRight className="w-4 h-4" />
+          <ChevronsRight className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>

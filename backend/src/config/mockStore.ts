@@ -369,6 +369,33 @@ export function createInitialState(): MockStoreState {
       createdAt: new Date('2026-01-12T00:00:00Z'),
       updatedAt: new Date('2026-01-12T00:00:00Z'),
     },
+    {
+      id: 'vendor-karthik-1',
+      tenantId: 'tenant-karthik',
+      name: 'JetBrains s.r.o.',
+      contactEmail: 'enterprise@jetbrains.com',
+      websiteUrl: 'https://www.jetbrains.com',
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
+    },
+    {
+      id: 'vendor-karthik-2',
+      tenantId: 'tenant-karthik',
+      name: 'Adobe Systems Inc.',
+      contactEmail: 'enterprise-licensing@adobe.com',
+      websiteUrl: 'https://www.adobe.com',
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
+    },
+    {
+      id: 'vendor-karthik-3',
+      tenantId: 'tenant-karthik',
+      name: 'Figma Inc.',
+      contactEmail: 'sales@figma.com',
+      websiteUrl: 'https://www.figma.com',
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
+    },
   ];
 
   const categories = [
@@ -399,6 +426,24 @@ export function createInitialState(): MockStoreState {
       createdAt: new Date('2026-01-15T00:00:00Z'),
       updatedAt: new Date('2026-01-15T00:00:00Z'),
     },
+    {
+      id: 'cat-karthik-1',
+      tenantId: 'tenant-karthik',
+      name: 'Engineering & IDEs',
+      description: 'Enterprise development environments, cloud SDKs, and build tools',
+      parentId: null,
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
+    },
+    {
+      id: 'cat-karthik-2',
+      tenantId: 'tenant-karthik',
+      name: 'Product Design & Creative',
+      description: 'Collaborative UI/UX design systems and digital media suites',
+      parentId: null,
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
+    },
   ];
 
   const tags = [
@@ -425,6 +470,22 @@ export function createInitialState(): MockStoreState {
       color: '#EC4899',
       createdAt: new Date('2026-01-15T00:00:00Z'),
       updatedAt: new Date('2026-01-15T00:00:00Z'),
+    },
+    {
+      id: 'tag-karthik-1',
+      tenantId: 'tenant-karthik',
+      name: 'Core Engineering',
+      color: '#3B82F6',
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
+    },
+    {
+      id: 'tag-karthik-2',
+      tenantId: 'tenant-karthik',
+      name: 'Design System',
+      color: '#10B981',
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
     },
   ];
 
@@ -502,6 +563,48 @@ export function createInitialState(): MockStoreState {
       description: 'InnovateLabs engineering IDE asset.',
       createdAt: new Date('2026-01-12T00:00:00Z'),
       updatedAt: new Date('2026-01-12T00:00:00Z'),
+    },
+    {
+      id: 'asset-karthik-1',
+      tenantId: 'tenant-karthik',
+      name: 'IntelliJ IDEA Ultimate Enterprise',
+      code: 'AST-KEW-001',
+      type: 'SOFTWARE',
+      status: 'ACTIVE',
+      categoryId: 'cat-karthik-1',
+      ownerId: 'user-karthik-admin',
+      vendorId: 'vendor-karthik-1',
+      description: 'Enterprise Java, TypeScript, and Cloud-Native IDE suite for Karthik Enterprise Workspace.',
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
+    },
+    {
+      id: 'asset-karthik-2',
+      tenantId: 'tenant-karthik',
+      name: 'Adobe Creative Cloud Enterprise',
+      code: 'AST-KEW-002',
+      type: 'SOFTWARE',
+      status: 'ACTIVE',
+      categoryId: 'cat-karthik-2',
+      ownerId: 'user-karthik-admin',
+      vendorId: 'vendor-karthik-2',
+      description: 'Complete creative cloud suite for digital asset production and brand engineering.',
+      createdAt: new Date('2026-01-06T00:00:00Z'),
+      updatedAt: new Date('2026-01-06T00:00:00Z'),
+    },
+    {
+      id: 'asset-karthik-3',
+      tenantId: 'tenant-karthik',
+      name: 'Figma Enterprise Organization',
+      code: 'AST-KEW-003',
+      type: 'SOFTWARE',
+      status: 'ACTIVE',
+      categoryId: 'cat-karthik-2',
+      ownerId: 'user-karthik-admin',
+      vendorId: 'vendor-karthik-3',
+      description: 'Collaborative design system and interactive prototyping workspace.',
+      createdAt: new Date('2026-01-07T00:00:00Z'),
+      updatedAt: new Date('2026-01-07T00:00:00Z'),
     },
   ];
 
@@ -669,6 +772,69 @@ export function createInitialState(): MockStoreState {
       createdAt: new Date('2026-01-12T00:00:00Z'),
       updatedAt: new Date('2026-01-12T00:00:00Z'),
     },
+    {
+      id: 'lic-karthik-1',
+      tenantId: 'tenant-karthik',
+      assetId: 'asset-karthik-1',
+      vendorId: 'vendor-karthik-1',
+      licenseTypeId: 3,
+      name: 'IntelliJ IDEA Ultimate Enterprise',
+      licenseKey: 'JB-INTEL-2026-KEW-88101',
+      type: 'SEAT_BASED',
+      status: 'ACTIVE',
+      totalSeats: 35,
+      allocatedSeats: 2,
+      cost: 699.0,
+      currency: 'USD',
+      autoRenew: true,
+      startDate: new Date('2026-01-05T00:00:00Z'),
+      endDate: new Date(Date.now() + 180 * 24 * 3600 * 1000),
+      expiresAt: new Date(Date.now() + 180 * 24 * 3600 * 1000),
+      createdAt: new Date('2026-01-05T00:00:00Z'),
+      updatedAt: new Date('2026-01-05T00:00:00Z'),
+    },
+    {
+      id: 'lic-karthik-2',
+      tenantId: 'tenant-karthik',
+      assetId: 'asset-karthik-2',
+      vendorId: 'vendor-karthik-2',
+      licenseTypeId: 3,
+      name: 'Adobe Creative Cloud Enterprise',
+      licenseKey: 'ADBE-CC-ENT-KEW-2026-402',
+      type: 'SEAT_BASED',
+      status: 'ACTIVE',
+      totalSeats: 25,
+      allocatedSeats: 1,
+      cost: 899.0,
+      currency: 'USD',
+      autoRenew: true,
+      startDate: new Date('2026-01-06T00:00:00Z'),
+      endDate: new Date(Date.now() + 14 * 24 * 3600 * 1000),
+      expiresAt: new Date(Date.now() + 14 * 24 * 3600 * 1000),
+      createdAt: new Date('2026-01-06T00:00:00Z'),
+      updatedAt: new Date('2026-01-06T00:00:00Z'),
+    },
+    {
+      id: 'lic-karthik-3',
+      tenantId: 'tenant-karthik',
+      assetId: 'asset-karthik-3',
+      vendorId: 'vendor-karthik-3',
+      licenseTypeId: 3,
+      name: 'Figma Enterprise Organization',
+      licenseKey: 'FIGMA-ENT-KEW-2026-715',
+      type: 'SEAT_BASED',
+      status: 'ACTIVE',
+      totalSeats: 30,
+      allocatedSeats: 1,
+      cost: 750.0,
+      currency: 'USD',
+      autoRenew: true,
+      startDate: new Date('2026-01-07T00:00:00Z'),
+      endDate: new Date(Date.now() + 45 * 24 * 3600 * 1000),
+      expiresAt: new Date(Date.now() + 45 * 24 * 3600 * 1000),
+      createdAt: new Date('2026-01-07T00:00:00Z'),
+      updatedAt: new Date('2026-01-07T00:00:00Z'),
+    },
   ];
 
   const allocations = [
@@ -716,6 +882,42 @@ export function createInitialState(): MockStoreState {
       status: 'ACTIVE',
       allocatedAt: new Date('2026-02-10T00:00:00Z'),
       notes: 'UI/UX Design Seat',
+    },
+    {
+      id: 'alloc-karthik-1',
+      tenantId: 'tenant-karthik',
+      licenseId: 'lic-karthik-1',
+      userId: 'user-karthik-admin',
+      status: 'ACTIVE',
+      allocatedAt: new Date('2026-01-10T00:00:00Z'),
+      notes: 'Executive Principal Architect IDE Seat',
+    },
+    {
+      id: 'alloc-karthik-2',
+      tenantId: 'tenant-karthik',
+      licenseId: 'lic-karthik-1',
+      userId: 'user-karthik-admin-alt',
+      status: 'ACTIVE',
+      allocatedAt: new Date('2026-01-12T00:00:00Z'),
+      notes: 'Core Engineering Lead Seat',
+    },
+    {
+      id: 'alloc-karthik-3',
+      tenantId: 'tenant-karthik',
+      licenseId: 'lic-karthik-2',
+      userId: 'user-karthik-admin-alt',
+      status: 'ACTIVE',
+      allocatedAt: new Date('2026-01-15T00:00:00Z'),
+      notes: 'Creative Cloud Enterprise Design Seat',
+    },
+    {
+      id: 'alloc-karthik-4',
+      tenantId: 'tenant-karthik',
+      licenseId: 'lic-karthik-3',
+      userId: 'user-karthik-admin',
+      status: 'ACTIVE',
+      allocatedAt: new Date('2026-01-18T00:00:00Z'),
+      notes: 'Figma Organization Admin & Design System Seat',
     },
   ];
 
@@ -905,11 +1107,15 @@ export class MockPrismaStore {
               tenants: mergeById(initial.tenants, parsed.tenants),
               users: mergeById(initial.users, parsed.users),
               vendors: mergeById(initial.vendors, parsed.vendors || []),
+              categories: mergeById(initial.categories, parsed.categories || []),
+              tags: mergeById(initial.tags, parsed.tags || []),
               assets: mergeById(initial.assets, parsed.assets || []),
               licenses: mergeById(initial.licenses, parsed.licenses || []),
+              allocations: mergeById(initial.allocations, parsed.allocations || []),
               assetVersions: mergeById(initial.assetVersions, parsed.assetVersions || []),
               notifications: mergeById(initial.notifications, parsed.notifications || []),
               emailDeliveries: mergeById(initial.emailDeliveries, parsed.emailDeliveries || []),
+              auditLogs: mergeById(initial.auditLogs, parsed.auditLogs || []),
             };
           }
         }
@@ -1031,6 +1237,20 @@ export class MockPrismaStore {
       } else if (key === 'role' && value && typeof value === 'object' && 'name' in (value as any)) {
         const userRole = this.state.roles.find((r) => r.id === item.roleId);
         if (!userRole || userRole.name !== (value as any).name) return false;
+      } else if (key === 'license' && value && typeof value === 'object') {
+        const relLic = this.state.licenses.find((l) => l.id === item.licenseId);
+        if (relLic) {
+          if (!this.matches(relLic, value)) return false;
+        } else if ((value as any).tenantId && item.tenantId !== (value as any).tenantId) {
+          return false;
+        }
+      } else if (key === 'user' && value && typeof value === 'object') {
+        const relUser = this.state.users.find((u) => u.id === item.userId);
+        if (relUser) {
+          if (!this.matches(relUser, value)) return false;
+        } else if ((value as any).tenantId && item.tenantId !== (value as any).tenantId) {
+          return false;
+        }
       } else if (key === 'assetId_versionNo' && value && typeof value === 'object') {
         const itemVer = item.versionNo ?? (parseInt(String(item.versionNumber || '1'), 10) || 1);
         if (item.assetId !== (value as any).assetId || itemVer !== (value as any).versionNo) return false;
@@ -1665,7 +1885,14 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('v_license_utilization')) {
-            const mapped = mockStore.state.licenses.map((l) => {
+            const tenantFilter = values.find(
+              (v: any) => typeof v === 'string' && v.startsWith('tenant-')
+            );
+            const sourceLicenses = tenantFilter
+              ? mockStore.state.licenses.filter((l) => l.tenantId === tenantFilter)
+              : mockStore.state.licenses;
+
+            const mapped = sourceLicenses.map((l) => {
               const vendor = mockStore.state.vendors.find((v) => v.id === l.vendorId);
               const licType = mockStore.state.licenseTypes.find((lt) => lt.id === l.licenseTypeId);
               const totalSeats = Number(l.totalSeats || 1);
@@ -1673,22 +1900,30 @@ export function createMockPrismaClient(): any {
                 (a) => a.licenseId === l.id && a.status === 'ACTIVE'
               ).length;
               const usedSeats = Math.max(Number(l.allocatedSeats ?? l.usedSeats ?? 0), activeAllocsForLic);
+              const availableSeats = Math.max(0, totalSeats - usedSeats);
               const endDate = l.endDate ?? l.expiresAt ?? null;
               const daysToExpiry = endDate
                 ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
                 : null;
+              const licName = l.name || l.licenseKey || 'Enterprise License';
               return {
+                id: l.id,
+                name: licName,
+                totalSeats,
+                usedSeats,
+                allocatedSeats: usedSeats,
+                availableSeats,
                 license_id: l.id,
                 tenant_id: l.tenantId,
                 vendor_id: l.vendorId,
                 license_type_id: l.licenseTypeId || 3,
-                license_name: l.name || l.licenseKey,
+                license_name: licName,
                 license_key: l.licenseKey ? `••••••••-${String(l.licenseKey).slice(-4)}` : '••••••••-KEY',
                 vendor_name: vendor?.name || 'Enterprise Vendor',
                 license_type: licType?.name || l.type || 'SEAT_BASED',
                 total_seats: totalSeats,
                 used_seats: usedSeats,
-                available_seats: Math.max(0, totalSeats - usedSeats),
+                available_seats: availableSeats,
                 utilization_pct: Math.round((usedSeats / Math.max(1, totalSeats)) * 100),
                 days_to_expiry: daysToExpiry,
                 status: l.status || 'ACTIVE',

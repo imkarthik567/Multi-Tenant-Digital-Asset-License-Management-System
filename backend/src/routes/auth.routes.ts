@@ -39,7 +39,10 @@ router.get('/me', authenticate, loadUser, authController.getMe);
 // 7. Role-Based Navigation Menu
 router.get('/menu', authenticate, loadUser, authController.getMenu);
 
-// 8. Google OAuth 2.0 Endpoints (optional; only register when credentials are configured)
+// 8. Firebase Google SSO Sign-In & Workspace Onboarding
+router.post('/google-sso', authController.googleSso);
+
+// 9. Legacy Google OAuth 2.0 Redirect Endpoints (optional; only register when credentials are configured)
 if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
   router.get(
     '/google',

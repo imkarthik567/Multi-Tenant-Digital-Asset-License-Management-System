@@ -64,6 +64,14 @@ export const tenantContext = (req: Request, res: Response, next: NextFunction): 
   }
 
   // Redesign: One interactive transaction/connection per request with set_config called once
+  let nextCalled = false;
+  const invokeNextOnce = () => {
+    if (!nextCalled && !res.headersSent && !res.writableEnded) {
+      nextCalled = true;
+      next();
+    }
+  };
+
   prisma.$transaction(
     async (tx) => {
       (req as any).__inRequestTx = true;
@@ -114,7 +122,7 @@ export const tenantContext = (req: Request, res: Response, next: NextFunction): 
           }
         });
 
-        next();
+        invokeNextOnce();
       });
     },
     {
@@ -122,14 +130,14 @@ export const tenantContext = (req: Request, res: Response, next: NextFunction): 
       timeout: 30000,
     }
   ).catch((_err) => {
-    if (!res.headersSent) {
-      // If PostgreSQL is unreachable or transaction timed out, fall back gracefully
+    if (!nextCalled && !res.headersSent && !res.writableEnded) {
+      // If PostgreSQL connection failed before invokeNextOnce() ran, fall back gracefully
       req.prisma = prismaForRequest({
         tenantId: userTenantId,
         userId: userId,
         isSuperAdmin: isSuperAdminBool,
       });
-      next();
+      invokeNextOnce();
     }
   });
 };

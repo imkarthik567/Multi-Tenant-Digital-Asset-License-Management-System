@@ -1,7 +1,3 @@
-// ==============================================================================
-// AssetVault Design System: Badge Component
-// ==============================================================================
-
 import React, { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
@@ -16,34 +12,34 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 
 const variantStyles: Record<BadgeVariant, { badge: string; dot: string }> = {
   default: {
-    badge: 'bg-slate-800 text-[var(--av-color-text-secondary,#94a3b8)] border border-[var(--av-color-border,#1e293b)]',
+    badge: 'bg-white/[0.04] text-slate-300 border border-white/[0.08]',
     dot: 'bg-slate-400',
   },
   success: {
-    badge: 'bg-emerald-950/50 text-[var(--av-color-success,#10b981)] border border-emerald-800/40',
-    dot: 'bg-[var(--av-color-success,#10b981)]',
+    badge: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+    dot: 'bg-emerald-400',
   },
   warning: {
-    badge: 'bg-amber-950/50 text-[var(--av-color-warning,#f59e0b)] border border-amber-800/40',
-    dot: 'bg-[var(--av-color-warning,#f59e0b)]',
+    badge: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+    dot: 'bg-amber-400',
   },
   danger: {
-    badge: 'bg-rose-950/50 text-[var(--av-color-danger,#f43f5e)] border border-rose-800/40',
-    dot: 'bg-[var(--av-color-danger,#f43f5e)]',
+    badge: 'bg-rose-500/10 text-rose-400 border border-rose-500/20',
+    dot: 'bg-rose-400',
   },
   info: {
-    badge: 'bg-indigo-950/50 text-[var(--av-color-primary-light,#818cf8)] border border-indigo-800/40',
-    dot: 'bg-[var(--av-color-primary,#6366f1)]',
+    badge: 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20',
+    dot: 'bg-indigo-400',
   },
   outline: {
-    badge: 'bg-transparent text-[var(--av-color-text-secondary,#94a3b8)] border border-[var(--av-color-border-subtle,#334155)]',
-    dot: 'bg-[var(--av-color-text-muted,#64748b)]',
+    badge: 'bg-transparent text-slate-400 border border-white/[0.1]',
+    dot: 'bg-slate-500',
   },
 };
 
 const sizeStyles: Record<BadgeSize, string> = {
   sm: 'text-[11px] px-2 py-0.5 gap-1.5 min-h-[20px]',
-  md: 'text-xs px-2.5 py-1 gap-1.5 min-h-[24px]',
+  md: 'text-xs px-2.5 py-0.5 gap-1.5 min-h-[22px]',
 };
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
@@ -64,7 +60,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
       <span
         ref={ref}
         className={cn(
-          'inline-flex items-center font-medium rounded-full select-none leading-none tracking-wide transition-colors',
+          'inline-flex items-center font-medium rounded-md select-none leading-none transition-colors',
           badgeStyle,
           sizeStyles[size],
           className
@@ -73,7 +69,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
       >
         {dot && (
           <span
-            className={cn('w-1.5 h-1.5 rounded-full shrink-0 animate-pulse', dotStyle)}
+            className={cn('w-1.5 h-1.5 rounded-full shrink-0', dotStyle)}
             aria-hidden="true"
           />
         )}

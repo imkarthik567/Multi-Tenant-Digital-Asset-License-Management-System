@@ -1,9 +1,3 @@
-// ==============================================================================
-// AssetVault: Debounced SearchInput Component
-// Course: BCSE307L Database Systems (Fall 2026-27)
-// Automatically debounces search input (300ms) with clear button and accessible label
-// ==============================================================================
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, X } from 'lucide-react';
 
@@ -24,12 +18,10 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 }) => {
   const [internalValue, setInternalValue] = useState(externalValue ?? '');
 
-  // Sync internal value when external changes
   useEffect(() => {
     setInternalValue(externalValue ?? '');
   }, [externalValue]);
 
-  // Debounced callback
   useEffect(() => {
     const handler = setTimeout(() => {
       if (internalValue !== externalValue) {
@@ -47,20 +39,20 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   return (
     <div className={`relative flex items-center w-full max-w-md ${className}`}>
-      <Search className="absolute left-3 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+      <Search className="absolute left-3 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
       <input
         type="text"
         value={internalValue ?? ''}
         onChange={(e) => setInternalValue(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all shadow-sm"
+        className="w-full h-9 pl-9 pr-8 text-xs bg-[#0b1120] border border-white/[0.08] hover:border-white/[0.15] rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-500 transition-colors"
       />
       {internalValue && (
         <button
           type="button"
           onClick={handleClear}
-          className="absolute right-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded transition-colors"
+          className="absolute right-2.5 text-slate-500 hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
           aria-label="Clear search"
         >
           <X className="w-3.5 h-3.5" />

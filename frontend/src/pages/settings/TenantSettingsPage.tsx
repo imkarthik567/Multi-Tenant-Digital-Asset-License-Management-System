@@ -7,14 +7,12 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Settings,
   Building,
   User as UserIcon,
   Shield,
   LogOut,
   Download,
   Database,
-  Mail,
   Edit3,
   Check,
 } from 'lucide-react';
@@ -143,79 +141,73 @@ export const TenantSettingsPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl pb-8">
       {/* Header */}
-      <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center space-x-2">
-          <div className="p-2 rounded-lg bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
-            <Settings className="w-5 h-5" />
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Account & Workspace Settings
-          </h1>
-        </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Manage your personal profile, automated notification email address, tenant organization configuration, and session security.
+      <div>
+        <h1 className="text-xl font-bold text-white tracking-tight">
+          Settings
+        </h1>
+        <p className="text-xs text-slate-400 mt-1">
+          Manage your profile, workspace preferences, and session security.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 dark:border-slate-800">
+      <div className="border-b border-white/[0.07]">
         <nav className="flex space-x-6" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`py-3 px-1 border-b-2 text-xs font-medium transition-colors flex items-center ${
+            className={`py-3 px-1 border-b-2 text-xs font-medium transition-colors flex items-center cursor-pointer ${
               activeTab === 'profile'
-                ? 'border-primary-500 text-primary-600 dark:text-primary-400 font-semibold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                ? 'border-indigo-500 text-white font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <UserIcon className="w-3.5 h-3.5 mr-1.5" />
-            User Profile & Email
+            Profile
           </button>
 
           {!user?.isSuperAdmin && (
             <button
               onClick={() => setActiveTab('organization')}
-              className={`py-3 px-1 border-b-2 text-xs font-medium transition-colors flex items-center ${
+              className={`py-3 px-1 border-b-2 text-xs font-medium transition-colors flex items-center cursor-pointer ${
                 activeTab === 'organization'
-                  ? 'border-primary-500 text-primary-600 dark:text-primary-400 font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                  ? 'border-indigo-500 text-white font-semibold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               <Building className="w-3.5 h-3.5 mr-1.5" />
-              Organization Workspace
+              Workspace
             </button>
           )}
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`py-3 px-1 border-b-2 text-xs font-medium transition-colors flex items-center ${
+            className={`py-3 px-1 border-b-2 text-xs font-medium transition-colors flex items-center cursor-pointer ${
               activeTab === 'security'
-                ? 'border-primary-500 text-primary-600 dark:text-primary-400 font-semibold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                ? 'border-indigo-500 text-white font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Shield className="w-3.5 h-3.5 mr-1.5" />
-            Session Security
+            Security
           </button>
         </nav>
       </div>
 
       {/* TAB 1: USER PROFILE */}
       {activeTab === 'profile' && (
-        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+        <div className="p-6 rounded-xl bg-[#0b1120] border border-white/[0.07] space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 rounded-full bg-primary-100 dark:bg-primary-950/80 text-primary-700 dark:text-primary-300 flex items-center justify-center font-bold text-lg uppercase shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-indigo-300 flex items-center justify-center font-bold text-sm uppercase">
                 {user?.fullName?.slice(0, 2) || 'AV'}
               </div>
               <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">{user?.fullName}</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{user?.email}</p>
+                <h2 className="text-sm font-semibold text-white">{user?.fullName}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{user?.email}</p>
                 <div className="mt-1.5">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-primary-50 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
-                    <Shield className="w-3 h-3 mr-1" />
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-white/[0.04] text-slate-300 border border-white/[0.06]">
                     {typeof user?.role === 'object' && user?.role !== null ? (user.role as any).name : user?.role}
                   </span>
                 </div>
@@ -223,18 +215,13 @@ export const TenantSettingsPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                <Mail className="w-3.5 h-3.5" />
-                <span>Auto-Email Active</span>
-              </span>
-
               <button
                 type="button"
                 onClick={() => setIsEditingProfile((prev) => !prev)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white/[0.05] hover:bg-white/[0.09] border border-white/[0.08] text-slate-200 transition-colors cursor-pointer"
               >
-                <Edit3 className="w-3.5 h-3.5 text-indigo-500" />
-                <span>{isEditingProfile ? 'Cancel Edit' : 'Edit Email & Name'}</span>
+                <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+                <span>{isEditingProfile ? 'Cancel' : 'Edit Profile'}</span>
               </button>
             </div>
           </div>
@@ -242,11 +229,11 @@ export const TenantSettingsPage: React.FC = () => {
           {isEditingProfile && (
             <form
               onSubmit={handleProfileSubmit}
-              className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-indigo-500/30 space-y-4"
+              className="p-4 rounded-xl bg-slate-950/60 border border-white/[0.08] space-y-4"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
                     Full Name
                   </label>
                   <input
@@ -254,20 +241,20 @@ export const TenantSettingsPage: React.FC = () => {
                     required
                     value={profileForm.fullName}
                     onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-white/[0.08] bg-[#0b1120] text-xs text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Email Address (Used for Automated Organization Emails)
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Email Address
                   </label>
                   <input
                     type="email"
                     required
                     value={profileForm.email}
                     onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                    placeholder="e.g. sudirniranjsnn07@gmail.com"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white"
+                    placeholder="name@company.com"
+                    className="w-full px-3 py-2 rounded-lg border border-white/[0.08] bg-[#0b1120] text-xs text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
@@ -275,55 +262,44 @@ export const TenantSettingsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={updateProfileMutation.isPending}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>{updateProfileMutation.isPending ? 'Saving...' : 'Save Updated Email'}</span>
+                  <span>{updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}</span>
                 </button>
               </div>
             </form>
           )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
-            <div>
-              <span className="text-slate-500 block mb-0.5">Account User ID</span>
-              <span className="font-mono text-slate-800 dark:text-slate-200">{user?.id}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block mb-0.5">Assigned Tenant ID</span>
-              <span className="font-mono text-slate-800 dark:text-slate-200">{user?.tenantId || 'Platform-Level'}</span>
-            </div>
-          </div>
         </div>
       )}
 
       {/* TAB 2: ORGANIZATION WORKSPACE */}
       {activeTab === 'organization' && !user?.isSuperAdmin && (
-        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+        <div className="p-6 rounded-xl bg-[#0b1120] border border-white/[0.07] space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">{tenant?.name || 'Organization'}</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                Workspace Slug: {tenant?.slug || 'default'}
+              <h2 className="text-sm font-semibold text-white">{tenant?.name || 'Organization'}</h2>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                {tenant?.slug || 'default'}
               </p>
             </div>
             <StatusBadge status={tenant?.status || 'ACTIVE'} />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-white/[0.06] text-xs">
             <div>
-              <span className="text-slate-500 block mb-0.5">Subscription Tier</span>
-              <span className="font-bold text-slate-900 dark:text-white">
-                {tenant?.plan?.name || `Plan #${tenant?.planId || 1}`}
+              <span className="text-slate-500 block mb-0.5">Subscription Plan</span>
+              <span className="font-semibold text-white">
+                {tenant?.plan?.name || `Enterprise`}
               </span>
             </div>
             <div>
               <span className="text-slate-500 block mb-0.5">Contact Email</span>
-              <span className="text-slate-800 dark:text-slate-200 font-mono">{tenant?.contactEmail || 'N/A'}</span>
+              <span className="text-slate-200">{tenant?.contactEmail || 'N/A'}</span>
             </div>
             <div>
-              <span className="text-slate-500 block mb-0.5">Created Date</span>
-              <span className="text-slate-800 dark:text-slate-200">
+              <span className="text-slate-500 block mb-0.5">Created</span>
+              <span className="text-slate-200">
                 {tenant?.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : 'N/A'}
               </span>
             </div>
@@ -331,23 +307,23 @@ export const TenantSettingsPage: React.FC = () => {
 
           {/* Data Lifecycle / GDPR Archive Section */}
           {canExportTenant && (
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="pt-4 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-primary-500" />
-                  Data Lifecycle & Compliance Archive
+                <h3 className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-indigo-400" />
+                  Workspace Data Archive
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Download an export archive of all organization assets, versions, licenses, seat allocations, categories, and tags.
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Download a complete JSON export of organization assets, licenses, and allocations.
                 </p>
               </div>
               <button
                 onClick={handleExportTenantData}
                 disabled={isExportingTenant}
-                className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors shadow-sm disabled:opacity-50 shrink-0"
+                className="inline-flex items-center px-3.5 py-2 text-xs font-medium rounded-lg text-slate-200 bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.09] transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5 mr-1.5 text-primary-500" />
-                {isExportingTenant ? 'Archiving...' : 'Export Tenant Data (JSON)'}
+                <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
+                {isExportingTenant ? 'Exporting...' : 'Export Archive'}
               </button>
             </div>
           )}
@@ -356,29 +332,20 @@ export const TenantSettingsPage: React.FC = () => {
 
       {/* TAB 3: SESSION SECURITY */}
       {activeTab === 'security' && (
-        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Active Sessions & Token Rotation</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              AssetVault uses short-lived in-memory JWT access tokens (15-minute expiration) paired with SHA-256 hashed
-              httpOnly rotating refresh tokens. If a token reuse attempt is detected, all sessions are automatically
-              invalidated.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-6 rounded-xl bg-[#0b1120] border border-white/[0.07] space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h4 className="text-xs font-bold text-rose-900 dark:text-rose-200">Revoke All Device Sessions</h4>
-              <p className="text-xs text-rose-700 dark:text-rose-400 mt-0.5">
-                Invalidates all active refresh tokens for your account across all browsers and devices.
+              <h4 className="text-sm font-semibold text-white">Active Device Sessions</h4>
+              <p className="text-xs text-slate-400 mt-1">
+                Sign out of all active sessions across every browser and device.
               </p>
             </div>
             <button
               onClick={() => setIsLogoutAllOpen(true)}
-              className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-lg text-white bg-rose-600 hover:bg-rose-700 transition-colors shrink-0 shadow-sm"
+              className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-lg text-white bg-rose-600 hover:bg-rose-500 transition-colors shrink-0 cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5 mr-1.5" />
-              Logout All Devices
+              Sign Out All Devices
             </button>
           </div>
         </div>

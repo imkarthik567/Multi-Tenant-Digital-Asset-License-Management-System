@@ -7,7 +7,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Store,
   Plus,
   Mail,
   Phone,
@@ -114,20 +113,15 @@ export const VendorListPage: React.FC = () => {
   const vendors = vendorsData?.data || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <div className="p-2 rounded-lg bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
-              <Store className="w-5 h-5" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Software & Asset Vendors
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Supplier accounts, contact directories, and procurement channels.
+          <h1 className="text-xl font-bold text-white tracking-tight">
+            Vendors
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Software suppliers, account contacts, and procurement directories.
           </p>
         </div>
 
@@ -138,7 +132,7 @@ export const VendorListPage: React.FC = () => {
               setForm({ name: '', contactEmail: '', website: '', supportPhone: '' });
               setIsModalOpen(true);
             }}
-            className="inline-flex items-center px-3.5 py-2 text-xs font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 shadow-sm transition-colors"
+            className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-lg text-white bg-indigo-600 hover:bg-indigo-500 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             Add Vendor
@@ -152,14 +146,14 @@ export const VendorListPage: React.FC = () => {
       </div>
 
       {isError && (
-        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
-          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
+        <div className="p-4 bg-rose-950/30 border border-rose-500/20 rounded-xl flex items-center justify-between">
+          <span className="text-xs text-rose-400 font-medium">
             {(error as any)?.message || 'Failed to load software vendors.'}
           </span>
           <button
             type="button"
             onClick={() => refetch()}
-            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+            className="text-xs font-semibold text-rose-300 underline hover:no-underline"
           >
             Retry
           </button>
@@ -183,33 +177,33 @@ export const VendorListPage: React.FC = () => {
           }}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {vendors.map((v) => (
             <div
               key={v.id}
-              className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4"
+              className="p-5 rounded-xl bg-[#0b1120] border border-white/[0.07] hover:border-white/[0.14] transition-colors flex flex-col justify-between space-y-4"
             >
               <div>
-                <div className="flex justify-between items-start">
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">{v.name}</h3>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
+                <div className="flex justify-between items-start gap-2">
+                  <h3 className="font-semibold text-white text-sm">{v.name}</h3>
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-300 border border-white/[0.06] shrink-0">
                     {v._count?.licenses ?? 0} licenses
                   </span>
                 </div>
 
                 {/* Contact Information */}
-                <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                <div className="mt-4 space-y-2 text-xs text-slate-400">
                   {v.contactEmail && (
                     <div className="flex items-center space-x-2">
-                      <Mail className="w-3.5 h-3.5 text-slate-400" />
-                      <a href={`mailto:${v.contactEmail}`} className="hover:underline truncate">
+                      <Mail className="w-3.5 h-3.5 text-slate-500" />
+                      <a href={`mailto:${v.contactEmail}`} className="hover:text-white transition-colors truncate">
                         {v.contactEmail}
                       </a>
                     </div>
                   )}
                   {v.supportPhone && (
                     <div className="flex items-center space-x-2">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      <Phone className="w-3.5 h-3.5 text-slate-500" />
                       <span>{v.supportPhone}</span>
                     </div>
                   )}
@@ -219,12 +213,12 @@ export const VendorListPage: React.FC = () => {
                     const safeHref = isHttp ? cleanUrl : /^javascript:/i.test(cleanUrl) ? '#' : `https://${cleanUrl}`;
                     return (
                       <div className="flex items-center space-x-2">
-                        <Globe className="w-3.5 h-3.5 text-slate-400" />
+                        <Globe className="w-3.5 h-3.5 text-slate-500" />
                         <a
                           href={safeHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:underline flex items-center text-primary-600 dark:text-primary-400 truncate"
+                          className="hover:text-indigo-300 flex items-center text-indigo-400 truncate transition-colors"
                         >
                           {v.website.replace(/^https?:\/\//, '')}
                           <ExternalLink className="w-3 h-3 ml-1" />
@@ -237,7 +231,7 @@ export const VendorListPage: React.FC = () => {
 
               {/* Action Controls */}
               <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end space-x-2">
+                <div className="pt-3 border-t border-white/[0.06] flex justify-end space-x-1.5">
                   <button
                     onClick={() => {
                       setEditingVendor(v);
@@ -249,14 +243,14 @@ export const VendorListPage: React.FC = () => {
                       });
                       setIsModalOpen(true);
                     }}
-                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-white/[0.05] rounded-md transition-colors cursor-pointer"
                     title="Edit Vendor"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setDeleteVendor(v)}
-                    className="p-1.5 text-slate-400 hover:text-rose-500 rounded"
+                    className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors cursor-pointer"
                     title="Delete Vendor"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

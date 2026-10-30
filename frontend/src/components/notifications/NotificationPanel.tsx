@@ -32,6 +32,8 @@ import { Notification, AutomatedEmailLog } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { NotificationStreamClient } from '../../services/notificationStream';
 import { Badge, Skeleton } from '../ui';
+import { GmailSenderBanner } from './GmailSenderBanner';
+import { getCachedGmailToken, googleSignIn, getConnectedGoogleEmail } from '../../services/gmailAuth';
 
 export interface NotificationPanelProps {
   isOpen: boolean;
@@ -124,6 +126,13 @@ export function getNotificationTypeMeta(type: string) {
         badgeClass: 'text-white bg-zinc-900 border-zinc-700',
         dotClass: 'bg-white',
         label: type === 'LICENSE_RENEWED' ? 'Contract Renewed' : 'Contract Updated',
+      };
+    case 'MEMBER_ONBOARDED':
+      return {
+        icon: Mail,
+        badgeClass: 'text-emerald-400 bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-emerald-400',
+        label: 'Auto-Onboarded',
       };
     case 'OVER_ALLOCATION':
     case 'SEAT_LIMIT':
@@ -436,9 +445,41 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
       );
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['email-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to execute automated expiry email scan');
+    },
+  });
+
+  // Deliver a single logged email directly to real Gmail inbox
+  const sendSingleEmailToGmailMutation = useMutation({
+    mutationFn: async (log: AutomatedEmailLog) => {
+      const statusRes: any = await api.get('/notifications/gmail-status');
+      const statusData = statusRes?.data || statusRes || {};
+      let token = getCachedGmailToken();
+
+      // Only open Google OAuth popup if neither backend Gmail (SMTP/OAuth) nor local token is connected
+      if (!token && !statusData.connected) {
+        token = await googleSignIn('karthiksmrk7377@gmail.com');
+        const sender = getConnectedGoogleEmail();
+        await api.post('/notifications/gmail-connect', {
+          accessToken: token,
+          senderEmail: sender,
+          flushPending: false,
+        });
+      }
+      return await api.post(`/notifications/email-logs/${log.id}/send-gmail`, {
+        accessToken: token || undefined,
+      });
+    },
+    onSuccess: (_res, log) => {
+      toast.success(`Delivered email "${log.subject}" to real Gmail inbox: ${log.recipientEmail}`);
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to deliver email to real Gmail inbox');
     },
   });
 
@@ -640,106 +681,139 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
             className="flex-1 overflow-y-auto p-4 space-y-2.5 divide-y-0"
           >
             {activeTab === 'emails' ? (
-              isEmailLogsLoading ? (
-                <div className="space-y-3 pt-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} variant="card" className="h-24 rounded-xl" />
-                  ))}
-                </div>
-              ) : emailLogs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-10 text-center my-auto min-h-[340px] space-y-4">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-center text-indigo-400">
-                    <Mail className="w-8 h-8" />
-                  </div>
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-bold text-slate-100">
-                      No Automated Emails Logged Yet
-                    </h3>
-                    <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-                      Click &ldquo;Scan Expirations &amp; Auto-Email&rdquo; below or allocate/renew a license to automatically send emails to organization members.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  <div className="px-1 pb-1 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Automated emails sent to organization members &amp; admins</span>
-                    <span className="font-mono tabular-nums text-emerald-400">{emailLogs.length} delivered</span>
-                  </div>
-                  {emailLogs.map((log) => {
-                    const meta = getNotificationTypeMeta(log.eventType);
-                    const IconComponent = meta.icon;
-                    const isExpanded = expandedEmailId === log.id;
-                    const relativeTime = formatRelativeTime(log.sentAt);
+              <div className="space-y-3">
+                <GmailSenderBanner compact />
 
-                    return (
-                      <div
-                        key={log.id}
-                        className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition-colors space-y-2.5"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <div className={`p-2 rounded-xl border shrink-0 mt-0.5 ${meta.badgeClass}`}>
-                              <IconComponent className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs font-bold text-slate-100 truncate">
-                                  {log.recipientName}
-                                </span>
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                                  {log.recipientRole}
-                                </span>
+                {isEmailLogsLoading ? (
+                  <div className="space-y-3 pt-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} variant="card" className="h-24 rounded-xl" />
+                    ))}
+                  </div>
+                ) : emailLogs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-10 text-center my-auto min-h-[280px] space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-center text-indigo-400">
+                      <Mail className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-bold text-slate-100">
+                        No Automated Emails Logged Yet
+                      </h3>
+                      <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                        Click &ldquo;Scan Expirations &amp; Auto-Email&rdquo; below or store a member email ID to automatically dispatch emails.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="px-1 pb-1 flex items-center justify-between text-[11px] text-slate-400">
+                      <span>Automated emails for organization members &amp; admins</span>
+                      <span className="font-mono tabular-nums text-emerald-400">
+                        {emailLogs.length} logged
+                      </span>
+                    </div>
+                    {emailLogs.map((log) => {
+                      const meta = getNotificationTypeMeta(log.eventType);
+                      const IconComponent = meta.icon;
+                      const isExpanded = expandedEmailId === log.id;
+                      const relativeTime = formatRelativeTime(log.sentAt);
+                      const isRealGmail =
+                        Boolean(log.realGmailSent) ||
+                        log.deliveryChannel === 'GMAIL_API' ||
+                        log.deliveryChannel === 'SMTP';
+
+                      return (
+                        <div
+                          key={log.id}
+                          className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition-colors space-y-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className={`p-2 rounded-xl border shrink-0 mt-0.5 ${meta.badgeClass}`}>
+                                <IconComponent className="w-4 h-4" />
                               </div>
-                              <div className="text-[11px] font-mono text-indigo-400 truncate mt-0.5">
-                                To: {log.recipientEmail}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-100 truncate">
+                                    {log.recipientName}
+                                  </span>
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                    {log.recipientRole}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] font-mono text-indigo-400 truncate mt-0.5">
+                                  To: {log.recipientEmail}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              {isRealGmail ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 border border-emerald-500/30 px-1.5 py-0.5 rounded font-mono tabular-nums">
+                                  <Send className="w-2.5 h-2.5" />
+                                  GMAIL INBOX
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-amber-950/50 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono tabular-nums">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  SANDBOX
+                                </span>
+                              )}
+                              <div className="text-[10px] text-slate-500 font-mono tabular-nums mt-0.5">
+                                {relativeTime}
                               </div>
                             </div>
                           </div>
 
-                          <div className="text-right shrink-0">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 font-mono tabular-nums">
-                              <Send className="w-2.5 h-2.5" />
-                              {log.status}
+                          <div className="text-xs font-semibold text-slate-200 leading-snug">
+                            {log.subject}
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] gap-2">
+                            <span className="text-slate-400 truncate max-w-[160px]">
+                              <span className="text-slate-300 font-medium">{log.licenseName}</span>
                             </span>
-                            <div className="text-[10px] text-slate-500 font-mono tabular-nums mt-0.5">
-                              {relativeTime}
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {!isRealGmail && (
+                                <button
+                                  type="button"
+                                  onClick={() => sendSingleEmailToGmailMutation.mutate(log)}
+                                  disabled={sendSingleEmailToGmailMutation.isPending}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-semibold cursor-pointer disabled:opacity-50"
+                                  title="Deliver this email to the recipient's real Gmail inbox now"
+                                >
+                                  <Send className="w-3 h-3" />
+                                  <span>Deliver to Gmail</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => setExpandedEmailId(isExpanded ? null : log.id)}
+                                className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
+                              >
+                                <span>{isExpanded ? 'Hide' : 'Preview'}</span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                )}
+                              </button>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="text-xs font-semibold text-slate-200 leading-snug">
-                          {log.subject}
+                          {isExpanded && (
+                            <div className="mt-2 p-3 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 font-mono whitespace-pre-line leading-relaxed">
+                              {log.bodyText}
+                            </div>
+                          )}
                         </div>
-
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px]">
-                          <span className="text-slate-400 truncate max-w-[210px]">
-                            License: <span className="text-slate-300 font-medium">{log.licenseName}</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setExpandedEmailId(isExpanded ? null : log.id)}
-                            className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
-                          >
-                            <span>{isExpanded ? 'Hide Email Body' : 'Preview Email'}</span>
-                            {isExpanded ? (
-                              <ChevronUp className="w-3.5 h-3.5" />
-                            ) : (
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="mt-2 p-3 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 font-mono whitespace-pre-line leading-relaxed">
-                            {log.bodyText}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             ) : isLoading ? (
               <div className="space-y-3 pt-2">
                 {Array.from({ length: 4 }).map((_, i) => (

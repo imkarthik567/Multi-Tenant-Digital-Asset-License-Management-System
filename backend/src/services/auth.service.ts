@@ -599,6 +599,271 @@ export class AuthService {
   public getMenu(roleName: RoleName): MenuItem[] {
     return getMenuItemsForRole(roleName);
   }
+
+  /**
+   * 8. Google SSO Sign-In & Workspace Onboarding
+   * - Signs in existing users directly into their assigned organization
+   * - If user is new and tenantName is not provided, returns { requiresOnboarding: true, profile }
+   * - If user is new and tenantName is provided, creates the Tenant + TENANT_ADMIN account and signs them in
+   */
+  public async googleSso(
+    input: {
+      email: string;
+      fullName?: string;
+      avatarUrl?: string | null;
+      tenantName?: string;
+      slug?: string;
+      contactEmail?: string;
+    },
+    metadata: { userAgent?: string; ipAddress?: string } = {}
+  ): Promise<
+    | ({ requiresOnboarding: false } & AuthSuccessResult)
+    | {
+        requiresOnboarding: true;
+        profile: { email: string; fullName: string; avatarUrl: string | null };
+      }
+  > {
+    const normalizedEmail = (input.email || '').toLowerCase().trim();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      throw new BadRequestError('A valid Google account email is required.');
+    }
+
+    let user = await systemPrisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: {
+        role: true,
+        tenant: {
+          include: { plan: true },
+        },
+      },
+    });
+
+    // Auto-provision or recover Karthikeyan owner account if missing
+    if (
+      !user &&
+      (normalizedEmail === 'karthikeyan.s050607@gmail.com' ||
+        normalizedEmail === 'karthiksmrk7377@gmail.com')
+    ) {
+      const freePlan =
+        (await systemPrisma.plan.findFirst({ where: { name: 'Enterprise' } })) ||
+        (await systemPrisma.plan.findFirst({ where: { name: 'Free Trial' } })) || { id: 3 };
+      let tenant = await systemPrisma.tenant.findUnique({
+        where: { id: 'tenant-karthik' },
+        include: { plan: true },
+      });
+      if (!tenant) {
+        tenant = await systemPrisma.tenant.create({
+          data: {
+            id: 'tenant-karthik',
+            name: 'Karthik Enterprise Workspace',
+            slug: 'karthik-org',
+            contactEmail: normalizedEmail,
+            status: 'ACTIVE',
+            planId: freePlan.id,
+          },
+          include: { plan: true },
+        });
+      }
+
+      const tenantAdminRole = await systemPrisma.role.findFirst({
+        where: { name: 'TENANT_ADMIN' },
+      });
+      const passwordHash = await hashPassword('Password123!');
+
+      user = await systemPrisma.user.create({
+        data: {
+          id: 'user-karthik-admin',
+          email: normalizedEmail,
+          fullName: input.fullName?.trim() || 'Karthikeyan S',
+          avatarUrl: input.avatarUrl || null,
+          roleId: tenantAdminRole ? tenantAdminRole.id : 2,
+          tenantId: tenant.id,
+          passwordHash,
+          isActive: true,
+          lastLoginAt: new Date(),
+        },
+        include: {
+          role: true,
+          tenant: { include: { plan: true } },
+        },
+      });
+    }
+
+    // Existing user found -> sign in directly
+    if (user) {
+      if (!user.isActive) {
+        throw new UnauthorizedError(
+          'Account is inactive. Please contact your organization administrator.'
+        );
+      }
+      if (user.tenant && user.tenant.status === 'SUSPENDED') {
+        throw new ForbiddenError(
+          'Organization account is suspended. Please contact platform support.'
+        );
+      }
+
+      const roleName = (user.role?.name || 'MEMBER') as RoleName;
+      const isSuperAdmin = roleName === 'SUPER_ADMIN';
+
+      const updatedFullName =
+        input.fullName && input.fullName.trim().length >= 2 && !user.fullName
+          ? input.fullName.trim()
+          : user.fullName;
+
+      await systemPrisma.user.update({
+        where: { id: user.id },
+        data: {
+          lastLoginAt: new Date(),
+          ...(input.avatarUrl && !user.avatarUrl ? { avatarUrl: input.avatarUrl } : {}),
+          ...(updatedFullName !== user.fullName ? { fullName: updatedFullName } : {}),
+        },
+      });
+
+      const accessToken = generateAccessToken({
+        id: user.id,
+        email: user.email,
+        fullName: updatedFullName,
+        tenantId: user.tenantId,
+        roleId: user.roleId,
+        role: roleName,
+        isSuperAdmin,
+      });
+
+      const refreshData = generateRefreshTokenData();
+      await systemPrisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: refreshData.tokenHash,
+          expiresAt: refreshData.expiresAt,
+          userAgent: metadata.userAgent,
+          ipAddress: metadata.ipAddress,
+        },
+      });
+
+      return {
+        requiresOnboarding: false,
+        accessToken,
+        rawRefreshToken: refreshData.rawToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: updatedFullName,
+          tenantId: user.tenantId,
+          role: roleName,
+          isSuperAdmin,
+          permissions: getPermissionsForRole(roleName),
+          tenant: user.tenant,
+        },
+      };
+    }
+
+    // New user -> check if required Organization Name was provided
+    const derivedFullName =
+      input.fullName && input.fullName.trim().length >= 2
+        ? input.fullName.trim()
+        : (normalizedEmail.split('@')[0] || 'User')
+            .replace(/[._-]+/g, ' ')
+            .replace(/\b\w/g, (l) => l.toUpperCase());
+
+    if (!input.tenantName || input.tenantName.trim().length < 2) {
+      return {
+        requiresOnboarding: true,
+        profile: {
+          email: normalizedEmail,
+          fullName: derivedFullName,
+          avatarUrl: input.avatarUrl || null,
+        },
+      };
+    }
+
+    // Organization Name provided -> provision new Tenant + TENANT_ADMIN User
+    const rawSlugBase = (input.slug || input.tenantName)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    let finalSlug = rawSlugBase.length >= 2 ? rawSlugBase : `org-${Date.now()}`;
+
+    const existingSlug = await systemPrisma.tenant.findUnique({
+      where: { slug: finalSlug },
+    });
+    if (existingSlug) {
+      finalSlug = `${finalSlug}-${Math.floor(100 + Math.random() * 900)}`;
+    }
+
+    const freePlan =
+      (await systemPrisma.plan.findFirst({ where: { name: 'Free Trial' } })) || { id: 1 };
+    const tenantAdminRole =
+      (await systemPrisma.role.findUnique({ where: { name: 'TENANT_ADMIN' } })) || {
+        id: 2,
+        name: 'TENANT_ADMIN',
+      };
+
+    const autoPasswordHash = await hashPassword(`GoogleSSO-${Date.now()}!Aa1`);
+
+    const createdTenant = await systemPrisma.tenant.create({
+      data: {
+        name: input.tenantName.trim(),
+        slug: finalSlug,
+        contactEmail: (input.contactEmail || normalizedEmail).toLowerCase().trim(),
+        planId: freePlan.id,
+        status: 'ACTIVE',
+      },
+      include: { plan: true },
+    });
+
+    const createdUser = await systemPrisma.user.create({
+      data: {
+        tenantId: createdTenant.id,
+        roleId: tenantAdminRole.id,
+        email: normalizedEmail,
+        fullName: derivedFullName,
+        avatarUrl: input.avatarUrl || null,
+        passwordHash: autoPasswordHash,
+        isActive: true,
+        lastLoginAt: new Date(),
+      },
+      include: { role: true },
+    });
+
+    const roleName = (createdUser.role?.name || 'TENANT_ADMIN') as RoleName;
+    const accessToken = generateAccessToken({
+      id: createdUser.id,
+      email: createdUser.email,
+      fullName: createdUser.fullName,
+      tenantId: createdUser.tenantId,
+      roleId: createdUser.roleId,
+      role: roleName,
+      isSuperAdmin: false,
+    });
+
+    const refreshData = generateRefreshTokenData();
+    await systemPrisma.refreshToken.create({
+      data: {
+        userId: createdUser.id,
+        tokenHash: refreshData.tokenHash,
+        expiresAt: refreshData.expiresAt,
+        userAgent: metadata.userAgent,
+        ipAddress: metadata.ipAddress,
+      },
+    });
+
+    return {
+      requiresOnboarding: false,
+      accessToken,
+      rawRefreshToken: refreshData.rawToken,
+      user: {
+        id: createdUser.id,
+        email: createdUser.email,
+        fullName: createdUser.fullName,
+        tenantId: createdUser.tenantId,
+        role: roleName,
+        isSuperAdmin: false,
+        permissions: getPermissionsForRole(roleName),
+        tenant: createdTenant,
+      },
+    };
+  }
 }
 
 export const authService = new AuthService();

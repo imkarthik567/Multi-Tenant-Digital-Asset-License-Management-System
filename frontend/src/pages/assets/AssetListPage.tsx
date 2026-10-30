@@ -975,15 +975,15 @@ export const AssetListPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
-              Digital Asset Repository
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              Assets
             </h1>
             {isFetching && (
-              <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+              <RefreshCw className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
             )}
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Enterprise digital catalog, multi-format media browser, and license compliance manager
+            Digital asset repository, version catalog, and license coverage.
           </p>
         </div>
 
@@ -1029,14 +1029,14 @@ export const AssetListPage: React.FC = () => {
       {/* ====================================================================== */}
       <div className="flex items-start gap-6">
         {/* Desktop Fixed Filter Sidebar */}
-        <aside className="hidden lg:block w-64 shrink-0 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4.5 backdrop-blur-md shadow-lg sticky top-20">
+        <aside className="hidden lg:block w-64 shrink-0 bg-[#0b1120] border border-white/[0.07] rounded-xl p-4 sticky top-20">
           {renderFilterSidebarContent()}
         </aside>
 
         {/* Data View Main Container */}
         <div className="flex-1 min-w-0 space-y-4">
           {/* Top Search & Controls Bar */}
-          <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm backdrop-blur-xs">
+          <div className="bg-[#0b1120] border border-white/[0.07] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
             {/* Search Input with Debounce/Immediate Sync */}
             <div className="flex-1 min-w-[220px] max-w-md">
               <Input
@@ -1335,10 +1335,10 @@ export const AssetListPage: React.FC = () => {
             /* ================================================================== */
             /* Table View Mode: Sortable Columns with Sticky Header               */
             /* ================================================================== */
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-[#0b1120] border border-white/[0.07] rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950/90 backdrop-blur border-b border-slate-800 sticky top-0 z-10 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                  <thead className="bg-white/[0.02] border-b border-white/[0.06] sticky top-0 z-10 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
                     <tr>
                       <th className="py-3 px-4 w-10">
                         <button

@@ -1,337 +1,356 @@
-// ==============================================================================
-// AssetVault: Modern Top Navigation Bar (56px Blurred Glass Shell)
-// Course: BCSE307L Database Systems (Fall 2026-27)
-// Features: 56px height, backdrop-blur-md glass, breadcrumb trail on the left,
-// Cmd+K global search trigger, notification bell with slide-over panel, and avatar dropdown.
-// ==============================================================================
-
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import {
-  Menu,
-  Bell,
-  Sun,
-  Moon,
-  LogOut,
-  User as UserIcon,
-  Settings,
-  Shield,
-  ChevronDown,
-  ChevronRight,
-  Search,
-  Home,
-} from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { useToast } from '../../context/ToastContext';
-import { StatusBadge } from '../common/StatusBadge';
-import { CommandPalette } from '../common/CommandPalette';
-import { NotificationPanel } from '../notifications/NotificationPanel';
-import { Avatar } from '../ui/Avatar';
-import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
-import { Notification } from '../../types';
+import {
+  Search,
+  Bell,
+  Menu,
+  LogOut,
+  Settings,
+  CheckCheck,
+  X,
+  ArrowRight,
+} from 'lucide-react';
 
-export interface NavbarProps {
+interface NavbarProps {
   onMobileMenuToggle: () => void;
 }
 
-const ROUTE_LABELS: Record<string, string> = {
-  assets: 'Digital Assets',
-  licenses: 'Licenses',
-  'my-licenses': 'My Licenses',
-  allocations: 'Seat Allocations',
-  vendors: 'Vendors',
-  categories: 'Categories',
-  tags: 'Metadata Tags',
-  users: 'Users & Roles',
-  reports: 'Analytical Reports',
-  'audit-logs': 'Audit Trail',
-  notifications: 'Notifications',
-  settings: 'Settings',
-  platform: 'Platform',
-  tenants: 'Tenants',
-  plans: 'Plans',
+const ROUTE_TITLES: Record<string, string> = {
+  '/': 'Overview',
+  '/assets': 'Assets',
+  '/licenses': 'Licenses',
+  '/my-licenses': 'My Licenses',
+  '/allocations': 'Allocations',
+  '/vendors': 'Vendors',
+  '/categories': 'Categories',
+  '/tags': 'Metadata Tags',
+  '/reports': 'Analytics',
+  '/users': 'Team',
+  '/audit': 'Audit Trail',
+  '/notifications': 'Notifications',
+  '/settings': 'Settings',
+  '/ai-assistant': 'Copilot',
 };
+
+const QUICK_JUMP_ITEMS = [
+  { label: 'Overview', path: '/', roles: ['TENANT_ADMIN', 'ASSET_MANAGER', 'MEMBER'] },
+  { label: 'Assets', path: '/assets', roles: ['TENANT_ADMIN', 'ASSET_MANAGER', 'MEMBER'] },
+  { label: 'My Licenses', path: '/my-licenses', roles: ['MEMBER'] },
+  { label: 'Licenses', path: '/licenses', roles: ['TENANT_ADMIN', 'ASSET_MANAGER'] },
+  { label: 'Allocations', path: '/allocations', roles: ['TENANT_ADMIN', 'ASSET_MANAGER'] },
+  { label: 'Vendors', path: '/vendors', roles: ['TENANT_ADMIN', 'ASSET_MANAGER'] },
+  { label: 'Analytics', path: '/reports', roles: ['TENANT_ADMIN', 'ASSET_MANAGER'] },
+  { label: 'Team', path: '/users', roles: ['TENANT_ADMIN'] },
+  { label: 'Settings', path: '/settings', roles: ['TENANT_ADMIN', 'ASSET_MANAGER', 'MEMBER'] },
+];
 
 export const Navbar: React.FC<NavbarProps> = ({ onMobileMenuToggle }) => {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-  const toast = useToast();
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isNotifPanelOpen, setIsNotifPanelOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const userRole =
-    typeof user?.role === 'object' && user?.role !== null
-      ? (user.role as any).name
-      : user?.role;
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const profileRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Breadcrumb Trail
-  const breadcrumbs = useMemo(() => {
-    const segments = location.pathname.split('/').filter(Boolean);
-    if (segments.length === 0) {
-      return [{ label: 'Dashboard', path: '/' }];
+  const pageTitle = ROUTE_TITLES[location.pathname] || 'Workspace';
+  const userRole = typeof user?.role === 'string' ? user.role : user?.role?.name || 'MEMBER';
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get('/notifications');
+      const payload = res.data?.data ?? res.data ?? [];
+      const list = Array.isArray(payload) ? payload : payload.notifications || [];
+      setNotifications(list.slice(0, 12));
+      setUnreadCount(list.filter((n: any) => !n.is_read && !n.isRead).length);
+    } catch {
+      // ignore background polling error
     }
+  };
 
-    const list = [{ label: 'Home', path: '/' }];
-    let accumulatedPath = '';
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 45000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
-    segments.forEach((seg) => {
-      accumulatedPath += `/${seg}`;
-      let label = ROUTE_LABELS[seg.toLowerCase()];
-      if (!label) {
-        if (seg.length > 12) {
-          label = 'Details';
-        } else {
-          label = seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' ');
-        }
-      }
-      list.push({ label, path: accumulatedPath });
-    });
-
-    return list;
-  }, [location.pathname]);
-
-  // Global Ctrl+K / Cmd+K shortcut for Command Palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsSearchOpen((prev) => !prev);
+        setSearchOpen((prev) => !prev);
+      } else if (e.key === 'Escape') {
+        setSearchOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  // Click outside listener for user dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setIsUserMenuOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Poll notifications count for topbar bell badge
-  const { data: notifData } = useQuery<Notification[]>({
-    queryKey: ['notifications'],
-    queryFn: async () => {
-      const res = await api.get<{ data: Notification[] }>('/notifications', { limit: 20 });
-      return (res as any)?.data || (res as any) || [];
-    },
-    refetchInterval: 30000,
-    enabled: !!user,
-  });
-
-  const unreadCount = Array.isArray(notifData)
-    ? notifData.filter((n: Notification) => !n.isRead).length
-    : 0;
-
-  const handleLogout = async () => {
+  const handleMarkAllRead = async () => {
     try {
-      await logout();
-      toast.info('You have been logged out');
-      navigate('/login');
+      await api.patch('/notifications/read-all');
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, isRead: true })));
+      setUnreadCount(0);
     } catch {
-      navigate('/login');
+      // ignore
     }
   };
 
+  const initials = (user?.fullName || user?.email || 'U')
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  const filteredLinks = QUICK_JUMP_ITEMS.filter(
+    (item) =>
+      item.roles.includes(userRole) &&
+      item.label.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <header className="h-14 px-3 sm:px-6 backdrop-blur-md bg-[#030712]/85 border-b border-slate-800/80 flex items-center justify-between gap-3 sticky top-0 z-30 transition-colors">
-      {/* Left: Mobile Drawer Trigger & Breadcrumb Trail */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <button
-          type="button"
-          onClick={onMobileMenuToggle}
-          className="lg:hidden p-1.5 text-slate-400 hover:bg-white/[0.06] rounded-lg transition-colors cursor-pointer"
-          aria-label="Toggle navigation drawer"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-
-        {/* Breadcrumb Trail */}
-        <nav aria-label="Breadcrumbs" className="flex items-center gap-1.5 text-xs text-slate-400 min-w-0">
-          <Link
-            to="/"
-            className="flex items-center hover:text-white transition-colors shrink-0"
-            title="Home"
-          >
-            <Home className="w-3.5 h-3.5" />
-          </Link>
-
-          {breadcrumbs.map((crumb, idx) => {
-            const isLast = idx === breadcrumbs.length - 1;
-            // Skip the first "Home" crumb since we rendered the icon
-            if (crumb.path === '/' && idx === 0) return null;
-
-            return (
-              <React.Fragment key={crumb.path}>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                {isLast ? (
-                  <span className="font-semibold text-slate-100 truncate max-w-[140px] sm:max-w-[200px]">
-                    {crumb.label}
-                  </span>
-                ) : (
-                  <Link
-                    to={crumb.path}
-                    className="hover:text-slate-200 transition-colors truncate max-w-[100px] sm:max-w-[160px]"
-                  >
-                    {crumb.label}
-                  </Link>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* Right: Global Search (Cmd+K), Theme, Notifications, Avatar */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Global Search Trigger (Cmd+K) */}
-        <button
-          type="button"
-          onClick={() => setIsSearchOpen(true)}
-          className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-400 bg-[#0b1120] hover:bg-[#131c31] hover:text-slate-200 rounded-lg border border-slate-800 hover:border-indigo-500/40 transition-all cursor-pointer shadow-xs"
-          aria-label="Open global search (Cmd+K)"
-        >
-          <Search className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-          <span className="hidden md:inline truncate text-[11px] font-medium">Search workspace...</span>
-          <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-[#030712] text-slate-400 border border-slate-800 rounded shadow-xs">
-            ⌘K
-          </kbd>
-        </button>
-
-        {/* Gemini AI Chat Toggle Button */}
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent('assetvault:toggle-ai-chat'))}
-          aria-label="Toggle Gemini AI Chatbot"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-indigo-200 bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-800/50 rounded-lg transition-colors cursor-pointer shadow-sm shadow-indigo-500/10"
-        >
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <span className="hidden sm:inline text-[11px]">AI Chat</span>
-        </button>
-
-        {/* Theme Toggle */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          className="p-2 text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors cursor-pointer"
-        >
-          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-
-        {/* Notification Bell Trigger (Opens Slide-Over Panel) */}
-        <button
-          type="button"
-          onClick={() => setIsNotifPanelOpen(true)}
-          aria-label="Notifications"
-          className="p-2 text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors relative cursor-pointer"
-        >
-          <Bell className="w-4 h-4" />
-          {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-[#030712] animate-pulse" />
-          )}
-        </button>
-
-        {/* User Avatar Dropdown */}
-        <div className="relative" ref={userMenuRef}>
+    <>
+      <header className="sticky top-0 z-30 h-14 bg-[#060913]/90 backdrop-blur-xl border-b border-white/[0.06] px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0">
+        {/* Left: Mobile Menu & Clean Page Title */}
+        <div className="flex items-center gap-3 min-w-0">
           <button
-            type="button"
-            onClick={() => setIsUserMenuOpen((prev) => !prev)}
-            className="flex items-center gap-2 p-1 rounded-lg hover:bg-[#131c31] transition-colors cursor-pointer"
-            aria-label="User profile menu"
+            onClick={onMobileMenuToggle}
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05] transition-colors"
+            aria-label="Open menu"
           >
-            <Avatar
-              size="sm"
-              name={user?.fullName}
-              src={user?.avatarUrl}
-              isOnline={true}
-            />
-            <div className="hidden sm:block text-left text-xs leading-tight">
-              <span className="font-semibold text-white block truncate max-w-[120px]">
-                {user?.fullName}
-              </span>
-              <span className="text-[10px] text-slate-400 uppercase font-medium">
-                {userRole?.replace('_', ' ')}
-              </span>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
+            <Menu className="w-5 h-5" />
           </button>
 
-          {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-[#0b1120] border border-slate-800 rounded-xl shadow-2xl py-1.5 z-50 animate-fade-in text-xs divide-y divide-slate-800">
-              <div className="p-3">
-                <p className="font-bold text-white truncate">
-                  {user?.fullName}
-                </p>
-                <p className="text-slate-400 truncate mt-0.5">{user?.email}</p>
-                <div className="mt-2">
-                  <StatusBadge status={userRole} size="sm" />
+          <span className="text-sm font-semibold text-white truncate">{pageTitle}</span>
+        </div>
+
+        {/* Center: Minimalist Search Bar */}
+        <div className="flex-1 max-w-sm mx-auto hidden md:block">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="w-full flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.07] text-slate-400 hover:text-slate-200 transition-all text-xs"
+          >
+            <span className="flex items-center gap-2 truncate">
+              <Search className="w-3.5 h-3.5 text-slate-500" />
+              <span>Search workspace...</span>
+            </span>
+            <kbd className="text-[10px] font-mono text-slate-500">⌘K</kbd>
+          </button>
+        </div>
+
+        {/* Right: Minimalist Actions (Search on mobile, Notifications, Profile) */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="md:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05] transition-colors"
+            aria-label="Search"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
+          {/* Notifications Bell */}
+          <button
+            type="button"
+            onClick={() => setNotifOpen(true)}
+            className="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05] transition-colors"
+            aria-label="Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            )}
+          </button>
+
+          {/* Clean User Avatar Button */}
+          <div className="relative" ref={profileRef}>
+            <button
+              type="button"
+              onClick={() => setProfileOpen(!profileOpen)}
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/[0.05] transition-colors"
+            >
+              <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-[11px] font-bold text-white">
+                {initials}
+              </div>
+              <span className="hidden sm:inline text-xs font-medium text-slate-200 max-w-[120px] truncate pr-1">
+                {user?.fullName || 'Account'}
+              </span>
+            </button>
+
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[#0b1120] border border-white/[0.08] shadow-2xl py-1.5 z-50">
+                <div className="px-3.5 py-2 border-b border-white/[0.06]">
+                  <p className="text-xs font-semibold text-white truncate">
+                    {user?.fullName || 'Workspace User'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    {user?.email}
+                  </p>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      navigate('/settings');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/[0.05] transition-colors"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Settings</span>
+                  </button>
+                </div>
+
+                <div className="border-t border-white/[0.06] pt-1">
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign out</span>
+                  </button>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+      </header>
 
-              <div className="py-1">
-                <Link
-                  to="/settings"
-                  onClick={() => setIsUserMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-3 py-2 text-slate-300 hover:bg-[#131c31] hover:text-white transition-colors"
-                >
-                  <UserIcon className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Profile & Password</span>
-                </Link>
-                {userRole === 'TENANT_ADMIN' && (
-                  <Link
-                    to="/settings"
-                    onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-slate-300 hover:bg-[#131c31] hover:text-white transition-colors"
-                  >
-                    <Settings className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Organization Settings</span>
-                  </Link>
-                )}
-                {user?.isSuperAdmin && (
-                  <Link
-                    to="/platform/tenants"
-                    onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-slate-300 hover:bg-[#131c31] hover:text-white transition-colors"
-                  >
-                    <Shield className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Platform Admin</span>
-                  </Link>
-                )}
-              </div>
-
-              <div className="py-1">
+      {/* Command Palette Modal (⌘K) */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setSearchOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-xl bg-[#0b1120] border border-white/[0.1] shadow-2xl overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07]">
+              <Search className="w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Jump to page..."
+                className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+              />
+              <button
+                onClick={() => setSearchOpen(false)}
+                className="text-[10px] text-slate-500 hover:text-slate-300 px-1.5 py-0.5 rounded bg-white/[0.05]"
+              >
+                ESC
+              </button>
+            </div>
+            <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5">
+              {filteredLinks.map((item) => (
                 <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-slate-300 hover:text-rose-300 hover:bg-rose-950/30 transition-colors font-medium cursor-pointer"
+                  key={item.path}
+                  onClick={() => {
+                    setSearchOpen(false);
+                    setSearchQuery('');
+                    navigate(item.path);
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Log out</span>
+                  <span>{item.label}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                </button>
+              ))}
+              {filteredLinks.length === 0 && (
+                <div className="py-6 text-center text-xs text-slate-500">
+                  No matching views found.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications Slide-Over Drawer */}
+      {notifOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+            onClick={() => setNotifOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-sm bg-[#090e1c] border-l border-white/[0.08] h-full flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-white">Notifications</h3>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    <span>Mark read</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setNotifOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05]"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
-          )}
+
+            <div className="flex-1 overflow-y-auto divide-y divide-white/[0.05]">
+              {notifications.length === 0 ? (
+                <div className="p-10 text-center text-xs text-slate-500">
+                  No workspace alerts.
+                </div>
+              ) : (
+                notifications.map((n, idx) => {
+                  const isRead = n.is_read || n.isRead;
+                  return (
+                    <div
+                      key={n.notification_id || n.id || `notif-${idx}`}
+                      className={`p-4 transition-colors ${isRead ? 'opacity-60' : ''}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-semibold text-white">
+                          {n.title || n.notification_type || 'Alert'}
+                        </p>
+                        {!isRead && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0 mt-1" />
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                        {n.message}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* Global Multi-Entity Command Palette Modal */}
-      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-
-      {/* Slide-over Notification Panel */}
-      <NotificationPanel isOpen={isNotifPanelOpen} onClose={() => setIsNotifPanelOpen(false)} />
-    </header>
+      )}
+    </>
   );
 };

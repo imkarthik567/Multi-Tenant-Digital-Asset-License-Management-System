@@ -156,3 +156,15 @@
   animation: beam-slide 9.5s linear infinite 5s;
 }
 
+/* Eliminate white/light-gray hover cursor background on all Recharts graphs */
+.recharts-tooltip-cursor,
+path.recharts-tooltip-cursor,
+rect.recharts-tooltip-cursor {
+  fill: transparent !important;
+  stroke: rgba(255, 255, 255, 0.08) !important;
+}
+rect.recharts-tooltip-cursor {
+  display: none !important;
+}
+
+

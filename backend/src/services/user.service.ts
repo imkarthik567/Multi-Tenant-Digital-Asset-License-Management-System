@@ -11,6 +11,12 @@ import { hashPassword } from '../utils/hash.util';
 import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
 import { mockStore } from '../config/mockStore';
+import { emailService } from './email.service';
+import {
+  deriveNameFromEmail,
+  generateAutoPassword,
+  extractEmailsFromText,
+} from '../utils/emailProfile.util';
 
 export class UserService {
   public async listUsers(
@@ -31,57 +37,246 @@ export class UserService {
   }
 
   public async createUser(prismaClient: any, tenantId: string, data: any, _actorUserId?: string) {
-    const existing = await prismaClient.user.findUnique({
-      where: { email: data.email },
-    });
-    if (existing) {
-      throw new ConflictError(`User with email '${data.email}' already exists.`);
+    const normalizedEmail = (data.email || '').trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      throw new BadRequestError('A valid member email address is required.');
     }
 
+    const existing = await prismaClient.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+    if (existing) {
+      throw new ConflictError(`User with email '${normalizedEmail}' already exists.`);
+    }
+
+    const targetRoleName = data.roleName || 'MEMBER';
     const role = await prismaClient.role.findUnique({
-      where: { name: data.roleName },
+      where: { name: targetRoleName },
     });
     if (!role || role.name === 'SUPER_ADMIN') {
       throw new BadRequestError('Invalid organization role specified.');
     }
 
-    const passwordHash = await hashPassword(data.password);
+    const autoDerivedName =
+      data.fullName && String(data.fullName).trim().length >= 2
+        ? String(data.fullName).trim()
+        : deriveNameFromEmail(normalizedEmail);
 
-    return userRepository.create(prismaClient, {
-      email: data.email,
-      fullName: data.fullName,
+    const rawPassword =
+      data.password && String(data.password).trim().length >= 6
+        ? String(data.password).trim()
+        : generateAutoPassword();
+
+    const passwordHash = await hashPassword(rawPassword);
+
+    const createdUser = await userRepository.create(prismaClient, {
+      email: normalizedEmail,
+      fullName: autoDerivedName,
       passwordHash,
       avatarUrl: data.avatarUrl || null,
       role: { connect: { id: role.id } },
       tenant: { connect: { id: tenantId } },
       isActive: true,
     });
+
+    await emailService.dispatchMemberOnboardingEmail({
+      tenantId,
+      userId: createdUser.id,
+      email: normalizedEmail,
+      fullName: autoDerivedName,
+      roleName: role.name,
+      generatedPassword: rawPassword,
+    });
+
+    return {
+      ...createdUser,
+      autoProvisioned: true,
+      welcomeEmailSent: true,
+    };
+  }
+
+  /**
+   * Bulk provisions organization members from a list, CSV, or raw text of email addresses.
+   * Requires zero manual name/password/role input from the admin.
+   */
+  public async bulkCreateUsersByEmail(
+    prismaClient: any,
+    tenantId: string,
+    payload: { emails?: string[] | string; rawText?: string; roleName?: string },
+    actorUserId?: string
+  ) {
+    const combinedInput = [
+      ...(Array.isArray(payload.emails) ? payload.emails : payload.emails ? [payload.emails] : []),
+      payload.rawText || '',
+    ].join('\n');
+
+    const extractedEmails = extractEmailsFromText(combinedInput);
+    if (extractedEmails.length === 0) {
+      throw new BadRequestError('No valid email addresses found in the provided input.');
+    }
+
+    const createdUsers: any[] = [];
+    const skippedEmails: string[] = [];
+
+    for (const email of extractedEmails) {
+      const existing = await prismaClient.user.findUnique({
+        where: { email },
+      });
+      if (existing) {
+        skippedEmails.push(email);
+        continue;
+      }
+
+      try {
+        const user = await this.createUser(
+          prismaClient,
+          tenantId,
+          {
+            email,
+            roleName: payload.roleName || 'MEMBER',
+          },
+          actorUserId
+        );
+        createdUsers.push(user);
+      } catch {
+        skippedEmails.push(email);
+      }
+    }
+
+    return {
+      createdCount: createdUsers.length,
+      skippedCount: skippedEmails.length,
+      createdUsers,
+      skippedEmails,
+      message:
+        createdUsers.length > 0
+          ? `Automatically provisioned ${createdUsers.length} member(s) and dispatched welcome emails.`
+          : 'All provided email addresses are already registered in the organization.',
+    };
+  }
+
+  /**
+   * Finds an existing member by email in the tenant or automatically provisions one on the fly.
+   */
+  public async findOrCreateMemberByEmail(
+    prismaClient: any,
+    tenantId: string,
+    email: string,
+    actorUserId?: string,
+    fullName?: string
+  ) {
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      throw new BadRequestError('A valid email address is required.');
+    }
+
+    const existing = await prismaClient.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    return this.createUser(
+      prismaClient,
+      tenantId,
+      {
+        email: normalizedEmail,
+        fullName: fullName && fullName.trim().length >= 2 ? fullName.trim() : undefined,
+        roleName: 'MEMBER',
+      },
+      actorUserId
+    );
   }
 
   public async updateUser(prismaClient: any, id: string, data: any) {
     const existingUser = await this.getUserById(prismaClient, id);
+    const updatePayload = { ...data };
 
-    if (data.email && data.email.toLowerCase() !== existingUser.email?.toLowerCase()) {
+    const isEmailChanged =
+      Boolean(updatePayload.email) &&
+      updatePayload.email.toLowerCase() !== existingUser.email?.toLowerCase();
+
+    if (isEmailChanged) {
+      const normalizedNewEmail = updatePayload.email.trim().toLowerCase();
       const duplicate = await prismaClient.user.findUnique({
-        where: { email: data.email.toLowerCase() },
+        where: { email: normalizedNewEmail },
       });
       if (duplicate && duplicate.id !== id) {
-        throw new ConflictError(`Another user with email '${data.email}' already exists.`);
+        throw new ConflictError(`Another user with email '${normalizedNewEmail}' already exists.`);
+      }
+      updatePayload.email = normalizedNewEmail;
+
+      // If admin only gave the new email without specifying a new name, or if old name was auto-derived, ensure fullName is valid
+      if (!updatePayload.fullName || String(updatePayload.fullName).trim().length < 2) {
+        updatePayload.fullName = deriveNameFromEmail(normalizedNewEmail);
       }
     }
 
-    const updated = await userRepository.update(prismaClient, id, data);
+    const previousRoleName =
+      typeof existingUser.role === 'object' && existingUser.role?.name
+        ? existingUser.role.name
+        : typeof existingUser.role === 'string'
+        ? existingUser.role
+        : existingUser.roleId === 2
+        ? 'ADMIN'
+        : existingUser.roleId === 3
+        ? 'MANAGER'
+        : 'MEMBER';
+
+    if (updatePayload.roleName && !updatePayload.roleId) {
+      const roleObj = await prismaClient.role.findUnique({
+        where: { name: updatePayload.roleName },
+      });
+      if (roleObj) {
+        updatePayload.roleId = roleObj.id;
+      }
+      delete updatePayload.roleName;
+    }
+
+    const updated = await userRepository.update(prismaClient, id, updatePayload);
 
     // Sync any in-memory allocations for this user so seat allocations reflect the updated email/name
     for (const alloc of mockStore.state.allocations as any[]) {
       if (alloc.userId === id) {
-        if (data.email) alloc.userEmail = data.email;
-        if (data.fullName) alloc.userName = data.fullName;
+        if (updatePayload.email) alloc.userEmail = updatePayload.email;
+        if (updatePayload.fullName) alloc.userName = updatePayload.fullName;
         if (alloc.user) {
-          if (data.email) alloc.user.email = data.email;
-          if (data.fullName) alloc.user.fullName = data.fullName;
+          if (updatePayload.email) alloc.user.email = updatePayload.email;
+          if (updatePayload.fullName) alloc.user.fullName = updatePayload.fullName;
         }
       }
+    }
+
+    const newRoleName =
+      typeof updated.role === 'object' && updated.role?.name
+        ? updated.role.name
+        : typeof updated.role === 'string'
+        ? updated.role
+        : updated.roleId === 2
+        ? 'ADMIN'
+        : updated.roleId === 3
+        ? 'MANAGER'
+        : 'MEMBER';
+
+    if (isEmailChanged && updated.email) {
+      await emailService.dispatchMemberOnboardingEmail({
+        tenantId: updated.tenantId || existingUser.tenantId || 'tenant-acme-corp',
+        userId: updated.id,
+        email: updated.email,
+        fullName: updated.fullName || deriveNameFromEmail(updated.email),
+        roleName: newRoleName,
+        isEmailUpdate: true,
+      });
+    } else if (updated.email && previousRoleName !== newRoleName) {
+      await emailService.dispatchRoleChangeEmail({
+        tenantId: updated.tenantId || existingUser.tenantId || 'tenant-acme-corp',
+        userId: updated.id,
+        email: updated.email,
+        fullName: updated.fullName || deriveNameFromEmail(updated.email),
+        previousRole: previousRoleName,
+        newRole: newRoleName,
+      });
     }
 
     return updated;
@@ -139,6 +334,14 @@ export class UserService {
         throw new NotFoundError('User not found in tenant organization.');
       }
 
+      const previousRoleName =
+        currentUser.role?.name ||
+        (currentUser.roleId === 2
+          ? 'ADMIN'
+          : currentUser.roleId === 3
+          ? 'MANAGER'
+          : 'MEMBER');
+
       const updatedUser = await tx.user.update({
         where: { id: userId },
         data: { roleId: targetRole.id },
@@ -156,6 +359,18 @@ export class UserService {
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+
+      if (updatedUser.email && previousRoleName !== targetRole.name) {
+        await emailService.dispatchRoleChangeEmail({
+          tenantId,
+          userId: updatedUser.id,
+          email: updatedUser.email,
+          fullName: updatedUser.fullName || deriveNameFromEmail(updatedUser.email),
+          previousRole: previousRoleName,
+          newRole: targetRole.name,
+          reason,
+        });
+      }
 
       return updatedUser;
     });

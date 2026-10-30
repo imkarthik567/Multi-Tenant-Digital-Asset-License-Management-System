@@ -13,6 +13,9 @@ import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { LoginPage } from './pages/auth/LoginPage';
+import { RegisterPage } from './pages/auth/RegisterPage';
+import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
 
 const PUBLIC_PATHS = ['/login', '/register', '/oauth-callback', '/403', '/404'];
 const LAST_ROUTE_STORAGE_KEY = 'assetvault_last_route';
@@ -68,35 +71,46 @@ const PageLoader: React.FC = () => (
   </div>
 );
 
+// Resilient lazy loader that retries once with cache-bust if Vite re-optimizes deps
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  importer: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return lazy(async () => {
+    try {
+      return await importer();
+    } catch (err) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return await importer();
+    }
+  });
+}
+
 // Lazy Loaded Pages
-const LoginPage = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
-const RegisterPage = lazy(() => import('./pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })));
-const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage').then((m) => ({ default: m.OAuthCallbackPage })));
-const ForbiddenPage = lazy(() => import('./pages/error/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })));
-const NotFoundPage = lazy(() => import('./pages/error/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+const ForbiddenPage = lazyWithRetry(() => import('./pages/error/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })));
+const NotFoundPage = lazyWithRetry(() => import('./pages/error/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
-const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
-const AssetListPage = lazy(() => import('./pages/assets/AssetListPage').then((m) => ({ default: m.AssetListPage })));
-const AssetDetailPage = lazy(() => import('./pages/assets/AssetDetailPage').then((m) => ({ default: m.AssetDetailPage })));
+const DashboardPage = lazyWithRetry(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const AssetListPage = lazyWithRetry(() => import('./pages/assets/AssetListPage').then((m) => ({ default: m.AssetListPage })));
+const AssetDetailPage = lazyWithRetry(() => import('./pages/assets/AssetDetailPage').then((m) => ({ default: m.AssetDetailPage })));
 
-const MyLicensesPage = lazy(() => import('./pages/licenses/MyLicensesPage').then((m) => ({ default: m.MyLicensesPage })));
-const LicenseListPage = lazy(() => import('./pages/licenses/LicenseListPage').then((m) => ({ default: m.LicenseListPage })));
-const LicenseDetailPage = lazy(() => import('./pages/licenses/LicenseDetailPage').then((m) => ({ default: m.LicenseDetailPage })));
-const AllocationListPage = lazy(() => import('./pages/allocations/AllocationListPage').then((m) => ({ default: m.AllocationListPage })));
+const MyLicensesPage = lazyWithRetry(() => import('./pages/licenses/MyLicensesPage').then((m) => ({ default: m.MyLicensesPage })));
+const LicenseListPage = lazyWithRetry(() => import('./pages/licenses/LicenseListPage').then((m) => ({ default: m.LicenseListPage })));
+const LicenseDetailPage = lazyWithRetry(() => import('./pages/licenses/LicenseDetailPage').then((m) => ({ default: m.LicenseDetailPage })));
+const AllocationListPage = lazyWithRetry(() => import('./pages/allocations/AllocationListPage').then((m) => ({ default: m.AllocationListPage })));
 
-const VendorListPage = lazy(() => import('./pages/vendors/VendorListPage').then((m) => ({ default: m.VendorListPage })));
-const CategoryListPage = lazy(() => import('./pages/categories/CategoryListPage').then((m) => ({ default: m.CategoryListPage })));
-const TagListPage = lazy(() => import('./pages/tags/TagListPage').then((m) => ({ default: m.TagListPage })));
+const VendorListPage = lazyWithRetry(() => import('./pages/vendors/VendorListPage').then((m) => ({ default: m.VendorListPage })));
+const CategoryListPage = lazyWithRetry(() => import('./pages/categories/CategoryListPage').then((m) => ({ default: m.CategoryListPage })));
+const TagListPage = lazyWithRetry(() => import('./pages/tags/TagListPage').then((m) => ({ default: m.TagListPage })));
 
-const UserListPage = lazy(() => import('./pages/users/UserListPage').then((m) => ({ default: m.UserListPage })));
-const NotificationListPage = lazy(() => import('./pages/notifications/NotificationListPage').then((m) => ({ default: m.NotificationListPage })));
-const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
-const AuditLogPage = lazy(() => import('./pages/audit-logs/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
-const TenantSettingsPage = lazy(() => import('./pages/settings/TenantSettingsPage').then((m) => ({ default: m.TenantSettingsPage })));
+const UserListPage = lazyWithRetry(() => import('./pages/users/UserListPage').then((m) => ({ default: m.UserListPage })));
+const NotificationListPage = lazyWithRetry(() => import('./pages/notifications/NotificationListPage').then((m) => ({ default: m.NotificationListPage })));
+const ReportsPage = lazyWithRetry(() => import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const AuditLogPage = lazyWithRetry(() => import('./pages/audit-logs/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
+const TenantSettingsPage = lazyWithRetry(() => import('./pages/settings/TenantSettingsPage').then((m) => ({ default: m.TenantSettingsPage })));
 
-const TenantListPage = lazy(() => import('./pages/platform/TenantListPage').then((m) => ({ default: m.TenantListPage })));
-const PlanListPage = lazy(() => import('./pages/platform/PlanListPage').then((m) => ({ default: m.PlanListPage })));
-const AiAssistantPage = lazy(() => import('./pages/ai/AiAssistantPage').then((m) => ({ default: m.AiAssistantPage })));
+const TenantListPage = lazyWithRetry(() => import('./pages/platform/TenantListPage').then((m) => ({ default: m.TenantListPage })));
+const PlanListPage = lazyWithRetry(() => import('./pages/platform/PlanListPage').then((m) => ({ default: m.PlanListPage })));
+const AiAssistantPage = lazyWithRetry(() => import('./pages/ai/AiAssistantPage').then((m) => ({ default: m.AiAssistantPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {

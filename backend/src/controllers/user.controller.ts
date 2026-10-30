@@ -32,6 +32,16 @@ export class UserController {
     sendResponse(res, 201, user);
   });
 
+  public bulkCreateUsersByEmail = asyncHandler(async (req: Request, res: Response) => {
+    const result = await userService.bulkCreateUsersByEmail(
+      req.prisma,
+      req.user!.tenantId as string,
+      req.body,
+      req.user?.id
+    );
+    sendResponse(res, 201, result);
+  });
+
   public updateUser = asyncHandler(async (req: Request, res: Response) => {
     const user = await userService.updateUser(req.prisma, req.params.id as string, req.body);
     sendResponse(res, 200, user);

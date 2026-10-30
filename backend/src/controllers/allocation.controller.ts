@@ -17,13 +17,17 @@ export class AllocationController {
       throw new BadRequestError('License ID is required for allocation');
     }
 
-    const { userId } = req.body;
+    const { userId, userEmail, userFullName, fullName, notes } = req.body;
     const result = await allocationService.allocateSeat(
       req.user!.tenantId as string,
       licenseId,
-      userId,
+      userId || '',
       req.user!.id,
-      req.user!.role
+      req.user!.role,
+      userEmail,
+      req.prisma,
+      userFullName || fullName,
+      notes
     );
     sendResponse(res, 201, result);
   });

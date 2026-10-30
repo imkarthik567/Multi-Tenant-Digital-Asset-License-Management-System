@@ -7,10 +7,13 @@ import { z } from 'zod';
 
 export const allocateSeatSchema = z
   .object({
-    userId: z.string().min(1, 'userId is required').trim(),
+    userId: z.string().trim().optional(),
+    userEmail: z.string().email('Valid email address is required').toLowerCase().trim().optional(),
     notes: z.string().max(500).optional(),
   })
-  .strip();
+  .refine((data) => Boolean(data.userId || data.userEmail), {
+    message: 'Either userId or userEmail is required to allocate a license seat',
+  });
 
 export const releaseSeatSchema = z
   .object({

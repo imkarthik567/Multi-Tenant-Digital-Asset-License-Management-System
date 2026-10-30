@@ -1,33 +1,25 @@
-// ==============================================================================
-// AssetVault: License Allocation Matrix
-// Course: BCSE307L Database Systems (Fall 2026-27)
-// Provisioned user software seats, release controls, and compliance status
-// ==============================================================================
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
-  Layers,
   ExternalLink,
   LogOut,
-  Mail,
+  Plus,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { LicenseAllocation } from '../../types';
+import { License, LicenseAllocation, User } from '../../types';
 import { useToast } from '../../context/ToastContext';
-import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { EmptyState } from '../../components/common/EmptyState';
 import { SearchInput } from '../../components/common/SearchInput';
 import { Pagination } from '../../components/common/Pagination';
 import { RoleGate } from '../../components/auth/RoleGate';
+import { Select, Button, Input } from '../../components/ui';
 
 export const AllocationListPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
@@ -37,7 +29,14 @@ export const AllocationListPage: React.FC = () => {
   const [releaseAllocationId, setReleaseAllocationId] = useState<string | null>(null);
   const [releaseReason, setReleaseReason] = useState('Administrative seat release');
 
-  // Fetch Allocations
+  const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
+  const [selectedLicenseId, setSelectedLicenseId] = useState('');
+  const [recipientMode, setRecipientMode] = useState<'existing' | 'email'>('existing');
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [allocationNotes, setAllocationNotes] = useState('');
+
   const {
     data: allocationsData,
     isLoading,
@@ -57,32 +56,86 @@ export const AllocationListPage: React.FC = () => {
   }>({
     queryKey: ['allocations', page, limit, statusFilter],
     queryFn: async () => {
-      const res = await api.get<{ data: LicenseAllocation[]; meta: any }>('/allocations', {
+      return api.get<{ data: LicenseAllocation[]; meta: any }>('/allocations', {
         params: {
           page,
           limit,
           status: statusFilter || undefined,
         },
       });
-      return res;
     },
   });
 
-  // Release Seat Mutation (sp_release_license_seat)
+  const { data: licensesData } = useQuery<{ data: License[] }>({
+    queryKey: ['licenses-for-allocation'],
+    queryFn: async () => {
+      return api.get<{ data: License[] }>('/licenses', {
+        params: { limit: 100 },
+      });
+    },
+  });
+
+  const { data: usersData } = useQuery<{ data: User[] }>({
+    queryKey: ['users-for-allocation'],
+    queryFn: async () => {
+      return api.get<{ data: User[] }>('/users', {
+        params: { limit: 100 },
+      });
+    },
+  });
+
+  const availableLicenses = (licensesData?.data || []).filter(
+    (l) => l.status !== 'CANCELLED' && l.status !== 'EXPIRED'
+  );
+  const workspaceUsers = (usersData?.data || []).filter((u) => u.isActive !== false);
+
+  const allocateMutation = useMutation({
+    mutationFn: async (payload: {
+      licenseId: string;
+      userId?: string;
+      userEmail?: string;
+      userFullName?: string;
+      notes?: string;
+    }) => api.post('/allocations', payload),
+    onSuccess: () => {
+      toast({
+        title: 'Seat Allocated',
+        message: 'License seat has been provisioned.',
+        type: 'success',
+      });
+      setIsAllocateModalOpen(false);
+      setSelectedLicenseId('');
+      setSelectedUserId('');
+      setNewMemberName('');
+      setNewMemberEmail('');
+      setAllocationNotes('');
+      queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['licenses'] });
+      queryClient.invalidateQueries({ queryKey: ['licenses-for-allocation'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Allocation Failed',
+        message: err.message || 'Could not allocate license seat.',
+        type: 'error',
+      });
+    },
+  });
+
   const releaseMutation = useMutation({
     mutationFn: ({ allocationId, reason }: { allocationId: string; reason: string }) =>
       api.post(`/allocations/${allocationId}/release`, { reason }),
     onSuccess: () => {
       toast({
-        title: 'Seat Released & Member Auto-Emailed',
-        message: 'Seat returned to pool and automated email sent to member and admins.',
+        title: 'Seat Released',
+        message: 'Seat returned to organization pool.',
         type: 'info',
       });
       setReleaseAllocationId(null);
       queryClient.invalidateQueries({ queryKey: ['allocations'] });
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['licenses-for-allocation'] });
     },
     onError: (err: any) => {
       toast({
@@ -93,10 +146,71 @@ export const AllocationListPage: React.FC = () => {
     },
   });
 
+  const handleOpenAllocateModal = () => {
+    if (!selectedLicenseId && availableLicenses.length > 0) {
+      const firstLic = availableLicenses[0] as any;
+      setSelectedLicenseId(firstLic.id || firstLic.license_id || '');
+    }
+    if (!selectedUserId && workspaceUsers.length > 0) {
+      setSelectedUserId(workspaceUsers[0].id);
+    }
+    setIsAllocateModalOpen(true);
+  };
+
+  const handleConfirmAllocate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLicenseId) {
+      toast({
+        title: 'License Required',
+        message: 'Please select a software license.',
+        type: 'error',
+      });
+      return;
+    }
+
+    if (recipientMode === 'existing') {
+      if (!selectedUserId) {
+        toast({
+          title: 'Member Required',
+          message: 'Please select a workspace member.',
+          type: 'error',
+        });
+        return;
+      }
+      allocateMutation.mutate({
+        licenseId: selectedLicenseId,
+        userId: selectedUserId,
+        notes: allocationNotes.trim() || undefined,
+      });
+    } else {
+      if (!newMemberName.trim() || newMemberName.trim().length < 2) {
+        toast({
+          title: 'Name Required',
+          message: 'Please enter the member name.',
+          type: 'error',
+        });
+        return;
+      }
+      if (!newMemberEmail.trim() || !newMemberEmail.includes('@')) {
+        toast({
+          title: 'Valid Email Required',
+          message: 'Please enter a valid email address.',
+          type: 'error',
+        });
+        return;
+      }
+      allocateMutation.mutate({
+        licenseId: selectedLicenseId,
+        userEmail: newMemberEmail.trim().toLowerCase(),
+        userFullName: newMemberName.trim(),
+        notes: allocationNotes.trim() || undefined,
+      });
+    }
+  };
+
   const allocations = allocationsData?.data || [];
   const meta = allocationsData?.meta || { page: 1, limit: 15, total: 0, totalPages: 1 };
 
-  // Filter client-side by search query if needed
   const filtered = allocations.filter((a) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -108,25 +222,31 @@ export const AllocationListPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+      {/* Minimalist Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <div className="p-2 rounded-lg bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400">
-              <Layers className="w-5 h-5" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              License Seat Allocations
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Enterprise software seat distribution matrix tracking user software provisioning and compliance.
+          <h1 className="text-xl font-bold text-white tracking-tight">
+            Allocations
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Track and manage software seats assigned across workspace members.
           </p>
         </div>
+
+        <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
+          <Button
+            variant="primary"
+            size="sm"
+            iconLeft={<Plus className="w-4 h-4" />}
+            onClick={handleOpenAllocateModal}
+          >
+            Allocate Seat
+          </Button>
+        </RoleGate>
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="w-full sm:w-72">
           <SearchInput
             value={search}
@@ -134,117 +254,124 @@ export const AllocationListPage: React.FC = () => {
               setSearch(val);
               setPage(1);
             }}
-            placeholder="Search by user or license..."
+            placeholder="Search by member or license..."
           />
         </div>
 
-        <select
+        <Select
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
-          className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 w-full sm:w-auto"
+          className="w-40"
         >
           <option value="">All Statuses</option>
-          <option value="ACTIVE">Active Allocations</option>
-          <option value="REVOKED">Released / Revoked Seats</option>
-        </select>
+          <option value="ACTIVE">Active</option>
+          <option value="REVOKED">Released</option>
+        </Select>
       </div>
 
       {isError && (
-        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 rounded-xl flex items-center justify-between">
-          <span className="text-xs text-rose-700 dark:text-rose-400 font-medium">
-            {(error as any)?.message || 'Failed to load license allocations.'}
-          </span>
+        <div className="p-4 bg-rose-950/40 border border-rose-900/60 rounded-xl flex items-center justify-between text-xs text-rose-300">
+          <span>{(error as any)?.message || 'Failed to load allocations.'}</span>
           <button
             type="button"
             onClick={() => refetch()}
-            className="text-xs font-semibold text-rose-700 dark:text-rose-300 underline hover:no-underline"
+            className="font-semibold underline hover:no-underline"
           >
             Retry
           </button>
         </div>
       )}
 
-      {/* Table / Content */}
       {isLoading ? (
         <LoadingSkeleton variant="table" />
       ) : filtered.length === 0 ? (
         <EmptyState
           title="No Allocations Found"
-          message="No user seat allocations recorded under the specified criteria."
+          message="Allocate a software license seat to a workspace member to get started."
+          action={{
+            label: 'Allocate Seat',
+            onClick: handleOpenAllocateModal,
+            icon: <Plus className="w-4 h-4" />,
+          }}
         />
       ) : (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+        <div className="rounded-xl border border-white/[0.07] overflow-hidden bg-[#0b1120]">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-850 text-slate-500 uppercase font-semibold">
+            <table className="min-w-full divide-y divide-white/[0.06] text-left text-xs">
+              <thead className="bg-white/[0.02] text-slate-400 text-[11px] uppercase tracking-wider font-medium">
                 <tr>
-                  <th className="px-4 py-3">User</th>
+                  <th className="px-5 py-3">Member</th>
                   <th className="px-4 py-3">License</th>
                   <th className="px-4 py-3">Vendor</th>
-                  <th className="px-4 py-3">Allocated Date</th>
+                  <th className="px-4 py-3">Allocated</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-5 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                {filtered.map((alloc) => (
-                  <tr key={alloc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                    <td className="px-4 py-3">
-                      <div>
-                        <span className="font-semibold text-slate-900 dark:text-white">
-                          {alloc.user?.fullName || 'User'}
-                        </span>
-                        <span className="block text-[11px] text-slate-400 font-mono">
-                          {alloc.user?.email || 'N/A'}
-                        </span>
-                      </div>
+              <tbody className="divide-y divide-white/[0.06]">
+                {filtered.map((alloc, idx) => (
+                  <tr
+                    key={alloc.id || `alloc-${idx}`}
+                    className="hover:bg-white/[0.02] transition-colors"
+                  >
+                    <td className="px-5 py-3.5">
+                      <span className="font-medium text-white block">
+                        {alloc.user?.fullName || 'Member'}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {alloc.user?.email || 'N/A'}
+                      </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       {alloc.license ? (
                         <Link
                           to={`/licenses/${alloc.license.id}`}
-                          className="font-medium text-primary-600 dark:text-primary-400 hover:underline flex items-center"
+                          className="font-medium text-slate-200 hover:text-indigo-400 inline-flex items-center gap-1"
                         >
-                          {alloc.license.name}
-                          <ExternalLink className="w-3 h-3 ml-1 text-slate-400" />
+                          <span>{alloc.license.name}</span>
+                          <ExternalLink className="w-3 h-3 text-slate-500" />
                         </Link>
                       ) : (
-                        'License'
+                        <span className="text-slate-400">License</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">
-                      {alloc.license?.vendor?.name || 'Independent'}
+                    <td className="px-4 py-3.5 text-slate-400">
+                      {alloc.license?.vendor?.name || '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">
+                    <td className="px-4 py-3.5 text-slate-400 font-mono">
                       {new Date(alloc.allocatedAt).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={alloc.status} size="sm" />
+                    <td className="px-4 py-3.5">
+                      <span
+                        className={`text-xs font-medium ${
+                          alloc.status === 'ACTIVE' ? 'text-emerald-400' : 'text-slate-500'
+                        }`}
+                      >
+                        {alloc.status === 'ACTIVE' ? 'Active' : 'Released'}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center justify-end gap-3">
-                        <span
-                          className="inline-flex items-center gap-1 text-[11px] text-emerald-500 dark:text-emerald-400 font-mono"
-                          title={`Automated lifecycle & expiry alerts enabled for ${alloc.user?.email || 'member'}`}
-                        >
-                          <Mail className="w-3 h-3" />
-                          <span>Auto-Mail Active</span>
+                    <td className="px-5 py-3.5 text-right">
+                      {alloc.status === 'ACTIVE' ? (
+                        <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
+                          <button
+                            type="button"
+                            onClick={() => setReleaseAllocationId(alloc.id)}
+                            className="text-rose-400 hover:text-rose-300 font-medium inline-flex items-center gap-1"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                            <span>Release</span>
+                          </button>
+                        </RoleGate>
+                      ) : (
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          {alloc.releasedAt
+                            ? new Date(alloc.releasedAt).toLocaleDateString()
+                            : '—'}
                         </span>
-                        {alloc.status === 'ACTIVE' && (
-                          <RoleGate roles={['TENANT_ADMIN', 'ASSET_MANAGER']}>
-                            <button
-                              onClick={() => setReleaseAllocationId(alloc.id)}
-                              className="text-rose-600 dark:text-rose-400 font-medium hover:underline inline-flex items-center text-xs cursor-pointer"
-                            >
-                              <LogOut className="w-3.5 h-3.5 mr-1" />
-                              Release Seat
-                            </button>
-                          </RoleGate>
-                        )}
-                      </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -252,7 +379,7 @@ export const AllocationListPage: React.FC = () => {
             </table>
           </div>
 
-          <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="p-3 border-t border-white/[0.06] bg-white/[0.01]">
             <Pagination
               currentPage={meta.page}
               totalPages={meta.totalPages}
@@ -265,50 +392,156 @@ export const AllocationListPage: React.FC = () => {
         </div>
       )}
 
-      {/* RELEASE SEAT MODAL */}
+      {/* Allocate Seat Modal */}
       <Modal
-        isOpen={!!releaseAllocationId}
-        onClose={() => setReleaseAllocationId(null)}
-        title="Release License Seat"
+        isOpen={isAllocateModalOpen}
+        onClose={() => setIsAllocateModalOpen(false)}
+        title="Allocate Software Seat"
       >
-        <div className="space-y-4 text-xs">
-          <p className="text-slate-600 dark:text-slate-300">
-            Releasing this seat invokes stored procedure{' '}
-            <code className="font-mono text-primary-500">sp_release_license_seat</code> and restores available seat
-            capacity for the license.
-          </p>
+        <form onSubmit={handleConfirmAllocate} className="space-y-4 text-xs">
+          <Select
+            label="Software License *"
+            value={selectedLicenseId}
+            onChange={(e) => setSelectedLicenseId(e.target.value)}
+          >
+            <option value="">Select a license...</option>
+            {availableLicenses.map((lic: any, idx: number) => {
+              const id = lic.id || lic.license_id || `lic-${idx}`;
+              const used = lic.usedSeats ?? lic.used_seats ?? 0;
+              const total = lic.totalSeats ?? lic.total_seats ?? 0;
+              return (
+                <option key={id} value={id}>
+                  {lic.name || lic.license_name} ({used}/{total} seats used)
+                </option>
+              );
+            })}
+          </Select>
 
-          <div>
-            <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Reason for Release</label>
-            <input
-              type="text"
-              value={releaseReason}
-              onChange={(e) => setReleaseReason(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-2 rounded-lg bg-[#050811] p-1 border border-white/[0.08]">
             <button
               type="button"
-              onClick={() => setReleaseAllocationId(null)}
-              className="px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+              onClick={() => setRecipientMode('existing')}
+              className={`py-1.5 rounded-md text-xs font-medium transition-colors ${
+                recipientMode === 'existing'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              Cancel
+              Existing Member
             </button>
             <button
               type="button"
-              disabled={releaseMutation.isPending}
+              onClick={() => setRecipientMode('email')}
+              className={`py-1.5 rounded-md text-xs font-medium transition-colors ${
+                recipientMode === 'email'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              New Member by Email
+            </button>
+          </div>
+
+          {recipientMode === 'existing' ? (
+            <Select
+              label="Workspace Member *"
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+            >
+              <option value="">Select member...</option>
+              {workspaceUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.fullName} ({u.email})
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <div className="space-y-3">
+              <Input
+                label="Member Name *"
+                type="text"
+                placeholder="Jane Doe"
+                value={newMemberName}
+                onChange={(e) => setNewMemberName(e.target.value)}
+              />
+              <Input
+                label="Member Email *"
+                type="email"
+                placeholder="jane@company.com"
+                value={newMemberEmail}
+                onChange={(e) => setNewMemberEmail(e.target.value)}
+              />
+            </div>
+          )}
+
+          <Input
+            label="Notes (Optional)"
+            type="text"
+            placeholder="Department or project reference..."
+            value={allocationNotes}
+            onChange={(e) => setAllocationNotes(e.target.value)}
+          />
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-white/[0.06]">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsAllocateModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              isLoading={allocateMutation.isPending}
+            >
+              Allocate Seat
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Release Seat Modal */}
+      <Modal
+        isOpen={!!releaseAllocationId}
+        onClose={() => setReleaseAllocationId(null)}
+        title="Release Seat"
+      >
+        <div className="space-y-4 text-xs">
+          <p className="text-slate-300">
+            Releasing this seat returns capacity to the license pool immediately.
+          </p>
+          <Input
+            label="Reason"
+            type="text"
+            value={releaseReason}
+            onChange={(e) => setReleaseReason(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-3 border-t border-white/[0.06]">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setReleaseAllocationId(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              isLoading={releaseMutation.isPending}
               onClick={() =>
                 releaseMutation.mutate({
                   allocationId: releaseAllocationId!,
                   reason: releaseReason,
                 })
               }
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg shadow-sm"
             >
-              {releaseMutation.isPending ? 'Releasing...' : 'Release Seat'}
-            </button>
+              Confirm Release
+            </Button>
           </div>
         </div>
       </Modal>

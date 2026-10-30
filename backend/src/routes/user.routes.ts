@@ -12,6 +12,7 @@ import { tenantContext } from '../middleware/tenantScope.middleware';
 import { validate } from '../middleware/validate.middleware';
 import {
   createUserSchema,
+  bulkCreateUsersByEmailSchema,
   updateUserSchema,
   changeRoleSchema,
   resetPasswordSchema,
@@ -35,6 +36,7 @@ router.get('/:id', authorize('users:read'), tenantContext, userController.getUse
 router.get('/:id/allocations', authorize('allocations:read'), tenantContext, allocationController.listAllocationsByUser);
 
 // User administration (Requires users:manage)
+router.post('/bulk-email', authorize('users:manage'), tenantContext, validate(bulkCreateUsersByEmailSchema), userController.bulkCreateUsersByEmail);
 router.post('/', authorize('users:manage'), tenantContext, validate(createUserSchema), userController.createUser);
 router.patch('/:id', authorize('users:manage'), tenantContext, validate(updateUserSchema), userController.updateUser);
 router.put('/:id', authorize('users:manage'), tenantContext, validate(updateUserSchema), userController.updateUser);

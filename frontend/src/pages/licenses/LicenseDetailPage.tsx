@@ -36,7 +36,6 @@ import {
   RotateCcw,
   History,
   Layers,
-  Search,
   Edit3,
   FileCode,
   FileText,
@@ -177,6 +176,7 @@ export const LicenseDetailPage: React.FC = () => {
 
   // User search dialog state inside Allocations tab
   const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [newMemberFullName, setNewMemberFullName] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [allocationNotes, setAllocationNotes] = useState('');
 
@@ -378,25 +378,28 @@ export const LicenseDetailPage: React.FC = () => {
   // Mutations
   // ============================================================================
 
-  // 1. Allocate Seat Mutation
+  // 1. Allocate Seat Mutation (Supports existing userId OR direct member email auto-provisioning)
   const allocateSeatMutation = useMutation({
-    mutationFn: (payload: { userId: string; notes?: string }) =>
+    mutationFn: (payload: { userId?: string; userEmail?: string; userFullName?: string; notes?: string }) =>
       api.post(`/licenses/${id}/allocate`, payload),
     onSuccess: (_res, variables) => {
       const allocatedUser = users.find((u) => u.id === variables.userId);
+      const targetEmail = allocatedUser?.email || variables.userEmail;
       toast.success(
-        allocatedUser?.email
-          ? `License seat allocated & automated email sent to ${allocatedUser.email}`
+        targetEmail
+          ? `License seat allocated & automated emails sent to ${targetEmail}`
           : 'License seat allocated & automated email dispatched to organization members'
       );
       setIsAllocateModalOpen(false);
       setSelectedUserId('');
       setAllocationNotes('');
       setUserSearchQuery('');
+      setNewMemberFullName('');
       queryClient.invalidateQueries({ queryKey: ['license', id] });
       queryClient.invalidateQueries({ queryKey: ['license', id, 'allocations'] });
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
       queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
@@ -1507,14 +1510,14 @@ export const LicenseDetailPage: React.FC = () => {
       )}
 
       {/* ====================================================================== */}
-      {/* MODAL: Allocate Seat User Search Dialog                                */}
+      {/* MODAL: Allocate Seat (By Member Email or Existing Member)              */}
       {/* ====================================================================== */}
       {isAllocateModalOpen && (
         <Modal
           isOpen={isAllocateModalOpen}
           onClose={() => setIsAllocateModalOpen(false)}
           title="Allocate License Seat"
-          description={`Assign a seat for "${license.name}" via stored procedure sp_allocate_license_seat`}
+          description={`Enter a member email address or select from the roster — new emails are auto-provisioned & emailed automatically`}
           maxWidth="md"
           footer={
             <>
@@ -1524,34 +1527,74 @@ export const LicenseDetailPage: React.FC = () => {
               <Button
                 variant="primary"
                 size="sm"
-                disabled={!selectedUserId || allocateSeatMutation.isPending}
-                isLoading={allocateSeatMutation.isPending}
-                onClick={() =>
-                  allocateSeatMutation.mutate({
-                    userId: selectedUserId,
-                    notes: allocationNotes,
-                  })
+                disabled={
+                  (!selectedUserId &&
+                    (!/^\S+@\S+\.\S+$/.test(userSearchQuery.trim()) ||
+                      newMemberFullName.trim().length < 2)) ||
+                  allocateSeatMutation.isPending
                 }
+                isLoading={allocateSeatMutation.isPending}
+                onClick={() => {
+                  const trimmedEmail = userSearchQuery.trim().toLowerCase();
+                  if (selectedUserId) {
+                    allocateSeatMutation.mutate({
+                      userId: selectedUserId,
+                      notes: allocationNotes,
+                    });
+                  } else if (/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+                    allocateSeatMutation.mutate({
+                      userEmail: trimmedEmail,
+                      userFullName: newMemberFullName.trim(),
+                      notes: allocationNotes,
+                    });
+                  }
+                }}
               >
-                Confirm Allocation
+                {selectedUserId
+                  ? 'Confirm Allocation'
+                  : /^\S+@\S+\.\S+$/.test(userSearchQuery.trim())
+                  ? `Onboard ${newMemberFullName.trim() || 'Member'} & Allocate Seat`
+                  : 'Confirm Allocation'}
               </Button>
             </>
           }
         >
           <div className="space-y-4">
-            {/* Live Search User Filter */}
+            {/* Direct Email Input or Live Search Filter */}
             <Input
-              label="Search Team Members"
-              placeholder="Filter by employee name or email..."
+              label="Member Email Address (or Search Roster) *"
+              placeholder="Type any member email (e.g. member@organization.com)..."
               value={userSearchQuery}
-              onChange={(e) => setUserSearchQuery(e.target.value)}
-              iconLeft={<Search className="w-4 h-4 text-slate-500" />}
+              onChange={(e) => {
+                setUserSearchQuery(e.target.value);
+                if (selectedUserId) setSelectedUserId('');
+              }}
+              iconLeft={<Mail className="w-4 h-4 text-slate-500" />}
             />
 
-            {/* User List with Selection */}
-            <div className="max-h-48 overflow-y-auto space-y-1.5 border border-slate-800 rounded-xl p-2 bg-slate-950">
+            {/* User List with Selection or Auto-Provision Notice */}
+            <div className="max-h-56 overflow-y-auto space-y-1.5 border border-slate-800 rounded-xl p-2 bg-slate-950">
               {filteredUsers.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-4">No employees matched your search</p>
+                /^\S+@\S+\.\S+$/.test(userSearchQuery.trim()) ? (
+                  <div className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-500/40 text-xs text-slate-200 space-y-2.5">
+                    <div className="font-semibold text-indigo-300">
+                      New Member Email Detected: {userSearchQuery.trim().toLowerCase()}
+                    </div>
+                    <Input
+                      label="Member Name *"
+                      placeholder="Enter the member's full name (e.g. Karthik S)..."
+                      value={newMemberFullName}
+                      onChange={(e) => setNewMemberFullName(e.target.value)}
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      Clicking confirm will create their member profile with this name, send their login credentials email, and allocate this license seat.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 text-center py-4">
+                    Enter a full email address above to onboard a new member and assign a seat
+                  </p>
+                )
               ) : (
                 filteredUsers.map((u) => {
                   const isSelected = selectedUserId === u.id;
@@ -1586,7 +1629,7 @@ export const LicenseDetailPage: React.FC = () => {
             </div>
 
             <Input
-              label="Assignment Notes / Workstation"
+              label="Assignment Notes / Workstation (Optional)"
               placeholder="e.g. Workstation WS-984, Project authorization code"
               value={allocationNotes}
               onChange={(e) => setAllocationNotes(e.target.value)}
