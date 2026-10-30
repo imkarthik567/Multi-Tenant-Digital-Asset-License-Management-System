@@ -72,13 +72,21 @@ export const GeminiChatWidget: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await api.post('/ai/chat', {
+      const res: any = await api.post('/ai/chat', {
+        prompt: text,
         messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
+        history: messages
+          .filter((m) => m.content && m.content.trim())
+          .map((m) => ({ role: m.role, text: m.content })),
         modelType: 'general',
         mode: 'copilot',
+        userId: user?.id,
+        userName: user?.fullName,
+        userEmail: user?.email,
+        userRole,
       });
-      const payload = res.data?.data ?? res.data;
-      const replyText = payload?.reply || 'I processed your request.';
+      const payload = res?.data ?? res;
+      const replyText = payload?.reply || payload?.text || 'I processed your request.';
       const replyMsg: ChatMessage = {
         role: 'model',
         content: replyText,
@@ -86,13 +94,15 @@ export const GeminiChatWidget: React.FC = () => {
       };
       setMessages((prev) => [...prev, replyMsg]);
     } catch (err: any) {
+      const errorMsg =
+        err?.message ||
+        err?.response?.data?.message ||
+        'Unable to reach the assistant right now. Please try again in a moment.';
       setMessages((prev) => [
         ...prev,
         {
           role: 'model',
-          content:
-            err?.response?.data?.message ||
-            'Unable to reach the assistant right now. Please try again in a moment.',
+          content: errorMsg,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);

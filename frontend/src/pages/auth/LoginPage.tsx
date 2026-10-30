@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { signInWithGoogleAccount } from '../../services/gmailAuth';
+import { signInWithGoogleAccount, FIREBASE_PROJECT_ID } from '../../services/gmailAuth';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { AuthAmbientBackground } from './AuthAmbientBackground';
@@ -23,6 +23,8 @@ import {
   Globe,
   User as UserIcon,
   CheckCircle2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 
 // Zod validation matching backend auth.validator.ts loginSchema
@@ -50,6 +52,7 @@ export const LoginPage: React.FC = () => {
   const location = useLocation();
 
   const [serverError, setServerError] = useState<string | null>(null);
+  const [unauthorizedDomainHost, setUnauthorizedDomainHost] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -102,6 +105,7 @@ export const LoginPage: React.FC = () => {
     try {
       setIsLoading(true);
       setServerError(null);
+      setUnauthorizedDomainHost(null);
       const user = await login(data.email, data.password);
       toast.success(`Welcome back, ${user.fullName}!`, 'Signed In Successfully');
       navigate(from, { replace: true });
@@ -118,6 +122,7 @@ export const LoginPage: React.FC = () => {
     try {
       setIsGoogleLoading(true);
       setServerError(null);
+      setUnauthorizedDomainHost(null);
 
       const googleProfile = await signInWithGoogleAccount();
       const result = await loginWithGoogle({
@@ -142,13 +147,24 @@ export const LoginPage: React.FC = () => {
         navigate(from, { replace: true });
       }
     } catch (err: any) {
-      const code = err?.code || '';
-      const msg = err?.message || 'Google Sign-In could not be completed.';
+      const code = String(err?.code || '');
+      const msg = String(err?.message || 'Google Sign-In could not be completed.');
       if (
         code === 'auth/popup-closed-by-user' ||
-        code === 'auth/cancelled-popup-request' ||
-        msg.toLowerCase().includes('popup')
+        code === 'auth/cancelled-popup-request'
       ) {
+        return;
+      }
+      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'multi-tenant-digital-asset-license.vercel.app';
+        setUnauthorizedDomainHost(host);
+        setServerError(
+          `Add "${host}" to Firebase Authorized Domains in project "${FIREBASE_PROJECT_ID}" to enable the Google OAuth popup on this domain.`
+        );
+        toast.error(
+          `Add "${host}" to Firebase Console → Authentication → Settings → Authorized domains`,
+          'Domain Not Yet Authorized in Firebase'
+        );
         return;
       }
       setServerError(msg);
@@ -337,9 +353,46 @@ export const LoginPage: React.FC = () => {
 
                 {/* Server Error Alert */}
                 {serverError && (
-                  <div className="mb-5 p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 flex items-start gap-2.5 animate-fade-in">
-                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                    <span>{serverError}</span>
+                  <div className="mb-5 p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 space-y-2.5 animate-fade-in">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                      <span>{serverError}</span>
+                    </div>
+                    {unauthorizedDomainHost && (
+                      <div className="pt-2 border-t border-rose-800/50 space-y-2 text-[11px] text-slate-200">
+                        <div className="flex items-center justify-between gap-2 bg-[#030712]/80 px-2.5 py-1.5 rounded-lg border border-white/10">
+                          <code className="font-mono text-indigo-300 truncate">
+                            {unauthorizedDomainHost}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(unauthorizedDomainHost);
+                              toast.success(`Copied ${unauthorizedDomainHost}`, 'Copied');
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-600/30 hover:bg-indigo-600 text-white font-semibold transition-colors shrink-0 cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" />
+                            Copy Domain
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/settings`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-indigo-300 hover:text-white underline font-semibold"
+                          >
+                            1. Open Firebase Authorized Domains
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <span className="text-slate-400">
+                            &rarr; Click <strong>Add domain</strong> &rarr; Paste{' '}
+                            <code className="font-mono text-indigo-300">{unauthorizedDomainHost}</code>
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -55,11 +55,39 @@ export class AiController {
 
   public askCopilot = async (req: Request, res: Response) => {
     try {
-      const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
+      let prompt =
+        typeof req.body?.prompt === 'string'
+          ? req.body.prompt.trim()
+          : typeof req.body?.message === 'string'
+          ? req.body.message.trim()
+          : '';
+
+      let history = Array.isArray(req.body?.history) ? req.body.history : [];
+
+      // Support { messages: [...] } from chat widget
+      if (!prompt && Array.isArray(req.body?.messages) && req.body.messages.length > 0) {
+        const lastUser = [...req.body.messages].reverse().find((m: any) => m.role === 'user');
+        if (lastUser && typeof lastUser.content === 'string') {
+          prompt = lastUser.content.trim();
+        } else if (lastUser && typeof lastUser.text === 'string') {
+          prompt = lastUser.text.trim();
+        }
+
+        if (history.length === 0) {
+          history = req.body.messages
+            .slice(0, -1)
+            .map((m: any) => ({
+              role: m.role === 'model' ? 'model' : 'user',
+              text: typeof m.content === 'string' ? m.content : typeof m.text === 'string' ? m.text : '',
+            }))
+            .filter((m: any) => m.text.trim().length > 0);
+        }
+      }
+
       if (!prompt) {
         throw new BadRequestError('A question prompt is required.');
       }
-      const history = Array.isArray(req.body?.history) ? req.body.history : [];
+
       const model = typeof req.body?.model === 'string' ? req.body.model : undefined;
       const persona = typeof req.body?.persona === 'string' ? req.body.persona : undefined;
       const userId =

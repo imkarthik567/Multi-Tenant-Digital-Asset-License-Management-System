@@ -163,12 +163,13 @@
       "fullName": "Karthikeyan S",
       "roleId": 2,
       "tenantId": "tenant-karthik",
-      "passwordHash": "$2a$12$XlWtiYi51zoib014XNXOLup5ViquXE8g68fOz/k4fBc6UKEpoS5iu",
+      "passwordHash": "$2a$12$oXOWO8bUMq.6P7B0rgQy3.tDluCUuxpp7P6SXae6zg4yLlbdXFQl2",
       "isActive": true,
       "department": "Executive Leadership",
       "createdAt": "2026-01-01T00:00:00.000Z",
-      "updatedAt": "2026-10-28T19:21:40.963Z",
-      "lastLoginAt": "2026-10-28T19:21:40.963Z"
+      "updatedAt": "2026-10-30T06:59:33.879Z",
+      "lastLoginAt": "2026-10-30T06:59:33.879Z",
+      "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocK2zloaU7zk1xhnXBi0LaOm-vcXpJVtbTg_HJBSq5gYQlowMg=s96-c"
     },
     {
       "id": "user-karthik-admin-alt",
@@ -419,6 +420,33 @@
       "website": "https://jetbrains.com",
       "createdAt": "2026-01-12T00:00:00.000Z",
       "updatedAt": "2026-01-12T00:00:00.000Z"
+    },
+    {
+      "id": "vendor-karthik-1",
+      "tenantId": "tenant-karthik",
+      "name": "JetBrains s.r.o.",
+      "contactEmail": "enterprise@jetbrains.com",
+      "websiteUrl": "https://www.jetbrains.com",
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "vendor-karthik-2",
+      "tenantId": "tenant-karthik",
+      "name": "Adobe Systems Inc.",
+      "contactEmail": "enterprise-licensing@adobe.com",
+      "websiteUrl": "https://www.adobe.com",
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "vendor-karthik-3",
+      "tenantId": "tenant-karthik",
+      "name": "Figma Inc.",
+      "contactEmail": "sales@figma.com",
+      "websiteUrl": "https://www.figma.com",
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
     }
   ],
   "categories": [
@@ -448,6 +476,24 @@
       "parentId": "cat-2",
       "createdAt": "2026-01-15T00:00:00.000Z",
       "updatedAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "cat-karthik-1",
+      "tenantId": "tenant-karthik",
+      "name": "Engineering & IDEs",
+      "description": "Enterprise development environments, cloud SDKs, and build tools",
+      "parentId": null,
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "cat-karthik-2",
+      "tenantId": "tenant-karthik",
+      "name": "Product Design & Creative",
+      "description": "Collaborative UI/UX design systems and digital media suites",
+      "parentId": null,
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
     }
   ],
   "tags": [
@@ -474,6 +520,22 @@
       "color": "#EC4899",
       "createdAt": "2026-01-15T00:00:00.000Z",
       "updatedAt": "2026-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "tag-karthik-1",
+      "tenantId": "tenant-karthik",
+      "name": "Core Engineering",
+      "color": "#3B82F6",
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "tag-karthik-2",
+      "tenantId": "tenant-karthik",
+      "name": "Design System",
+      "color": "#10B981",
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
     }
   ],
   "assets": [
@@ -550,6 +612,48 @@
       "description": "InnovateLabs engineering IDE asset.",
       "createdAt": "2026-01-12T00:00:00.000Z",
       "updatedAt": "2026-01-12T00:00:00.000Z"
+    },
+    {
+      "id": "asset-karthik-1",
+      "tenantId": "tenant-karthik",
+      "name": "IntelliJ IDEA Ultimate Enterprise",
+      "code": "AST-KEW-001",
+      "type": "SOFTWARE",
+      "status": "ACTIVE",
+      "categoryId": "cat-karthik-1",
+      "ownerId": "user-karthik-admin",
+      "vendorId": "vendor-karthik-1",
+      "description": "Enterprise Java, TypeScript, and Cloud-Native IDE suite for Karthik Enterprise Workspace.",
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "asset-karthik-2",
+      "tenantId": "tenant-karthik",
+      "name": "Adobe Creative Cloud Enterprise",
+      "code": "AST-KEW-002",
+      "type": "SOFTWARE",
+      "status": "ACTIVE",
+      "categoryId": "cat-karthik-2",
+      "ownerId": "user-karthik-admin",
+      "vendorId": "vendor-karthik-2",
+      "description": "Complete creative cloud suite for digital asset production and brand engineering.",
+      "createdAt": "2026-01-06T00:00:00.000Z",
+      "updatedAt": "2026-01-06T00:00:00.000Z"
+    },
+    {
+      "id": "asset-karthik-3",
+      "tenantId": "tenant-karthik",
+      "name": "Figma Enterprise Organization",
+      "code": "AST-KEW-003",
+      "type": "SOFTWARE",
+      "status": "ACTIVE",
+      "categoryId": "cat-karthik-2",
+      "ownerId": "user-karthik-admin",
+      "vendorId": "vendor-karthik-3",
+      "description": "Collaborative design system and interactive prototyping workspace.",
+      "createdAt": "2026-01-07T00:00:00.000Z",
+      "updatedAt": "2026-01-07T00:00:00.000Z"
     }
   ],
   "assetVersions": [
@@ -715,20 +819,72 @@
       "expiresAt": "2027-04-26T16:59:46.521Z",
       "createdAt": "2026-01-12T00:00:00.000Z",
       "updatedAt": "2026-01-12T00:00:00.000Z"
+    },
+    {
+      "id": "lic-karthik-1",
+      "tenantId": "tenant-karthik",
+      "assetId": "asset-karthik-1",
+      "vendorId": "vendor-karthik-1",
+      "licenseTypeId": 3,
+      "name": "IntelliJ IDEA Ultimate Enterprise",
+      "licenseKey": "JB-INTEL-2026-KEW-88101",
+      "type": "SEAT_BASED",
+      "status": "ACTIVE",
+      "totalSeats": 35,
+      "allocatedSeats": 2,
+      "cost": 699,
+      "currency": "USD",
+      "autoRenew": true,
+      "startDate": "2026-01-05T00:00:00.000Z",
+      "endDate": "2027-04-28T03:43:24.461Z",
+      "expiresAt": "2027-04-28T03:43:24.461Z",
+      "createdAt": "2026-01-05T00:00:00.000Z",
+      "updatedAt": "2026-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "lic-karthik-2",
+      "tenantId": "tenant-karthik",
+      "assetId": "asset-karthik-2",
+      "vendorId": "vendor-karthik-2",
+      "licenseTypeId": 3,
+      "name": "Adobe Creative Cloud Enterprise",
+      "licenseKey": "ADBE-CC-ENT-KEW-2026-402",
+      "type": "SEAT_BASED",
+      "status": "ACTIVE",
+      "totalSeats": 25,
+      "allocatedSeats": 1,
+      "cost": 899,
+      "currency": "USD",
+      "autoRenew": true,
+      "startDate": "2026-01-06T00:00:00.000Z",
+      "endDate": "2026-11-13T03:43:24.461Z",
+      "expiresAt": "2026-11-13T03:43:24.461Z",
+      "createdAt": "2026-01-06T00:00:00.000Z",
+      "updatedAt": "2026-01-06T00:00:00.000Z"
+    },
+    {
+      "id": "lic-karthik-3",
+      "tenantId": "tenant-karthik",
+      "assetId": "asset-karthik-3",
+      "vendorId": "vendor-karthik-3",
+      "licenseTypeId": 3,
+      "name": "Figma Enterprise Organization",
+      "licenseKey": "FIGMA-ENT-KEW-2026-715",
+      "type": "SEAT_BASED",
+      "status": "ACTIVE",
+      "totalSeats": 30,
+      "allocatedSeats": 1,
+      "cost": 750,
+      "currency": "USD",
+      "autoRenew": true,
+      "startDate": "2026-01-07T00:00:00.000Z",
+      "endDate": "2026-12-14T03:43:24.461Z",
+      "expiresAt": "2026-12-14T03:43:24.461Z",
+      "createdAt": "2026-01-07T00:00:00.000Z",
+      "updatedAt": "2026-01-07T00:00:00.000Z"
     }
   ],
   "allocations": [
-    {
-      "id": "f7b6d177-f925-48ca-95dc-3a72d3f834e6",
-      "tenantId": "tenant-acme-corp",
-      "licenseId": "lic-4",
-      "userId": "user-karthik-admin-alt",
-      "allocatedBy": "user-karthik-admin",
-      "status": "ACTIVE",
-      "allocatedAt": "2026-10-29T04:23:04.167Z",
-      "revokedAt": null,
-      "notes": "Allocated via sp_allocate_license_seat"
-    },
     {
       "id": "alloc-1",
       "tenantId": "tenant-acme-corp",
@@ -773,6 +929,53 @@
       "status": "ACTIVE",
       "allocatedAt": "2026-02-10T00:00:00.000Z",
       "notes": "UI/UX Design Seat"
+    },
+    {
+      "id": "alloc-karthik-1",
+      "tenantId": "tenant-karthik",
+      "licenseId": "lic-karthik-1",
+      "userId": "user-karthik-admin",
+      "status": "ACTIVE",
+      "allocatedAt": "2026-01-10T00:00:00.000Z",
+      "notes": "Executive Principal Architect IDE Seat"
+    },
+    {
+      "id": "alloc-karthik-2",
+      "tenantId": "tenant-karthik",
+      "licenseId": "lic-karthik-1",
+      "userId": "user-karthik-admin-alt",
+      "status": "ACTIVE",
+      "allocatedAt": "2026-01-12T00:00:00.000Z",
+      "notes": "Core Engineering Lead Seat"
+    },
+    {
+      "id": "alloc-karthik-3",
+      "tenantId": "tenant-karthik",
+      "licenseId": "lic-karthik-2",
+      "userId": "user-karthik-admin-alt",
+      "status": "ACTIVE",
+      "allocatedAt": "2026-01-15T00:00:00.000Z",
+      "notes": "Creative Cloud Enterprise Design Seat"
+    },
+    {
+      "id": "alloc-karthik-4",
+      "tenantId": "tenant-karthik",
+      "licenseId": "lic-karthik-3",
+      "userId": "user-karthik-admin",
+      "status": "ACTIVE",
+      "allocatedAt": "2026-01-18T00:00:00.000Z",
+      "notes": "Figma Organization Admin & Design System Seat"
+    },
+    {
+      "id": "f7b6d177-f925-48ca-95dc-3a72d3f834e6",
+      "tenantId": "tenant-acme-corp",
+      "licenseId": "lic-4",
+      "userId": "user-karthik-admin-alt",
+      "allocatedBy": "user-karthik-admin",
+      "status": "ACTIVE",
+      "allocatedAt": "2026-10-29T04:23:04.167Z",
+      "revokedAt": null,
+      "notes": "Allocated via sp_allocate_license_seat"
     }
   ],
   "notifications": [
@@ -909,6 +1112,139 @@
       "bodyText": "Hello Acme Team Member,\n\nAn active software license seat for \"IntelliJ IDEA Ultimate Enterprise\" (JetBrains) has been allocated to your organization account (member@acme.com) in Acme Corporation.\n\nLicense Status: ACTIVE\nContract End Date: 2027-04-26\nNotes: Fullstack Core Dev seat",
       "status": "SENT",
       "sentAt": "2026-10-28T16:14:46.522Z"
+    },
+    {
+      "id": "email-aba1d81d-16fc-47f8-9eff-2f7105fe800b",
+      "tenantId": "tenant-karthik",
+      "tenantName": "Karthik Enterprise Workspace",
+      "recipientUserId": "user-karthik-admin-alt",
+      "recipientEmail": "karthiksmrk7377@gmail.com",
+      "recipientName": "Karthikeyan S",
+      "recipientRole": "TENANT_ADMIN",
+      "licenseId": "lic-karthik-2",
+      "licenseName": "Adobe Creative Cloud Enterprise",
+      "eventType": "EXPIRY_15",
+      "subject": "[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise",
+      "bodyText": "Hello Karthikeyan S,\n\nThis is an automated alert from your organization workspace Karthik Enterprise Workspace.\n\n[WARNING (15 DAYS)] Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 14 Days\nOrganization: Karthik Enterprise Workspace\nRecipient Role: Organization Administrator (TENANT_ADMIN)\nLicense: Adobe Creative Cloud Enterprise\nContract End Date: 2026-11-13\nRemaining: 14 days\n\nPlease visit http://localhost:5173/licenses to review or renew this license.",
+      "bodyHtml": "\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise</title>\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;\">\n    <div style=\"background-color: #0f172a; padding: 20px 24px;\">\n      <h2 style=\"color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;\">\n        AssetVault <span style=\"font-size: 14px; font-weight: 400; color: #94a3b8;\">| Automated Organization Alert</span>\n      </h2>\n    </div>\n    <div style=\"padding: 24px;\">\n      <div style=\"display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #ffffff; background-color: #f59e0b; margin-bottom: 16px;\">\n        WARNING (15 DAYS)\n      </div>\n      <h3 style=\"margin-top: 0; margin-bottom: 8px; font-size: 18px; color: #0f172a;\">Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 14 Days</h3>\n      <p style=\"margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Hello <strong>Karthikeyan S</strong>, this is an automated notification sent to your organization email account (<strong>karthiksmrk7377@gmail.com</strong>) for workspace <strong>Karthik Enterprise Workspace</strong>.\n      </p>\n\n      <div style=\"background-color: #f1f5f9; border-radius: 6px; padding: 16px; margin-bottom: 24px;\">\n        <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Organization:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Karthik Enterprise Workspace</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Recipient Role:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Organization Administrator (TENANT_ADMIN)</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Software License:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Adobe Creative Cloud Enterprise</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Contract End Date:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">2026-11-13</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Time Remaining:</td>\n            <td style=\"padding: 6px 0; font-weight: 700; color: #f59e0b;\">14 days</td>\n          </tr>\n        </table>\n      </div>\n\n      <p style=\"margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Please review covering licenses or trigger a contract renewal in AssetVault to prevent assigned member seats and covered digital assets from lapsing.\n      </p>\n\n      <a href=\"http://localhost:5173/licenses\" style=\"display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 6px;\">\n        View License in AssetVault &rarr;\n      </a>\n    </div>\n    <div style=\"background-color: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;\">\n      Automated organization email dispatched by AssetVault.\n    </div>\n  </div>\n</body>\n</html>\n",
+      "status": "SENT",
+      "deliveryChannel": "SANDBOX",
+      "realGmailSent": false,
+      "sentAt": "2026-10-30T03:44:05.351Z"
+    },
+    {
+      "id": "email-1dc005f1-4d5c-4052-9b2e-8bff8f7cd3e7",
+      "tenantId": "tenant-karthik",
+      "tenantName": "Karthik Enterprise Workspace",
+      "recipientUserId": "user-karthik-admin",
+      "recipientEmail": "karthikeyan.s050607@gmail.com",
+      "recipientName": "Karthikeyan S",
+      "recipientRole": "TENANT_ADMIN",
+      "licenseId": "lic-karthik-2",
+      "licenseName": "Adobe Creative Cloud Enterprise",
+      "eventType": "EXPIRY_15",
+      "subject": "[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise",
+      "bodyText": "Hello Karthikeyan S,\n\nThis is an automated alert from your organization workspace Karthik Enterprise Workspace.\n\n[WARNING (15 DAYS)] Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 14 Days\nOrganization: Karthik Enterprise Workspace\nRecipient Role: Organization Administrator (TENANT_ADMIN)\nLicense: Adobe Creative Cloud Enterprise\nContract End Date: 2026-11-13\nRemaining: 14 days\n\nPlease visit http://localhost:5173/licenses to review or renew this license.",
+      "bodyHtml": "\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise</title>\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;\">\n    <div style=\"background-color: #0f172a; padding: 20px 24px;\">\n      <h2 style=\"color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;\">\n        AssetVault <span style=\"font-size: 14px; font-weight: 400; color: #94a3b8;\">| Automated Organization Alert</span>\n      </h2>\n    </div>\n    <div style=\"padding: 24px;\">\n      <div style=\"display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #ffffff; background-color: #f59e0b; margin-bottom: 16px;\">\n        WARNING (15 DAYS)\n      </div>\n      <h3 style=\"margin-top: 0; margin-bottom: 8px; font-size: 18px; color: #0f172a;\">Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 14 Days</h3>\n      <p style=\"margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Hello <strong>Karthikeyan S</strong>, this is an automated notification sent to your organization email account (<strong>karthikeyan.s050607@gmail.com</strong>) for workspace <strong>Karthik Enterprise Workspace</strong>.\n      </p>\n\n      <div style=\"background-color: #f1f5f9; border-radius: 6px; padding: 16px; margin-bottom: 24px;\">\n        <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Organization:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Karthik Enterprise Workspace</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Recipient Role:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Organization Administrator (TENANT_ADMIN)</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Software License:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Adobe Creative Cloud Enterprise</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Contract End Date:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">2026-11-13</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Time Remaining:</td>\n            <td style=\"padding: 6px 0; font-weight: 700; color: #f59e0b;\">14 days</td>\n          </tr>\n        </table>\n      </div>\n\n      <p style=\"margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Please review covering licenses or trigger a contract renewal in AssetVault to prevent assigned member seats and covered digital assets from lapsing.\n      </p>\n\n      <a href=\"http://localhost:5173/licenses\" style=\"display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 6px;\">\n        View License in AssetVault &rarr;\n      </a>\n    </div>\n    <div style=\"background-color: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;\">\n      Automated organization email dispatched by AssetVault.\n    </div>\n  </div>\n</body>\n</html>\n",
+      "status": "SENT",
+      "deliveryChannel": "SANDBOX",
+      "realGmailSent": false,
+      "sentAt": "2026-10-30T03:44:00.300Z"
+    },
+    {
+      "id": "email-351d6c9b-a65b-4150-b3b7-7cdefaec30c1",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-asset-manager",
+      "recipientEmail": "manager@acme.com",
+      "recipientName": "Acme Asset Manager",
+      "recipientRole": "ASSET_MANAGER",
+      "licenseId": "lic-4",
+      "licenseName": "Figma Enterprise Organization",
+      "eventType": "EXPIRY_30",
+      "subject": "[AssetVault] NOTICE (30 DAYS): Figma Enterprise Organization",
+      "bodyText": "Hello Acme Asset Manager,\n\nThis is an automated alert from your organization workspace Acme Corporation.\n\n[NOTICE (30 DAYS)] License \"Figma Enterprise Organization\" Expires in 24 Days\nOrganization: Acme Corporation\nRecipient Role: Organization Administrator (ASSET_MANAGER)\nLicense: Figma Enterprise Organization\nContract End Date: 2026-11-22\nRemaining: 24 days\n\nPlease visit http://localhost:5173/licenses to review or renew this license.",
+      "bodyHtml": "\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>[AssetVault] NOTICE (30 DAYS): Figma Enterprise Organization</title>\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;\">\n    <div style=\"background-color: #0f172a; padding: 20px 24px;\">\n      <h2 style=\"color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;\">\n        AssetVault <span style=\"font-size: 14px; font-weight: 400; color: #94a3b8;\">| Automated Organization Alert</span>\n      </h2>\n    </div>\n    <div style=\"padding: 24px;\">\n      <div style=\"display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #ffffff; background-color: #3b82f6; margin-bottom: 16px;\">\n        NOTICE (30 DAYS)\n      </div>\n      <h3 style=\"margin-top: 0; margin-bottom: 8px; font-size: 18px; color: #0f172a;\">License \"Figma Enterprise Organization\" Expires in 24 Days</h3>\n      <p style=\"margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Hello <strong>Acme Asset Manager</strong>, this is an automated notification sent to your organization email account (<strong>manager@acme.com</strong>) for workspace <strong>Acme Corporation</strong>.\n      </p>\n\n      <div style=\"background-color: #f1f5f9; border-radius: 6px; padding: 16px; margin-bottom: 24px;\">\n        <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Organization:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Acme Corporation</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Recipient Role:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Organization Administrator (ASSET_MANAGER)</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Software License:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Figma Enterprise Organization</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Contract End Date:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">2026-11-22</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Time Remaining:</td>\n            <td style=\"padding: 6px 0; font-weight: 700; color: #3b82f6;\">24 days</td>\n          </tr>\n        </table>\n      </div>\n\n      <p style=\"margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Please review covering licenses or trigger a contract renewal in AssetVault to prevent assigned member seats and covered digital assets from lapsing.\n      </p>\n\n      <a href=\"http://localhost:5173/licenses\" style=\"display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 6px;\">\n        View License in AssetVault &rarr;\n      </a>\n    </div>\n    <div style=\"background-color: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;\">\n      Automated organization email dispatched by AssetVault.\n    </div>\n  </div>\n</body>\n</html>\n",
+      "status": "SENT",
+      "deliveryChannel": "SANDBOX",
+      "realGmailSent": false,
+      "sentAt": "2026-10-30T03:43:55.498Z"
+    },
+    {
+      "id": "email-5bf822ef-1ec5-4fc7-8083-f3b0a22fabf4",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-tenant-admin",
+      "recipientEmail": "admin@acme.com",
+      "recipientName": "Acme Administrator",
+      "recipientRole": "TENANT_ADMIN",
+      "licenseId": "lic-4",
+      "licenseName": "Figma Enterprise Organization",
+      "eventType": "EXPIRY_30",
+      "subject": "[AssetVault] NOTICE (30 DAYS): Figma Enterprise Organization",
+      "bodyText": "Hello Acme Administrator,\n\nThis is an automated alert from your organization workspace Acme Corporation.\n\n[NOTICE (30 DAYS)] License \"Figma Enterprise Organization\" Expires in 24 Days\nOrganization: Acme Corporation\nRecipient Role: Organization Administrator (TENANT_ADMIN)\nLicense: Figma Enterprise Organization\nContract End Date: 2026-11-22\nRemaining: 24 days\n\nPlease visit http://localhost:5173/licenses to review or renew this license.",
+      "bodyHtml": "\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>[AssetVault] NOTICE (30 DAYS): Figma Enterprise Organization</title>\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;\">\n    <div style=\"background-color: #0f172a; padding: 20px 24px;\">\n      <h2 style=\"color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;\">\n        AssetVault <span style=\"font-size: 14px; font-weight: 400; color: #94a3b8;\">| Automated Organization Alert</span>\n      </h2>\n    </div>\n    <div style=\"padding: 24px;\">\n      <div style=\"display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #ffffff; background-color: #3b82f6; margin-bottom: 16px;\">\n        NOTICE (30 DAYS)\n      </div>\n      <h3 style=\"margin-top: 0; margin-bottom: 8px; font-size: 18px; color: #0f172a;\">License \"Figma Enterprise Organization\" Expires in 24 Days</h3>\n      <p style=\"margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Hello <strong>Acme Administrator</strong>, this is an automated notification sent to your organization email account (<strong>admin@acme.com</strong>) for workspace <strong>Acme Corporation</strong>.\n      </p>\n\n      <div style=\"background-color: #f1f5f9; border-radius: 6px; padding: 16px; margin-bottom: 24px;\">\n        <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Organization:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Acme Corporation</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Recipient Role:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Organization Administrator (TENANT_ADMIN)</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Software License:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Figma Enterprise Organization</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Contract End Date:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">2026-11-22</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Time Remaining:</td>\n            <td style=\"padding: 6px 0; font-weight: 700; color: #3b82f6;\">24 days</td>\n          </tr>\n        </table>\n      </div>\n\n      <p style=\"margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Please review covering licenses or trigger a contract renewal in AssetVault to prevent assigned member seats and covered digital assets from lapsing.\n      </p>\n\n      <a href=\"http://localhost:5173/licenses\" style=\"display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 6px;\">\n        View License in AssetVault &rarr;\n      </a>\n    </div>\n    <div style=\"background-color: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;\">\n      Automated organization email dispatched by AssetVault.\n    </div>\n  </div>\n</body>\n</html>\n",
+      "status": "SENT",
+      "deliveryChannel": "SANDBOX",
+      "realGmailSent": false,
+      "sentAt": "2026-10-30T03:43:50.778Z"
+    },
+    {
+      "id": "email-180eaa15-beff-4347-93c3-27ff0b9a0792",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-member",
+      "recipientEmail": "member@acme.com",
+      "recipientName": "Acme Team Member",
+      "recipientRole": "MEMBER",
+      "licenseId": "lic-3",
+      "licenseName": "Adobe Creative Cloud Enterprise",
+      "eventType": "EXPIRY_15",
+      "subject": "[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise",
+      "bodyText": "Hello Acme Team Member,\n\nThis is an automated alert from your organization workspace Acme Corporation.\n\n[WARNING (15 DAYS)] Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 13 Days\nOrganization: Acme Corporation\nRecipient Role: Assigned Seat Holder (MEMBER)\nLicense: Adobe Creative Cloud Enterprise\nContract End Date: 2026-11-11\nRemaining: 13 days\n\nPlease visit http://localhost:5173/licenses to review or renew this license.",
+      "bodyHtml": "\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise</title>\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;\">\n    <div style=\"background-color: #0f172a; padding: 20px 24px;\">\n      <h2 style=\"color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;\">\n        AssetVault <span style=\"font-size: 14px; font-weight: 400; color: #94a3b8;\">| Automated Organization Alert</span>\n      </h2>\n    </div>\n    <div style=\"padding: 24px;\">\n      <div style=\"display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #ffffff; background-color: #f59e0b; margin-bottom: 16px;\">\n        WARNING (15 DAYS)\n      </div>\n      <h3 style=\"margin-top: 0; margin-bottom: 8px; font-size: 18px; color: #0f172a;\">Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 13 Days</h3>\n      <p style=\"margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Hello <strong>Acme Team Member</strong>, this is an automated notification sent to your organization email account (<strong>member@acme.com</strong>) for workspace <strong>Acme Corporation</strong>.\n      </p>\n\n      <div style=\"background-color: #f1f5f9; border-radius: 6px; padding: 16px; margin-bottom: 24px;\">\n        <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Organization:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Acme Corporation</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Recipient Role:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Assigned Seat Holder (MEMBER)</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Software License:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Adobe Creative Cloud Enterprise</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Contract End Date:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">2026-11-11</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Time Remaining:</td>\n            <td style=\"padding: 6px 0; font-weight: 700; color: #f59e0b;\">13 days</td>\n          </tr>\n        </table>\n      </div>\n\n      <p style=\"margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Your assigned license seat is approaching its contract end date. Organization administrators have also been notified to renew coverage.\n      </p>\n\n      <a href=\"http://localhost:5173/licenses\" style=\"display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 6px;\">\n        View License in AssetVault &rarr;\n      </a>\n    </div>\n    <div style=\"background-color: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;\">\n      Automated organization email dispatched by AssetVault.\n    </div>\n  </div>\n</body>\n</html>\n",
+      "status": "SENT",
+      "deliveryChannel": "SANDBOX",
+      "realGmailSent": false,
+      "sentAt": "2026-10-30T03:43:45.716Z"
+    },
+    {
+      "id": "email-49cbcfe4-0a95-42d1-8013-c13e9ba58176",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-asset-manager",
+      "recipientEmail": "manager@acme.com",
+      "recipientName": "Acme Asset Manager",
+      "recipientRole": "ASSET_MANAGER",
+      "licenseId": "lic-3",
+      "licenseName": "Adobe Creative Cloud Enterprise",
+      "eventType": "EXPIRY_15",
+      "subject": "[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise",
+      "bodyText": "Hello Acme Asset Manager,\n\nThis is an automated alert from your organization workspace Acme Corporation.\n\n[WARNING (15 DAYS)] Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 13 Days\nOrganization: Acme Corporation\nRecipient Role: Organization Administrator (ASSET_MANAGER)\nLicense: Adobe Creative Cloud Enterprise\nContract End Date: 2026-11-11\nRemaining: 13 days\n\nPlease visit http://localhost:5173/licenses to review or renew this license.",
+      "bodyHtml": "\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise</title>\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;\">\n    <div style=\"background-color: #0f172a; padding: 20px 24px;\">\n      <h2 style=\"color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;\">\n        AssetVault <span style=\"font-size: 14px; font-weight: 400; color: #94a3b8;\">| Automated Organization Alert</span>\n      </h2>\n    </div>\n    <div style=\"padding: 24px;\">\n      <div style=\"display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #ffffff; background-color: #f59e0b; margin-bottom: 16px;\">\n        WARNING (15 DAYS)\n      </div>\n      <h3 style=\"margin-top: 0; margin-bottom: 8px; font-size: 18px; color: #0f172a;\">Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 13 Days</h3>\n      <p style=\"margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Hello <strong>Acme Asset Manager</strong>, this is an automated notification sent to your organization email account (<strong>manager@acme.com</strong>) for workspace <strong>Acme Corporation</strong>.\n      </p>\n\n      <div style=\"background-color: #f1f5f9; border-radius: 6px; padding: 16px; margin-bottom: 24px;\">\n        <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Organization:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Acme Corporation</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Recipient Role:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Organization Administrator (ASSET_MANAGER)</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Software License:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Adobe Creative Cloud Enterprise</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Contract End Date:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">2026-11-11</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Time Remaining:</td>\n            <td style=\"padding: 6px 0; font-weight: 700; color: #f59e0b;\">13 days</td>\n          </tr>\n        </table>\n      </div>\n\n      <p style=\"margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Please review covering licenses or trigger a contract renewal in AssetVault to prevent assigned member seats and covered digital assets from lapsing.\n      </p>\n\n      <a href=\"http://localhost:5173/licenses\" style=\"display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 6px;\">\n        View License in AssetVault &rarr;\n      </a>\n    </div>\n    <div style=\"background-color: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;\">\n      Automated organization email dispatched by AssetVault.\n    </div>\n  </div>\n</body>\n</html>\n",
+      "status": "SENT",
+      "deliveryChannel": "SANDBOX",
+      "realGmailSent": false,
+      "sentAt": "2026-10-30T03:43:40.633Z"
+    },
+    {
+      "id": "email-47e9cfbf-23c4-49c5-8eec-7dce59e02ab9",
+      "tenantId": "tenant-acme-corp",
+      "tenantName": "Acme Corporation",
+      "recipientUserId": "user-tenant-admin",
+      "recipientEmail": "admin@acme.com",
+      "recipientName": "Acme Administrator",
+      "recipientRole": "TENANT_ADMIN",
+      "licenseId": "lic-3",
+      "licenseName": "Adobe Creative Cloud Enterprise",
+      "eventType": "EXPIRY_15",
+      "subject": "[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise",
+      "bodyText": "Hello Acme Administrator,\n\nThis is an automated alert from your organization workspace Acme Corporation.\n\n[WARNING (15 DAYS)] Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 13 Days\nOrganization: Acme Corporation\nRecipient Role: Organization Administrator (TENANT_ADMIN)\nLicense: Adobe Creative Cloud Enterprise\nContract End Date: 2026-11-11\nRemaining: 13 days\n\nPlease visit http://localhost:5173/licenses to review or renew this license.",
+      "bodyHtml": "\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise</title>\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;\">\n    <div style=\"background-color: #0f172a; padding: 20px 24px;\">\n      <h2 style=\"color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;\">\n        AssetVault <span style=\"font-size: 14px; font-weight: 400; color: #94a3b8;\">| Automated Organization Alert</span>\n      </h2>\n    </div>\n    <div style=\"padding: 24px;\">\n      <div style=\"display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #ffffff; background-color: #f59e0b; margin-bottom: 16px;\">\n        WARNING (15 DAYS)\n      </div>\n      <h3 style=\"margin-top: 0; margin-bottom: 8px; font-size: 18px; color: #0f172a;\">Action Required: License \"Adobe Creative Cloud Enterprise\" Expires in 13 Days</h3>\n      <p style=\"margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Hello <strong>Acme Administrator</strong>, this is an automated notification sent to your organization email account (<strong>admin@acme.com</strong>) for workspace <strong>Acme Corporation</strong>.\n      </p>\n\n      <div style=\"background-color: #f1f5f9; border-radius: 6px; padding: 16px; margin-bottom: 24px;\">\n        <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Organization:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Acme Corporation</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Recipient Role:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Organization Administrator (TENANT_ADMIN)</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Software License:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">Adobe Creative Cloud Enterprise</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Contract End Date:</td>\n            <td style=\"padding: 6px 0; font-weight: 600; color: #0f172a;\">2026-11-11</td>\n          </tr>\n          <tr>\n            <td style=\"padding: 6px 0; color: #64748b;\">Time Remaining:</td>\n            <td style=\"padding: 6px 0; font-weight: 700; color: #f59e0b;\">13 days</td>\n          </tr>\n        </table>\n      </div>\n\n      <p style=\"margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.5;\">\n        Please review covering licenses or trigger a contract renewal in AssetVault to prevent assigned member seats and covered digital assets from lapsing.\n      </p>\n\n      <a href=\"http://localhost:5173/licenses\" style=\"display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 6px;\">\n        View License in AssetVault &rarr;\n      </a>\n    </div>\n    <div style=\"background-color: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;\">\n      Automated organization email dispatched by AssetVault.\n    </div>\n  </div>\n</body>\n</html>\n",
+      "status": "SENT",
+      "deliveryChannel": "SANDBOX",
+      "realGmailSent": false,
+      "sentAt": "2026-10-30T03:43:35.538Z"
     },
     {
       "id": "email-9ae221d6-18b7-4e03-996d-3f69cbd8d022",
@@ -1083,6 +1419,28 @@
       "expiresAt": "2026-11-05T04:37:09.982Z",
       "userAgent": "node",
       "ipAddress": "::ffff:127.0.0.1"
+    },
+    {
+      "id": "50a9066f-18a0-45bc-b03c-78781ba8ecc0",
+      "createdAt": "2026-10-30T06:45:41.864Z",
+      "updatedAt": "2026-10-30T06:45:41.864Z",
+      "revokedAt": null,
+      "userId": "user-karthik-admin",
+      "tokenHash": "b327ba4602c03cf44e3dbd1cbc78015967c1596d3bb54c35b92a90139891e465",
+      "expiresAt": "2026-11-06T06:45:41.863Z",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "ipAddress": "169.254.169.126"
+    },
+    {
+      "id": "62180aa5-9d84-4f9f-b7bd-9fd5462af148",
+      "createdAt": "2026-10-30T06:59:33.878Z",
+      "updatedAt": "2026-10-30T06:59:33.878Z",
+      "revokedAt": null,
+      "userId": "user-karthik-admin",
+      "tokenHash": "9f387b032eebe82366ef0a05a3052f54de87c00c9374104ded2449aca395cedc",
+      "expiresAt": "2026-11-06T06:59:33.878Z",
+      "userAgent": "curl/7.88.1",
+      "ipAddress": "127.0.0.1"
     }
   ],
   "assetTags": [],

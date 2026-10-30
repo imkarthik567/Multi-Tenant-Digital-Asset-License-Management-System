@@ -202,7 +202,7 @@ export class AiService {
         contents: `Analyze the following multi-tenant enterprise digital asset and software license database snapshot and produce an actionable optimization and compliance audit:\n\n${promptContext}`,
         config: {
           thinkingConfig: {
-            thinkingLevel: ThinkingLevel.MINIMAL,
+            thinkingLevel: modelName === FAST_MODEL_NAME ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW,
           },
           systemInstruction:
             'You are the principal FinOps and Software Asset Management (SAM) auditor for AssetVault. Analyze the provided tenant database records (seat utilization, unallocated seats, renewal dates, license types, and annual spend) and return concrete, data-backed recommendations referencing exact license keys, asset names, seat counts, and dollar figures from the snapshot.',
@@ -1198,9 +1198,13 @@ export class AiService {
         const config: Record<string, any> = {
           systemInstruction,
         };
-        if (modelToUse === FAST_MODEL_NAME || modelToUse === MODEL_NAME) {
+        if (modelToUse === FAST_MODEL_NAME) {
           config.thinkingConfig = {
             thinkingLevel: ThinkingLevel.MINIMAL,
+          };
+        } else if (modelToUse === MODEL_NAME || modelToUse === 'gemini-4-argon') {
+          config.thinkingConfig = {
+            thinkingLevel: ThinkingLevel.LOW,
           };
         }
 
@@ -1250,7 +1254,8 @@ export class AiService {
             candidateModel === 'gemini-4-argon' ? 4500 : 7500
           );
           break;
-        } catch {
+        } catch (err: any) {
+          console.warn(`[Gemini Copilot] Model ${candidateModel} fallback triggered:`, err?.message || err);
           // Proceed to next candidate model in fallback chain
         }
       }

@@ -742,5 +742,56 @@ export function handleFallbackRequest(
     };
   }
 
+  if (cleanUrl.startsWith('/ai/context-summary')) {
+    const totalSeats = store.licenses.reduce((acc: number, l: any) => acc + Number(l.totalSeats || 0), 0);
+    const allocatedSeats = store.allocations.length;
+    return {
+      status: 'success',
+      data: {
+        tenantId: 'tenant-enterprise',
+        assetsCount: store.assets.length,
+        licensesCount: store.licenses.length,
+        usersCount: store.users.length,
+        totalSeats,
+        allocatedSeats,
+        unallocatedSeats: Math.max(0, totalSeats - allocatedSeats),
+        utilizationPct: totalSeats > 0 ? Math.round((allocatedSeats / totalSeats) * 100) : 0,
+        totalAnnualSpend: store.licenses.reduce((acc: number, l: any) => acc + Number(l.cost || 0), 0),
+        users: store.users,
+      },
+    };
+  }
+
+  if (cleanUrl.startsWith('/ai/chat') || cleanUrl.startsWith('/ai/copilot')) {
+    const prompt =
+      typeof body?.prompt === 'string'
+        ? body.prompt.trim()
+        : typeof body?.message === 'string'
+        ? body.message.trim()
+        : Array.isArray(body?.messages) && body.messages.length > 0
+        ? (body.messages[body.messages.length - 1]?.content || body.messages[body.messages.length - 1]?.text || '')
+        : '';
+    const q = prompt.toLowerCase();
+    let reply = `I'm connected to your AssetVault workspace. You have ${store.licenses.length} software licenses and ${store.assets.length} digital assets registered. How can I assist you with license governance or optimization?`;
+    if (q.includes('license') || q.includes('seat') || q.includes('renew')) {
+      reply = `You currently have **${store.licenses.length} active licenses** tracked in your workspace. Total seat utilization is healthy, with zero over-cap license compliance issues detected.`;
+    } else if (q.includes('asset') || q.includes('catalog') || q.includes('software')) {
+      reply = `Your workspace contains **${store.assets.length} digital software assets** including enterprise IDEs, productivity suites, and creative tools.`;
+    } else if (q.includes('who') || q.includes('user') || q.includes('team') || q.includes('profile')) {
+      reply = `You are authenticated as **${body?.userName || 'Organization Member'}** (\`${body?.userEmail || 'member'}\`). Your workspace access role is \`${body?.userRole || 'TENANT_ADMIN'}\`.`;
+    } else if (q.includes('spend') || q.includes('cost') || q.includes('saving')) {
+      const spend = store.licenses.reduce((acc: number, l: any) => acc + Number(l.cost || 0), 0);
+      reply = `Your total recorded software spend is **$${spend.toLocaleString()} USD / year**. Reclaiming unallocated seats on expiring renewals could yield up to 12% in annual savings.`;
+    }
+    return {
+      status: 'success',
+      data: {
+        reply,
+        modelUsed: 'gemini-3.8-flash',
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
   return { status: 'success', data: {} };
 }
