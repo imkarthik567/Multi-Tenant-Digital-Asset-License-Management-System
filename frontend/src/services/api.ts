@@ -11,6 +11,7 @@ import {
   getRosterSyncHeader,
   recordRosterSyncEntry,
   syncServerUsersToFallbackStore,
+  syncAuthenticatedSessionToFallbackStore,
 } from './localFallback';
 import { getCachedGmailToken } from './gmailAuth';
 
@@ -96,6 +97,7 @@ export const setStoredSession = (session: { user: any; tenant: any; permissions:
       const serialized = JSON.stringify(session);
       localStorage.setItem('assetvault_session_cache', serialized);
       sessionStorage.setItem('assetvault_session_cache', serialized);
+      syncAuthenticatedSessionToFallbackStore(session);
     } else {
       localStorage.removeItem('assetvault_session_cache');
       sessionStorage.removeItem('assetvault_session_cache');
@@ -314,8 +316,13 @@ export const api = {
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('GET', url, undefined, configOrParams?.params ?? configOrParams) as T;
       }
+      if (url.includes('/auth/me') && (response.data as any)?.data) {
+        syncAuthenticatedSessionToFallbackStore((response.data as any).data);
+      }
       if (url.startsWith('/users') && Array.isArray((response.data as any)?.data)) {
-        syncServerUsersToFallbackStore((response.data as any).data);
+        const cached = getStoredSession();
+        const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
+        syncServerUsersToFallbackStore((response.data as any).data, activeTenantId);
       }
       return response.data;
     } catch (err) {
@@ -337,8 +344,18 @@ export const api = {
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('POST', url, data) as T;
       }
+      if (
+        (url.includes('/auth/login') ||
+          url.includes('/auth/register-tenant') ||
+          url.includes('/auth/google-sso')) &&
+        (response.data as any)?.data
+      ) {
+        syncAuthenticatedSessionToFallbackStore((response.data as any).data);
+      }
       if (url === '/users' && (response.data as any)?.data?.email) {
         const created = (response.data as any).data;
+        const cached = getStoredSession();
+        const activeTenantId = created.tenantId || cached?.tenant?.id || cached?.user?.tenantId;
         const rName =
           typeof created.role === 'object' && created.role?.name
             ? created.role.name
@@ -349,10 +366,9 @@ export const api = {
           fullName: created.fullName,
           roleName: rName,
           roleId: created.roleId,
-          tenantId: created.tenantId,
+          tenantId: activeTenantId,
           isActive: created.isActive !== false,
         });
-        syncServerUsersToFallbackStore([created], created.tenantId);
       }
       return response.data;
     } catch (err) {

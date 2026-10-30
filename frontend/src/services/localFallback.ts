@@ -5,8 +5,14 @@
 // Preserves full 4xx validation/auth behavior when backend is reachable.
 // ==============================================================================
 
-const STORAGE_KEY = 'assetvault_fallback_store_v1';
-const ROSTER_SYNC_KEY = 'assetvault_roster_sync_v1';
+const STORAGE_KEY = 'assetvault_fallback_store_v2';
+const ROSTER_SYNC_KEY = 'assetvault_roster_sync_v2';
+
+// Clean up legacy v1 keys that could contain merged cross-tenant entries
+try {
+  localStorage.removeItem('assetvault_fallback_store_v1');
+  localStorage.removeItem('assetvault_roster_sync_v1');
+} catch {}
 
 const DEFAULT_PERMISSIONS = [
   'tenants:read_own',
@@ -109,21 +115,43 @@ export interface RosterSyncEntry {
   deleted?: boolean;
 }
 
+function getCurrentSessionTenantId(): string | null {
+  try {
+    const rawSession =
+      localStorage.getItem('assetvault_session_cache') ||
+      sessionStorage.getItem('assetvault_session_cache');
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      return parsed?.tenant?.id || parsed?.user?.tenantId || parsed?.user?.tenant?.id || null;
+    }
+  } catch {}
+  return null;
+}
+
 export function recordRosterSyncEntry(entry: RosterSyncEntry): void {
   try {
     const email = String(entry.email || '').toLowerCase().trim();
     if (!email || !email.includes('@')) return;
+    const tenantId = entry.tenantId || getCurrentSessionTenantId();
+    if (!tenantId) return;
+
     const raw = localStorage.getItem(ROSTER_SYNC_KEY);
     const list: RosterSyncEntry[] = raw ? JSON.parse(raw) : [];
     const filtered = Array.isArray(list)
-      ? list.filter((item) => String(item.email || '').toLowerCase().trim() !== email)
+      ? list.filter(
+          (item) =>
+            !(
+              String(item.email || '').toLowerCase().trim() === email &&
+              item.tenantId === tenantId
+            )
+        )
       : [];
 
     // If promoting to TENANT_ADMIN, demote any previous TENANT_ADMIN in the same tenant in sync list
     if (entry.roleName === 'TENANT_ADMIN' || entry.roleId === 2) {
       for (const existing of filtered) {
         if (
-          (!entry.tenantId || !existing.tenantId || existing.tenantId === entry.tenantId) &&
+          existing.tenantId === tenantId &&
           (existing.roleName === 'TENANT_ADMIN' || existing.roleId === 2)
         ) {
           existing.roleName = 'ASSET_MANAGER';
@@ -132,18 +160,22 @@ export function recordRosterSyncEntry(entry: RosterSyncEntry): void {
       }
     }
 
-    filtered.push({ ...entry, email });
+    filtered.push({ ...entry, email, tenantId });
     localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(filtered.slice(-50)));
   } catch {}
 }
 
 export function getRosterSyncHeader(): string | null {
   try {
+    const activeTenantId = getCurrentSessionTenantId();
+    if (!activeTenantId) return null;
     const raw = localStorage.getItem(ROSTER_SYNC_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return null;
-    return btoa(unescape(encodeURIComponent(JSON.stringify(parsed))));
+    const scopedEntries = parsed.filter((item) => item && item.tenantId === activeTenantId);
+    if (scopedEntries.length === 0) return null;
+    return btoa(unescape(encodeURIComponent(JSON.stringify(scopedEntries))));
   } catch {
     return null;
   }
@@ -197,18 +229,6 @@ function getInitialStore(): FallbackStore {
         fullName: 'Karthikeyan S',
         role: 'TENANT_ADMIN',
         roleId: 2,
-        tenantId: 'tenant-karthik',
-        isActive: true,
-        isSuperAdmin: false,
-        department: 'Executive Leadership',
-        createdAt: now,
-      },
-      {
-        id: 'user-karthik-smrk',
-        email: 'karthiksmrk7377@gmail.com',
-        fullName: 'Karthikeyan S',
-        role: 'ASSET_MANAGER',
-        roleId: 3,
         tenantId: 'tenant-karthik',
         isActive: true,
         isSuperAdmin: false,
@@ -301,9 +321,9 @@ function getInitialStore(): FallbackStore {
         name: 'IntelliJ IDEA Ultimate Enterprise',
         licenseKey: 'JB-IDEA-ENT-2026-9941',
         totalSeats: 25,
-        usedSeats: 8,
-        allocatedSeats: 8,
-        availableSeats: 17,
+        usedSeats: 1,
+        allocatedSeats: 1,
+        availableSeats: 24,
         cost: 2400,
         currency: 'USD',
         status: 'ACTIVE',
@@ -322,9 +342,9 @@ function getInitialStore(): FallbackStore {
         name: 'Adobe Creative Cloud Enterprise',
         licenseKey: 'ADBE-CC-ENT-2026-0812',
         totalSeats: 20,
-        usedSeats: 14,
-        allocatedSeats: 14,
-        availableSeats: 6,
+        usedSeats: 1,
+        allocatedSeats: 1,
+        availableSeats: 19,
         cost: 1850,
         currency: 'USD',
         status: 'ACTIVE',
@@ -337,6 +357,7 @@ function getInitialStore(): FallbackStore {
     allocations: [
       {
         id: 'alloc-1',
+        tenantId: 'tenant-karthik',
         licenseId: 'lic-1',
         userId: 'user-karthik-admin',
         status: 'ACTIVE',
@@ -348,6 +369,7 @@ function getInitialStore(): FallbackStore {
     notifications: [
       {
         id: 'notif-1',
+        tenantId: 'tenant-karthik',
         type: 'EXPIRY_15',
         title: 'Adobe Creative Cloud Enterprise Expires in 14 Days',
         message: 'License "Adobe Creative Cloud Enterprise" is scheduled to expire soon.',
@@ -358,6 +380,7 @@ function getInitialStore(): FallbackStore {
     auditLogs: [
       {
         id: 'audit-1',
+        tenantId: 'tenant-karthik',
         tableName: 'licenses',
         action: 'INSERT',
         recordId: 'lic-1',
@@ -416,7 +439,7 @@ function loadStore(): FallbackStore {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.users)) {
+      if (parsed && Array.isArray(parsed.users) && Array.isArray(parsed.tenants)) {
         enforceSingleAdminInStore(parsed);
         return parsed;
       }
@@ -435,46 +458,217 @@ function saveStore(store: FallbackStore): void {
   } catch {}
 }
 
+function getActiveSessionContext(store: FallbackStore): {
+  activeTenantId: string;
+  activeTenant: any;
+  activeUser: any | null;
+} {
+  let sessionUser: any = null;
+  let sessionTenant: any = null;
+  try {
+    const rawSession =
+      localStorage.getItem('assetvault_session_cache') ||
+      sessionStorage.getItem('assetvault_session_cache');
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      sessionUser = parsed?.user || null;
+      sessionTenant = parsed?.tenant || parsed?.user?.tenant || null;
+    }
+  } catch {}
+
+  const resolvedTenantId =
+    sessionTenant?.id ||
+    sessionUser?.tenantId ||
+    sessionUser?.tenant?.id ||
+    store.tenants[0]?.id ||
+    'tenant-karthik';
+
+  let storeModified = false;
+  let tenantInStore = store.tenants.find((t) => t.id === resolvedTenantId);
+  if (!tenantInStore && sessionTenant && sessionTenant.id) {
+    tenantInStore = {
+      id: sessionTenant.id,
+      name: sessionTenant.name || 'Organization Workspace',
+      slug: sessionTenant.slug || `org-${sessionTenant.id}`,
+      contactEmail: sessionTenant.contactEmail || sessionUser?.email || 'admin@company.com',
+      status: sessionTenant.status || 'ACTIVE',
+      planId: sessionTenant.plan?.id || 1,
+      plan: sessionTenant.plan || {
+        id: 1,
+        name: 'Free Trial',
+        maxUsers: 10,
+        maxAssets: 100,
+        monthlyPrice: 0,
+      },
+      createdAt: new Date().toISOString(),
+    };
+    store.tenants.unshift(tenantInStore);
+    storeModified = true;
+  }
+
+  let userInStore: any = null;
+  if (sessionUser && sessionUser.email) {
+    const emailLower = String(sessionUser.email).toLowerCase().trim();
+    const roleStr = getUserRoleString(sessionUser);
+    const roleId = roleStr === 'TENANT_ADMIN' ? 2 : roleStr === 'ASSET_MANAGER' ? 3 : 4;
+
+    userInStore = store.users.find(
+      (u) =>
+        u.tenantId === resolvedTenantId &&
+        (u.id === sessionUser.id || String(u.email || '').toLowerCase().trim() === emailLower)
+    );
+
+    if (!userInStore) {
+      // Remove any stale duplicate of this user email from other tenants if they registered a new org
+      store.users = store.users.filter(
+        (u) => String(u.email || '').toLowerCase().trim() !== emailLower
+      );
+      userInStore = {
+        id: sessionUser.id || `user-${Date.now()}`,
+        email: emailLower,
+        fullName: sessionUser.fullName || sessionUser.name || emailLower.split('@')[0],
+        role: roleStr,
+        roleId,
+        tenantId: resolvedTenantId,
+        isActive: true,
+        isSuperAdmin: Boolean(sessionUser.isSuperAdmin),
+        createdAt: sessionUser.createdAt || new Date().toISOString(),
+      };
+      store.users.push(userInStore);
+      storeModified = true;
+    } else if (userInStore.tenantId !== resolvedTenantId) {
+      userInStore.tenantId = resolvedTenantId;
+      storeModified = true;
+    }
+  }
+
+  if (storeModified) {
+    saveStore(store);
+  }
+
+  return {
+    activeTenantId: resolvedTenantId,
+    activeTenant: tenantInStore || sessionTenant || store.tenants[0],
+    activeUser: userInStore || sessionUser,
+  };
+}
+
+export function syncAuthenticatedSessionToFallbackStore(rawPayload: any): void {
+  if (!rawPayload) return;
+  try {
+    const payload = rawPayload?.data ? rawPayload.data : rawPayload;
+    const user = payload?.user || (payload?.email ? payload : null);
+    const tenant = payload?.tenant || user?.tenant || null;
+    if (!user || !user.email) return;
+
+    const tenantId = tenant?.id || user?.tenantId;
+    if (!tenantId) return;
+
+    const store = loadStore();
+    let existingTenant = store.tenants.find((t) => t.id === tenantId);
+    if (!existingTenant) {
+      existingTenant = {
+        id: tenantId,
+        name: tenant?.name || 'Organization Workspace',
+        slug: tenant?.slug || `org-${tenantId}`,
+        contactEmail: tenant?.contactEmail || user.email,
+        status: tenant?.status || 'ACTIVE',
+        planId: tenant?.plan?.id || payload?.plan?.id || 1,
+        plan: tenant?.plan || payload?.plan || {
+          id: 1,
+          name: 'Free Trial',
+          maxUsers: 10,
+          maxAssets: 100,
+          monthlyPrice: 0,
+        },
+        createdAt: new Date().toISOString(),
+      };
+      store.tenants.unshift(existingTenant);
+    } else if (tenant?.name) {
+      existingTenant.name = tenant.name;
+      existingTenant.slug = tenant.slug || existingTenant.slug;
+    }
+
+    const emailLower = String(user.email).toLowerCase().trim();
+    const roleStr = getUserRoleString(user);
+    const roleId = roleStr === 'TENANT_ADMIN' ? 2 : roleStr === 'ASSET_MANAGER' ? 3 : 4;
+
+    // Remove this email from any other tenant so a user belongs exclusively to their authenticated tenant
+    store.users = store.users.filter(
+      (u) =>
+        !(
+          String(u.email || '').toLowerCase().trim() === emailLower &&
+          u.tenantId !== tenantId
+        )
+    );
+
+    const existingUser = store.users.find(
+      (u) =>
+        u.tenantId === tenantId &&
+        (u.id === user.id || String(u.email || '').toLowerCase().trim() === emailLower)
+    );
+
+    if (existingUser) {
+      existingUser.id = user.id || existingUser.id;
+      existingUser.email = emailLower;
+      existingUser.fullName = user.fullName || user.name || existingUser.fullName;
+      existingUser.role = roleStr;
+      existingUser.roleId = roleId;
+      existingUser.tenantId = tenantId;
+      existingUser.isActive = user.isActive !== false;
+    } else {
+      store.users.push({
+        id: user.id || `user-${Date.now()}`,
+        email: emailLower,
+        fullName: user.fullName || user.name || emailLower.split('@')[0],
+        role: roleStr,
+        roleId,
+        tenantId,
+        isActive: user.isActive !== false,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+        createdAt: user.createdAt || new Date().toISOString(),
+      });
+    }
+
+    saveStore(store);
+  } catch {}
+}
+
 export function syncServerUsersToFallbackStore(users: any[], tenantId?: string): void {
-  if (!Array.isArray(users) || users.length === 0) return;
+  if (!Array.isArray(users)) return;
   try {
     const store = loadStore();
-    for (const srvUser of users) {
-      if (!srvUser || !srvUser.email) continue;
-      const emailLower = String(srvUser.email).toLowerCase().trim();
-      const roleStr = getUserRoleString(srvUser);
-      const roleId =
-        roleStr === 'TENANT_ADMIN' ? 2 : roleStr === 'ASSET_MANAGER' ? 3 : 4;
-      const existing = store.users.find(
-        (u) => u.id === srvUser.id || String(u.email || '').toLowerCase().trim() === emailLower
-      );
-      if (existing) {
-        existing.id = srvUser.id || existing.id;
-        existing.fullName = srvUser.fullName || existing.fullName;
-        existing.role = roleStr;
-        existing.roleId = roleId;
-        existing.isActive = srvUser.isActive !== false;
-        if (srvUser.tenantId || tenantId) {
-          existing.tenantId = srvUser.tenantId || tenantId;
-        }
-        if (roleStr === 'TENANT_ADMIN' && existing.tenantId) {
-          const tenant = store.tenants.find((t) => t.id === existing.tenantId);
-          if (tenant) tenant.contactEmail = existing.email;
-        }
-      } else {
-        store.users.push({
-          id: srvUser.id || `user-${Date.now()}`,
+    const { activeTenantId } = getActiveSessionContext(store);
+    const targetTenantId =
+      tenantId ||
+      users.find((u) => u && u.tenantId)?.tenantId ||
+      activeTenantId;
+
+    if (!targetTenantId) return;
+
+    // Replace the user list for targetTenantId with the authoritative server response for this tenant
+    const otherTenantUsers = store.users.filter((u) => u.tenantId !== targetTenantId);
+    const normalizedServerUsers = users
+      .filter((srvUser) => srvUser && srvUser.email)
+      .map((srvUser) => {
+        const emailLower = String(srvUser.email).toLowerCase().trim();
+        const roleStr = getUserRoleString(srvUser);
+        const roleId = roleStr === 'TENANT_ADMIN' ? 2 : roleStr === 'ASSET_MANAGER' ? 3 : 4;
+        return {
+          id: srvUser.id || `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           email: emailLower,
           fullName: srvUser.fullName || emailLower.split('@')[0],
           role: roleStr,
           roleId,
-          tenantId: srvUser.tenantId || tenantId || store.tenants[0]?.id || 'tenant-karthik',
+          tenantId: srvUser.tenantId || targetTenantId,
           isActive: srvUser.isActive !== false,
-          isSuperAdmin: false,
+          isSuperAdmin: Boolean(srvUser.isSuperAdmin),
+          department: srvUser.department || 'Operations',
           createdAt: srvUser.createdAt || new Date().toISOString(),
-        });
-      }
-    }
+        };
+      });
+
+    store.users = [...otherTenantUsers, ...normalizedServerUsers];
     saveStore(store);
   } catch {}
 }
@@ -487,39 +681,45 @@ export function handleFallbackRequest(
 ): any {
   const cleanUrl = url.replace(/^\/api(\/v1)?/, '');
   const store = loadStore();
+  const { activeTenantId, activeTenant, activeUser } = getActiveSessionContext(store);
 
   // 1. POST /auth/login
   if (method === 'POST' && cleanUrl.includes('/auth/login')) {
     const email = String(body?.email || 'karthikeyan.s050607@gmail.com').toLowerCase().trim();
-    let user = store.users.find((u) => u.email.toLowerCase() === email);
-    let tenant = store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
+    let user = store.users.find((u) => String(u.email || '').toLowerCase().trim() === email);
+    let tenant = user ? store.tenants.find((t) => t.id === user.tenantId) : null;
 
     if (!user) {
-      const namePart = email.split('@')[0]?.replace(/[._0-9]+/g, ' ').trim() || 'Enterprise Member';
-      const displayFullName = namePart
-        .split(' ')
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ') || 'Karthikeyan S';
+      const namePart = email.split('@')[0]?.replace(/[._0-9]+/g, ' ').trim() || 'Organization Admin';
+      const displayFullName =
+        namePart
+          .split(' ')
+          .filter(Boolean)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ') || 'Organization Admin';
 
-      const hasExistingAdmin = store.users.some(
-        (u) => u.tenantId === tenant.id && (getUserRoleString(u) === 'TENANT_ADMIN' || Number(u.roleId) === 2)
-      );
-      const assignedRole =
-        !hasExistingAdmin && email === 'karthikeyan.s050607@gmail.com'
-          ? 'TENANT_ADMIN'
-          : email === 'karthiksmrk7377@gmail.com'
-          ? 'ASSET_MANAGER'
-          : 'MEMBER';
-      const assignedRoleId =
-        assignedRole === 'TENANT_ADMIN' ? 2 : assignedRole === 'ASSET_MANAGER' ? 3 : 4;
+      const newTenantId = email === 'karthikeyan.s050607@gmail.com' ? 'tenant-karthik' : `tenant-${Date.now()}`;
+      tenant = store.tenants.find((t) => t.id === newTenantId);
+      if (!tenant) {
+        tenant = {
+          id: newTenantId,
+          name: `${displayFullName} Workspace`,
+          slug: `org-${Date.now()}`,
+          contactEmail: email,
+          status: 'ACTIVE',
+          planId: 1,
+          plan: { id: 1, name: 'Free Trial', maxUsers: 10, maxAssets: 100, monthlyPrice: 0 },
+          createdAt: new Date().toISOString(),
+        };
+        store.tenants.unshift(tenant);
+      }
 
       user = {
         id: `user-${Date.now()}`,
         email,
         fullName: displayFullName,
-        role: assignedRole,
-        roleId: assignedRoleId,
+        role: 'TENANT_ADMIN',
+        roleId: 2,
         tenantId: tenant.id,
         isActive: true,
         isSuperAdmin: false,
@@ -527,6 +727,10 @@ export function handleFallbackRequest(
       };
       store.users.push(user);
       saveStore(store);
+    }
+
+    if (!tenant) {
+      tenant = store.tenants.find((t) => t.id === user.tenantId) || store.tenants[0];
     }
 
     const roleStr = getUserRoleString(user);
@@ -549,19 +753,20 @@ export function handleFallbackRequest(
   // 2. POST /auth/register-tenant
   if (method === 'POST' && cleanUrl.includes('/auth/register-tenant')) {
     const tenantId = `tenant-${Date.now()}`;
+    const adminEmail = (body?.adminEmail || 'admin@company.com').toLowerCase().trim();
     const tenant = {
       id: tenantId,
       name: body?.tenantName || 'New Enterprise Workspace',
       slug: body?.slug || `org-${Date.now()}`,
-      contactEmail: body?.contactEmail || body?.adminEmail || 'admin@company.com',
+      contactEmail: body?.contactEmail || adminEmail,
       status: 'ACTIVE',
-      planId: 3,
-      plan: { id: 3, name: 'Enterprise', maxUsers: 500, maxAssets: 50000, monthlyPrice: 199 },
+      planId: 1,
+      plan: { id: 1, name: 'Free Trial', maxUsers: 10, maxAssets: 100, monthlyPrice: 0 },
       createdAt: new Date().toISOString(),
     };
     const user = {
       id: `user-${Date.now()}`,
-      email: (body?.adminEmail || 'admin@company.com').toLowerCase().trim(),
+      email: adminEmail,
       fullName: body?.adminFullName || 'Organization Admin',
       role: 'TENANT_ADMIN',
       roleId: 2,
@@ -570,6 +775,10 @@ export function handleFallbackRequest(
       isSuperAdmin: false,
       createdAt: new Date().toISOString(),
     };
+    // Ensure this email is not attached to any other tenant
+    store.users = store.users.filter(
+      (u) => String(u.email || '').toLowerCase().trim() !== adminEmail
+    );
     store.tenants.unshift(tenant);
     store.users.unshift(user);
     saveStore(store);
@@ -592,10 +801,10 @@ export function handleFallbackRequest(
 
   // 2b. POST /auth/google-sso
   if (method === 'POST' && cleanUrl.includes('/auth/google-sso')) {
-    const email = String(body?.email || 'karthiksmrk7377@gmail.com').toLowerCase().trim();
-    let user = store.users.find((u) => u.email.toLowerCase() === email);
+    const email = String(body?.email || '').toLowerCase().trim();
+    let user = store.users.find((u) => String(u.email || '').toLowerCase().trim() === email);
 
-    if (user) {
+    if (user && (!body?.tenantName || String(body.tenantName).trim().length < 2)) {
       const tenant = store.tenants.find((t) => t.id === user.tenantId) || store.tenants[0];
       const roleStr = getUserRoleString(user);
       const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: roleStr, tenantId: tenant.id }))}`;
@@ -645,8 +854,8 @@ export function handleFallbackRequest(
       slug: body?.slug || `org-${Date.now()}`,
       contactEmail: body?.contactEmail || email,
       status: 'ACTIVE',
-      planId: 3,
-      plan: { id: 3, name: 'Enterprise', maxUsers: 500, maxAssets: 50000, monthlyPrice: 199 },
+      planId: 1,
+      plan: { id: 1, name: 'Free Trial', maxUsers: 10, maxAssets: 100, monthlyPrice: 0 },
       createdAt: new Date().toISOString(),
     };
 
@@ -663,6 +872,9 @@ export function handleFallbackRequest(
       createdAt: new Date().toISOString(),
     };
 
+    store.users = store.users.filter(
+      (u) => String(u.email || '').toLowerCase().trim() !== email
+    );
     store.tenants.unshift(tenant);
     store.users.unshift(user);
     saveStore(store);
@@ -686,8 +898,8 @@ export function handleFallbackRequest(
 
   // 2c. POST /auth/refresh
   if (method === 'POST' && cleanUrl.includes('/auth/refresh')) {
-    const user = store.users[0];
-    const tenant = store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
+    const user = activeUser || store.users[0];
+    const tenant = activeTenant || store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
     const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role, tenantId: tenant.id }))}`;
     return {
       status: 'success',
@@ -700,19 +912,9 @@ export function handleFallbackRequest(
 
   // 3. GET /auth/me
   if (method === 'GET' && cleanUrl.includes('/auth/me')) {
-    let cachedUser: any = null;
-    try {
-      const rawSession = localStorage.getItem('assetvault_session_cache');
-      if (rawSession) {
-        const parsed = JSON.parse(rawSession);
-        if (parsed?.user?.email) {
-          cachedUser = store.users.find((u) => u.email.toLowerCase() === parsed.user.email.toLowerCase()) || parsed.user;
-        }
-      }
-    } catch {}
-    const user = cachedUser || store.users[0];
+    const user = activeUser || store.users[0];
     const roleStr = getUserRoleString(user);
-    const tenant = store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
+    const tenant = activeTenant || store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
     return {
       status: 'success',
       data: {
@@ -731,28 +933,41 @@ export function handleFallbackRequest(
     return { status: 'success', message: 'Successfully logged out' };
   }
 
+  // Scoped collections for the active tenant
+  const tenantAssets = store.assets.filter((a) => a.tenantId === activeTenantId);
+  const tenantLicenses = store.licenses.filter((l) => l.tenantId === activeTenantId);
+  const tenantVendors = store.vendors.filter((v) => v.tenantId === activeTenantId);
+  const tenantAllocations = store.allocations.filter((a) => a.tenantId === activeTenantId);
+  const tenantNotifications = store.notifications.filter((n) => n.tenantId === activeTenantId);
+  const tenantAuditLogs = store.auditLogs.filter((l) => l.tenantId === activeTenantId);
+  const tenantUsers = store.users.filter((u) => u.tenantId === activeTenantId);
+
   // 5. GET /reports/dashboard
   if (cleanUrl.includes('/reports/dashboard')) {
-    const tenant = store.tenants[0];
-    const totalSeats = store.licenses.reduce((s, l) => s + Number(l.totalSeats || 0), 0);
-    const allocatedSeats = store.licenses.reduce((s, l) => s + Number(l.usedSeats || 0), 0);
-    const totalSpend = store.licenses.reduce((s, l) => s + Number(l.cost || 0), 0);
+    const totalSeats = tenantLicenses.reduce((s, l) => s + Number(l.totalSeats || 0), 0);
+    const allocatedSeats = tenantLicenses.reduce((s, l) => s + Number(l.usedSeats ?? l.allocatedSeats ?? 0), 0);
+    const totalSpend = tenantLicenses.reduce((s, l) => s + Number(l.cost || 0), 0);
+    const expiringCount = tenantLicenses.filter((l) => {
+      if (!l.endDate) return false;
+      const days = Math.ceil((new Date(l.endDate).getTime() - Date.now()) / 86400000);
+      return days >= 0 && days <= 30;
+    }).length;
     return {
       status: 'success',
       data: {
-        tenant,
+        tenant: activeTenant,
         stats: {
-          total_assets: store.assets.length,
-          asset_count: store.assets.length,
-          total_licenses: store.licenses.length,
-          license_count: store.licenses.length,
-          user_count: store.users.length,
+          total_assets: tenantAssets.length,
+          asset_count: tenantAssets.length,
+          total_licenses: tenantLicenses.length,
+          license_count: tenantLicenses.length,
+          user_count: tenantUsers.length,
           allocated_seats: allocatedSeats,
           active_allocated_seats: allocatedSeats,
           total_seats: totalSeats,
           total_contracted_seats: totalSeats,
-          expiring_in_30_days: 1,
-          expiring_licenses_30d: 1,
+          expiring_in_30_days: expiringCount,
+          expiring_licenses_30d: expiringCount,
           unlicensed_assets_count: 0,
           total_license_cost: totalSpend,
           total_license_spend: totalSpend,
@@ -765,31 +980,35 @@ export function handleFallbackRequest(
   if (cleanUrl.includes('/reports/license-utilization')) {
     return {
       status: 'success',
-      data: store.licenses.map((l) => ({
-        license_id: l.id,
-        license_name: l.name,
-        vendor_name: l.vendor?.name || 'Enterprise Vendor',
-        license_type: 'SEAT_BASED',
-        total_seats: l.totalSeats,
-        used_seats: l.usedSeats,
-        available_seats: Math.max(0, l.totalSeats - l.usedSeats),
-        utilization_pct: Math.round((l.usedSeats / Math.max(1, l.totalSeats)) * 100),
-        status: l.status,
-        cost: l.cost,
-        currency: l.currency || 'USD',
-      })),
+      data: tenantLicenses.map((l) => {
+        const usedSeats = Number(l.usedSeats ?? l.allocatedSeats ?? 0);
+        const totalSeats = Number(l.totalSeats || 1);
+        return {
+          license_id: l.id,
+          license_name: l.name,
+          vendor_name: l.vendor?.name || 'Enterprise Vendor',
+          license_type: 'SEAT_BASED',
+          total_seats: totalSeats,
+          used_seats: usedSeats,
+          available_seats: Math.max(0, totalSeats - usedSeats),
+          utilization_pct: Math.round((usedSeats / Math.max(1, totalSeats)) * 100),
+          status: l.status,
+          cost: l.cost,
+          currency: l.currency || 'USD',
+        };
+      }),
     };
   }
 
   if (cleanUrl.includes('/reports/expiring-licenses')) {
     return {
       status: 'success',
-      data: store.licenses.map((l) => ({
+      data: tenantLicenses.map((l) => ({
         license_id: l.id,
         license_name: l.name,
         vendor_name: l.vendor?.name || 'Enterprise Vendor',
         total_seats: l.totalSeats,
-        active_allocations: l.usedSeats,
+        active_allocations: l.usedSeats ?? l.allocatedSeats ?? 0,
         end_date: l.endDate,
         days_left: 14,
         urgency_bucket: 'WARNING',
@@ -802,17 +1021,25 @@ export function handleFallbackRequest(
   if (cleanUrl.includes('/reports/vendor-spend')) {
     return {
       status: 'success',
-      data: store.vendors.map((v) => ({
-        vendor_id: v.id,
-        vendor_name: v.name,
-        license_count: 1,
-        grand_total_spend: 2400,
-        total_seats_contracted: 25,
-      })),
+      data: tenantVendors.map((v) => {
+        const vLics = tenantLicenses.filter((l) => l.vendorId === v.id);
+        const spend = vLics.reduce((s, l) => s + Number(l.cost || 0), 0);
+        const seats = vLics.reduce((s, l) => s + Number(l.totalSeats || 0), 0);
+        return {
+          vendor_id: v.id,
+          vendor_name: v.name,
+          license_count: vLics.length,
+          grand_total_spend: spend,
+          total_seats_contracted: seats,
+        };
+      }),
     };
   }
 
   if (cleanUrl.includes('/reports/spend-by-month')) {
+    if (tenantLicenses.length === 0) {
+      return { status: 'success', data: [] };
+    }
     return {
       status: 'success',
       data: [
@@ -826,17 +1053,20 @@ export function handleFallbackRequest(
   if (cleanUrl.includes('/reports/top-assets')) {
     return {
       status: 'success',
-      data: store.assets.map((a, i) => ({
+      data: tenantAssets.map((a, i) => ({
         asset_id: a.id,
         asset_name: a.name,
         asset_code: a.assetCode,
-        download_count: 18 - i * 4,
+        download_count: Math.max(1, 18 - i * 4),
         rank: i + 1,
       })),
     };
   }
 
   if (cleanUrl.includes('/reports/access-trend')) {
+    if (tenantAssets.length === 0) {
+      return { status: 'success', data: [] };
+    }
     return {
       status: 'success',
       data: [
@@ -863,6 +1093,7 @@ export function handleFallbackRequest(
     if (method === 'POST') {
       const created = {
         id: `asset-${Date.now()}`,
+        tenantId: activeTenantId,
         assetCode: body?.assetCode || `AST-${Date.now().toString().slice(-3)}`,
         name: body?.name || 'New Digital Asset',
         assetType: body?.assetType || 'SOFTWARE',
@@ -876,13 +1107,14 @@ export function handleFallbackRequest(
       saveStore(store);
       return { status: 'success', data: created };
     }
-    return makePaginated(store.assets);
+    return makePaginated(tenantAssets);
   }
 
   if (cleanUrl.startsWith('/licenses')) {
     if (method === 'POST') {
       const created = {
         id: `lic-${Date.now()}`,
+        tenantId: activeTenantId,
         name: body?.name || 'New Enterprise License',
         licenseKey: body?.licenseKey || `LIC-${Date.now()}`,
         totalSeats: Number(body?.totalSeats || 10),
@@ -900,15 +1132,29 @@ export function handleFallbackRequest(
       saveStore(store);
       return { status: 'success', data: created };
     }
-    return makePaginated(store.licenses);
+    return makePaginated(tenantLicenses);
   }
 
   if (cleanUrl.startsWith('/allocations')) {
-    return makePaginated(store.allocations);
+    return makePaginated(tenantAllocations);
   }
 
   if (cleanUrl.startsWith('/vendors')) {
-    return makePaginated(store.vendors);
+    if (method === 'POST') {
+      const created = {
+        id: `vendor-${Date.now()}`,
+        tenantId: activeTenantId,
+        name: body?.name || 'New Enterprise Vendor',
+        website: body?.website || body?.websiteUrl || '',
+        supportEmail: body?.supportEmail || body?.contactEmail || '',
+        contactEmail: body?.contactEmail || body?.supportEmail || '',
+        createdAt: new Date().toISOString(),
+      };
+      store.vendors.unshift(created);
+      saveStore(store);
+      return { status: 'success', data: created };
+    }
+    return makePaginated(tenantVendors);
   }
 
   if (cleanUrl.startsWith('/categories')) {
@@ -920,16 +1166,6 @@ export function handleFallbackRequest(
   }
 
   if (cleanUrl.startsWith('/users')) {
-    let activeTenantId = store.tenants[0]?.id || 'tenant-karthik';
-    try {
-      const rawSession = localStorage.getItem('assetvault_session_cache');
-      if (rawSession) {
-        const parsed = JSON.parse(rawSession);
-        if (parsed?.tenant?.id) activeTenantId = parsed.tenant.id;
-        else if (parsed?.user?.tenantId) activeTenantId = parsed.user.tenantId;
-      }
-    } catch {}
-
     // POST /users/bulk-email
     if (method === 'POST' && cleanUrl.includes('/bulk-email')) {
       const rawText = String(body?.rawText || '');
@@ -937,7 +1173,7 @@ export function handleFallbackRequest(
       const createdUsers: any[] = [];
       for (const m of matches) {
         const email = m.trim().toLowerCase();
-        if (store.users.some((u) => u.email.toLowerCase() === email)) continue;
+        if (store.users.some((u) => u.tenantId === activeTenantId && u.email.toLowerCase() === email)) continue;
         const fullName = email
           .split('@')[0]
           .replace(/[._-]+/g, ' ')
@@ -1018,7 +1254,7 @@ export function handleFallbackRequest(
     if (method === 'PATCH' && roleMatch) {
       const targetUserId = roleMatch[1];
       const newRoleName = String(body?.roleName || 'MEMBER');
-      const targetUser = store.users.find((u) => u.id === targetUserId);
+      const targetUser = store.users.find((u) => u.id === targetUserId && u.tenantId === activeTenantId);
       if (targetUser) {
         const userTenantId = targetUser.tenantId || activeTenantId;
         if (newRoleName === 'TENANT_ADMIN') {
@@ -1063,7 +1299,7 @@ export function handleFallbackRequest(
     const statusMatch = cleanUrl.match(/^\/users\/([^/]+)\/status$/);
     if (method === 'PATCH' && statusMatch) {
       const targetUserId = statusMatch[1];
-      const targetUser = store.users.find((u) => u.id === targetUserId);
+      const targetUser = store.users.find((u) => u.id === targetUserId && u.tenantId === activeTenantId);
       if (targetUser) {
         targetUser.isActive = Boolean(body?.isActive);
         saveStore(store);
@@ -1084,7 +1320,7 @@ export function handleFallbackRequest(
     const updateMatch = cleanUrl.match(/^\/users\/([^/]+)$/);
     if (method === 'PATCH' && updateMatch) {
       const targetUserId = updateMatch[1];
-      const targetUser = store.users.find((u) => u.id === targetUserId);
+      const targetUser = store.users.find((u) => u.id === targetUserId && u.tenantId === activeTenantId);
       if (targetUser) {
         if (body?.fullName) targetUser.fullName = String(body.fullName).trim();
         if (body?.email) targetUser.email = String(body.email).trim().toLowerCase();
@@ -1105,7 +1341,7 @@ export function handleFallbackRequest(
     // DELETE /users/:id
     if (method === 'DELETE' && updateMatch) {
       const targetUserId = updateMatch[1];
-      const idx = store.users.findIndex((u) => u.id === targetUserId);
+      const idx = store.users.findIndex((u) => u.id === targetUserId && u.tenantId === activeTenantId);
       if (idx !== -1) {
         const removed = store.users[idx];
         if (getUserRoleString(removed) !== 'TENANT_ADMIN') {
@@ -1114,6 +1350,7 @@ export function handleFallbackRequest(
           recordRosterSyncEntry({
             id: removed.id,
             email: removed.email,
+            tenantId: activeTenantId,
             deleted: true,
           });
         }
@@ -1121,16 +1358,16 @@ export function handleFallbackRequest(
       }
     }
 
-    const tenantUsers = store.users.filter((u) => !u.tenantId || u.tenantId === activeTenantId);
-    return makePaginated(tenantUsers.length > 0 ? tenantUsers : store.users);
+    const strictTenantUsers = store.users.filter((u) => u.tenantId === activeTenantId);
+    return makePaginated(strictTenantUsers);
   }
 
   if (cleanUrl.startsWith('/notifications')) {
-    return makePaginated(store.notifications);
+    return makePaginated(tenantNotifications);
   }
 
   if (cleanUrl.startsWith('/audit-logs')) {
-    return makePaginated(store.auditLogs);
+    return makePaginated(tenantAuditLogs);
   }
 
   if (cleanUrl.startsWith('/plans')) {
@@ -1149,9 +1386,9 @@ export function handleFallbackRequest(
       status: 'success',
       data: {
         results: {
-          assets: store.assets,
-          licenses: store.licenses,
-          vendors: store.vendors,
+          assets: tenantAssets,
+          licenses: tenantLicenses,
+          vendors: tenantVendors,
           tags: store.tags,
         },
       },
@@ -1159,21 +1396,21 @@ export function handleFallbackRequest(
   }
 
   if (cleanUrl.startsWith('/ai/context-summary')) {
-    const totalSeats = store.licenses.reduce((acc: number, l: any) => acc + Number(l.totalSeats || 0), 0);
-    const allocatedSeats = store.allocations.length;
+    const totalSeats = tenantLicenses.reduce((acc: number, l: any) => acc + Number(l.totalSeats || 0), 0);
+    const allocatedSeats = tenantAllocations.length;
     return {
       status: 'success',
       data: {
-        tenantId: 'tenant-enterprise',
-        assetsCount: store.assets.length,
-        licensesCount: store.licenses.length,
-        usersCount: store.users.length,
+        tenantId: activeTenantId,
+        assetsCount: tenantAssets.length,
+        licensesCount: tenantLicenses.length,
+        usersCount: tenantUsers.length,
         totalSeats,
         allocatedSeats,
         unallocatedSeats: Math.max(0, totalSeats - allocatedSeats),
         utilizationPct: totalSeats > 0 ? Math.round((allocatedSeats / totalSeats) * 100) : 0,
-        totalAnnualSpend: store.licenses.reduce((acc: number, l: any) => acc + Number(l.cost || 0), 0),
-        users: store.users,
+        totalAnnualSpend: tenantLicenses.reduce((acc: number, l: any) => acc + Number(l.cost || 0), 0),
+        users: tenantUsers,
       },
     };
   }
@@ -1188,15 +1425,15 @@ export function handleFallbackRequest(
         ? (body.messages[body.messages.length - 1]?.content || body.messages[body.messages.length - 1]?.text || '')
         : '';
     const q = prompt.toLowerCase();
-    let reply = `I'm connected to your AssetVault workspace. You have ${store.licenses.length} software licenses and ${store.assets.length} digital assets registered. How can I assist you with license governance or optimization?`;
+    let reply = `I'm connected to your AssetVault workspace. You have ${tenantLicenses.length} software licenses and ${tenantAssets.length} digital assets registered. How can I assist you with license governance or optimization?`;
     if (q.includes('license') || q.includes('seat') || q.includes('renew')) {
-      reply = `You currently have **${store.licenses.length} active licenses** tracked in your workspace. Total seat utilization is healthy, with zero over-cap license compliance issues detected.`;
+      reply = `You currently have **${tenantLicenses.length} active licenses** tracked in your workspace. Total seat utilization is healthy, with zero over-cap license compliance issues detected.`;
     } else if (q.includes('asset') || q.includes('catalog') || q.includes('software')) {
-      reply = `Your workspace contains **${store.assets.length} digital software assets** including enterprise IDEs, productivity suites, and creative tools.`;
+      reply = `Your workspace contains **${tenantAssets.length} digital software assets** including enterprise IDEs, productivity suites, and creative tools.`;
     } else if (q.includes('who') || q.includes('user') || q.includes('team') || q.includes('profile')) {
       reply = `You are authenticated as **${body?.userName || 'Organization Member'}** (\`${body?.userEmail || 'member'}\`). Your workspace access role is \`${body?.userRole || 'TENANT_ADMIN'}\`.`;
     } else if (q.includes('spend') || q.includes('cost') || q.includes('saving')) {
-      const spend = store.licenses.reduce((acc: number, l: any) => acc + Number(l.cost || 0), 0);
+      const spend = tenantLicenses.reduce((acc: number, l: any) => acc + Number(l.cost || 0), 0);
       reply = `Your total recorded software spend is **$${spend.toLocaleString()} USD / year**. Reclaiming unallocated seats on expiring renewals could yield up to 12% in annual savings.`;
     }
     return {

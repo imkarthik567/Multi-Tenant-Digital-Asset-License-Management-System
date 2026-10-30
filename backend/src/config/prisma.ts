@@ -66,24 +66,33 @@ const TENANT_TOP_LEVEL_MODELS = [
  */
 function createTxScopedClient(tx: any, ctx: RequestContext): any {
   const tenantId = ctx.tenantId || '';
+  const scopedMockClient = tenantId && !ctx.isSuperAdmin
+    ? createMockPrismaClient(tenantId)
+    : mockFallbackClient;
 
   return new Proxy(tx, {
     get(target, prop: string) {
       if (prop === '$queryRaw') {
         return async (...args: any[]) => {
+          if (target === (mockFallbackClient as any)) {
+            return await (scopedMockClient as any).$queryRaw(...args);
+          }
           try {
             return await target.$queryRaw(...args);
           } catch {
-            return await (mockFallbackClient as any).$queryRaw(...args);
+            return await (scopedMockClient as any).$queryRaw(...args);
           }
         };
       }
       if (prop === '$executeRaw') {
         return async (...args: any[]) => {
+          if (target === (mockFallbackClient as any)) {
+            return await (scopedMockClient as any).$executeRaw(...args);
+          }
           try {
             return await target.$executeRaw(...args);
           } catch {
-            return await (mockFallbackClient as any).$executeRaw(...args);
+            return await (scopedMockClient as any).$executeRaw(...args);
           }
         };
       }

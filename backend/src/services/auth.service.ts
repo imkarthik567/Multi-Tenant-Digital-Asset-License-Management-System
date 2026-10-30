@@ -84,7 +84,7 @@ export class AuthService {
     });
 
     // 2b. Auto-provision or recover Karthikeyan workspace account if missing
-    if (!user && (normalizedEmail === 'karthikeyan.s050607@gmail.com' || normalizedEmail === 'karthiksmrk7377@gmail.com')) {
+    if (!user && normalizedEmail === 'karthikeyan.s050607@gmail.com') {
       const freePlan = await systemPrisma.plan.findFirst({ where: { name: 'Free Trial' } }) || { id: 1 };
       let tenant = await systemPrisma.tenant.findUnique({
         where: { id: 'tenant-karthik' },
@@ -104,26 +104,17 @@ export class AuthService {
         });
       }
 
-      const existingTenantAdmin = await systemPrisma.user.findFirst({
-        where: { tenantId: tenant.id, roleId: 2 },
-      });
-      const isPrimaryOwner =
-        normalizedEmail === 'karthikeyan.s050607@gmail.com' && !existingTenantAdmin;
-
       const targetRole = await systemPrisma.role.findFirst({
-        where: { name: isPrimaryOwner ? 'TENANT_ADMIN' : 'ASSET_MANAGER' },
+        where: { name: 'TENANT_ADMIN' },
       });
       const passwordHash = await hashPassword(input.password || 'Password123!');
 
       user = await systemPrisma.user.create({
         data: {
-          id:
-            normalizedEmail === 'karthikeyan.s050607@gmail.com'
-              ? 'user-karthik-admin'
-              : 'user-karthik-admin-alt',
+          id: 'user-karthik-admin',
           email: normalizedEmail,
           fullName: 'Karthikeyan S',
-          roleId: targetRole ? targetRole.id : isPrimaryOwner ? 2 : 3,
+          roleId: targetRole ? targetRole.id : 2,
           tenantId: tenant.id,
           passwordHash,
           isActive: true,
@@ -656,11 +647,7 @@ export class AuthService {
     });
 
     // Auto-provision or recover Karthikeyan workspace account if missing
-    if (
-      !user &&
-      (normalizedEmail === 'karthikeyan.s050607@gmail.com' ||
-        normalizedEmail === 'karthiksmrk7377@gmail.com')
-    ) {
+    if (!user && normalizedEmail === 'karthikeyan.s050607@gmail.com') {
       const freePlan =
         (await systemPrisma.plan.findFirst({ where: { name: 'Enterprise' } })) ||
         (await systemPrisma.plan.findFirst({ where: { name: 'Free Trial' } })) || { id: 3 };
@@ -682,27 +669,18 @@ export class AuthService {
         });
       }
 
-      const existingTenantAdmin = await systemPrisma.user.findFirst({
-        where: { tenantId: tenant.id, roleId: 2 },
-      });
-      const isPrimaryOwner =
-        normalizedEmail === 'karthikeyan.s050607@gmail.com' && !existingTenantAdmin;
-
       const targetRole = await systemPrisma.role.findFirst({
-        where: { name: isPrimaryOwner ? 'TENANT_ADMIN' : 'ASSET_MANAGER' },
+        where: { name: 'TENANT_ADMIN' },
       });
       const passwordHash = await hashPassword('Password123!');
 
       user = await systemPrisma.user.create({
         data: {
-          id:
-            normalizedEmail === 'karthikeyan.s050607@gmail.com'
-              ? 'user-karthik-admin'
-              : 'user-karthik-admin-alt',
+          id: 'user-karthik-admin',
           email: normalizedEmail,
           fullName: input.fullName?.trim() || 'Karthikeyan S',
           avatarUrl: input.avatarUrl || null,
-          roleId: targetRole ? targetRole.id : isPrimaryOwner ? 2 : 3,
+          roleId: targetRole ? targetRole.id : 2,
           tenantId: tenant.id,
           passwordHash,
           isActive: true,

@@ -130,18 +130,6 @@ export function createInitialState(): MockStoreState {
       updatedAt: new Date('2026-01-01T00:00:00Z'),
     },
     {
-      id: 'user-karthik-admin-alt',
-      email: 'karthiksmrk7377@gmail.com',
-      fullName: 'Karthikeyan S',
-      roleId: 3,
-      tenantId: 'tenant-karthik',
-      passwordHash: BCRYPT_PASSWORD_HASH,
-      isActive: true,
-      department: 'Executive Leadership',
-      createdAt: new Date('2026-01-01T00:00:00Z'),
-      updatedAt: new Date('2026-01-01T00:00:00Z'),
-    },
-    {
       id: 'user-super-admin',
       email: 'superadmin@assetvault.io',
       fullName: 'Global Super Administrator',
@@ -783,7 +771,7 @@ export function createInitialState(): MockStoreState {
       type: 'SEAT_BASED',
       status: 'ACTIVE',
       totalSeats: 35,
-      allocatedSeats: 2,
+      allocatedSeats: 1,
       cost: 699.0,
       currency: 'USD',
       autoRenew: true,
@@ -804,7 +792,7 @@ export function createInitialState(): MockStoreState {
       type: 'SEAT_BASED',
       status: 'ACTIVE',
       totalSeats: 25,
-      allocatedSeats: 1,
+      allocatedSeats: 0,
       cost: 899.0,
       currency: 'USD',
       autoRenew: true,
@@ -891,24 +879,6 @@ export function createInitialState(): MockStoreState {
       status: 'ACTIVE',
       allocatedAt: new Date('2026-01-10T00:00:00Z'),
       notes: 'Executive Principal Architect IDE Seat',
-    },
-    {
-      id: 'alloc-karthik-2',
-      tenantId: 'tenant-karthik',
-      licenseId: 'lic-karthik-1',
-      userId: 'user-karthik-admin-alt',
-      status: 'ACTIVE',
-      allocatedAt: new Date('2026-01-12T00:00:00Z'),
-      notes: 'Core Engineering Lead Seat',
-    },
-    {
-      id: 'alloc-karthik-3',
-      tenantId: 'tenant-karthik',
-      licenseId: 'lic-karthik-2',
-      userId: 'user-karthik-admin-alt',
-      status: 'ACTIVE',
-      allocatedAt: new Date('2026-01-15T00:00:00Z'),
-      notes: 'Creative Cloud Enterprise Design Seat',
     },
     {
       id: 'alloc-karthik-4',
@@ -1098,6 +1068,9 @@ export class MockPrismaStore {
               for (const item of savedArr) map.set(String(item.id), item);
               return Array.from(map.values());
             };
+            const cleanedUsers = mergeById(initial.users, parsed.users).filter(
+              (u) => !(u.id === 'user-karthik-admin-alt' && u.tenantId === 'tenant-karthik')
+            );
             const mergedState: MockStoreState = {
               ...initial,
               ...parsed,
@@ -1105,7 +1078,7 @@ export class MockPrismaStore {
               plans: initial.plans,
               licenseTypes: initial.licenseTypes,
               tenants: mergeById(initial.tenants, parsed.tenants),
-              users: mergeById(initial.users, parsed.users),
+              users: cleanedUsers,
               vendors: mergeById(initial.vendors, parsed.vendors || []),
               categories: mergeById(initial.categories, parsed.categories || []),
               tags: mergeById(initial.tags, parsed.tags || []),
@@ -1171,11 +1144,18 @@ export class MockPrismaStore {
 
       for (const item of items) {
         const email = String(item?.email || '').toLowerCase().trim();
-        if (!email || !email.includes('@')) continue;
+        const targetTenantId = item?.tenantId ? String(item.tenantId).trim() : '';
+        if (!email || !email.includes('@') || !targetTenantId) continue;
+
+        const tenantExists = this.state.tenants.some((t) => t.id === targetTenantId);
+        if (!tenantExists) continue;
 
         if (item.deleted) {
           const idx = this.state.users.findIndex(
-            (u) => String(u.email || '').toLowerCase().trim() === email && Number(u.roleId) !== 2
+            (u) =>
+              u.tenantId === targetTenantId &&
+              String(u.email || '').toLowerCase().trim() === email &&
+              Number(u.roleId) !== 2
           );
           if (idx !== -1) {
             this.state.users.splice(idx, 1);
@@ -1190,8 +1170,9 @@ export class MockPrismaStore {
 
         const existingUser = this.state.users.find(
           (u) =>
-            (item.id && u.id === item.id) ||
-            String(u.email || '').toLowerCase().trim() === email
+            u.tenantId === targetTenantId &&
+            ((item.id && u.id === item.id) ||
+              String(u.email || '').toLowerCase().trim() === email)
         );
 
         if (existingUser) {
@@ -1219,16 +1200,21 @@ export class MockPrismaStore {
             existingUser.isActive = item.isActive;
             modified = true;
           }
-        } else if (item.tenantId) {
-          const tenantExists = this.state.tenants.some((t) => t.id === item.tenantId);
-          if (tenantExists) {
+        } else {
+          // Do not merge if email already belongs to a different organization
+          const emailInAnotherTenant = this.state.users.some(
+            (u) =>
+              u.tenantId !== targetTenantId &&
+              String(u.email || '').toLowerCase().trim() === email
+          );
+          if (!emailInAnotherTenant) {
             const safeRoleId = desiredRoleId === 2 ? 3 : desiredRoleId || 4;
             this.state.users.push({
               id: item.id || `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               email,
               fullName: item.fullName || email.split('@')[0],
               roleId: safeRoleId,
-              tenantId: item.tenantId,
+              tenantId: targetTenantId,
               passwordHash: BCRYPT_PASSWORD_HASH,
               isActive: item.isActive !== false,
               department: 'Operations',
@@ -1833,7 +1819,7 @@ function extractSqlAndValues(queryArg: any, restArgs: any[]): { sqlText: string;
   return { sqlText: String(queryArg || ''), values: restArgs };
 }
 
-export function createMockPrismaClient(): any {
+export function createMockPrismaClient(scopedTenantId?: string): any {
   const handler: ProxyHandler<any> = {
     get(_target, prop: string | symbol) {
       if (typeof prop !== 'string') return undefined;
@@ -1843,7 +1829,7 @@ export function createMockPrismaClient(): any {
       if (prop === '$transaction') {
         return async (fnOrArray: any) => {
           if (typeof fnOrArray === 'function') {
-            return fnOrArray(createMockPrismaClient());
+            return fnOrArray(createMockPrismaClient(scopedTenantId));
           }
           if (Array.isArray(fnOrArray)) {
             return Promise.all(fnOrArray);
@@ -1854,13 +1840,39 @@ export function createMockPrismaClient(): any {
       if (prop === '$queryRaw') {
         return async (...rawArgs: any[]) => {
           const { sqlText, values } = extractSqlAndValues(rawArgs[0], rawArgs.slice(1));
+          const resolvedTenantId =
+            scopedTenantId ||
+            values.find(
+              (v: any) =>
+                typeof v === 'string' &&
+                (v.startsWith('tenant-') || mockStore.state.tenants.some((t) => t.id === v))
+            );
+
+          const tenantAssets = resolvedTenantId
+            ? mockStore.state.assets.filter((a) => a.tenantId === resolvedTenantId && !a.deletedAt)
+            : mockStore.state.assets.filter((a) => !a.deletedAt);
+          const tenantLicenses = resolvedTenantId
+            ? mockStore.state.licenses.filter((l) => l.tenantId === resolvedTenantId && !l.deletedAt)
+            : mockStore.state.licenses.filter((l) => !l.deletedAt);
+          const tenantUsers = resolvedTenantId
+            ? mockStore.state.users.filter((u) => u.tenantId === resolvedTenantId && !u.deletedAt)
+            : mockStore.state.users.filter((u) => !u.deletedAt);
+          const tenantVendors = resolvedTenantId
+            ? mockStore.state.vendors.filter((v) => v.tenantId === resolvedTenantId && !v.deletedAt)
+            : mockStore.state.vendors.filter((v) => !v.deletedAt);
 
           if (sqlText.includes('fn_tenant_dashboard_stats')) {
-            const totalAssets = mockStore.state.assets.length;
-            const totalLicenses = mockStore.state.licenses.length;
-            const totalSeats = mockStore.state.licenses.reduce((s, l) => s + (l.totalSeats || 0), 0);
-            const allocatedSeats = mockStore.state.licenses.reduce((s, l) => s + (l.allocatedSeats || 0), 0);
-            const totalSpend = mockStore.state.licenses.reduce((s, l) => s + Number(l.cost || 0), 0);
+            const totalAssets = tenantAssets.length;
+            const totalLicenses = tenantLicenses.length;
+            const totalSeats = tenantLicenses.reduce((s, l) => s + Number(l.totalSeats || 0), 0);
+            const allocatedSeats = tenantLicenses.reduce((s, l) => s + Number(l.allocatedSeats || 0), 0);
+            const totalSpend = tenantLicenses.reduce((s, l) => s + Number(l.cost || 0), 0);
+            const expiring30d = tenantLicenses.filter((l) => {
+              const exp = l.endDate || l.expiresAt;
+              if (!exp) return false;
+              const days = Math.ceil((new Date(exp).getTime() - Date.now()) / (24 * 3600 * 1000));
+              return days >= 0 && days <= 30;
+            }).length;
             return [
               {
                 fn_tenant_dashboard_stats: {
@@ -1868,13 +1880,13 @@ export function createMockPrismaClient(): any {
                   asset_count: totalAssets,
                   total_licenses: totalLicenses,
                   license_count: totalLicenses,
-                  user_count: mockStore.state.users.length,
+                  user_count: tenantUsers.length,
                   allocated_seats: allocatedSeats,
                   active_allocated_seats: allocatedSeats,
                   total_seats: totalSeats,
                   total_contracted_seats: totalSeats,
-                  expiring_in_30_days: 1,
-                  expiring_licenses_30d: 1,
+                  expiring_in_30_days: expiring30d,
+                  expiring_licenses_30d: expiring30d,
                   unlicensed_assets_count: 0,
                   total_license_cost: totalSpend,
                   total_license_spend: totalSpend,
@@ -1885,7 +1897,7 @@ export function createMockPrismaClient(): any {
 
           if (sqlText.includes('v_asset_catalog')) {
             if (sqlText.toLowerCase().includes('count(')) {
-              const total = mockStore.state.assets.length;
+              const total = tenantAssets.length;
               return [
                 {
                   total,
@@ -1900,17 +1912,18 @@ export function createMockPrismaClient(): any {
             if (sqlText.includes('UNLICENSED')) {
               return [];
             }
-            return mockStore.state.assets.map((a, idx) => ({
+            const tenantOwner = tenantUsers.find((u) => Number(u.roleId) === 2) || tenantUsers[0];
+            return tenantAssets.map((a, idx) => ({
               asset_id: a.id,
               tenant_id: a.tenantId,
-              asset_code: `AST-${100 + idx}`,
+              asset_code: a.code || a.assetCode || `AST-${100 + idx}`,
               asset_name: a.name,
               description: a.description,
               asset_type: a.type,
               asset_status: a.status,
               category_name: 'Developer Tools',
-              owner_name: 'Acme Administrator',
-              owner_email: 'admin@acme.com',
+              owner_name: tenantOwner?.fullName || 'Workspace Admin',
+              owner_email: tenantOwner?.email || 'admin@workspace.io',
               latest_version_no: 1,
               total_versions: 1,
               tags: ['Engineering', 'Production'],
@@ -1940,7 +1953,7 @@ export function createMockPrismaClient(): any {
             }
             const newAlloc = {
               id: crypto.randomUUID(),
-              tenantId: lic.tenantId || 'tenant-acme-corp',
+              tenantId: lic.tenantId || resolvedTenantId || 'tenant-acme-corp',
               licenseId,
               userId,
               allocatedBy: allocatedBy || userId,
@@ -2009,14 +2022,7 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('v_license_utilization')) {
-            const tenantFilter = values.find(
-              (v: any) => typeof v === 'string' && v.startsWith('tenant-')
-            );
-            const sourceLicenses = tenantFilter
-              ? mockStore.state.licenses.filter((l) => l.tenantId === tenantFilter)
-              : mockStore.state.licenses;
-
-            const mapped = sourceLicenses.map((l) => {
+            const mapped = tenantLicenses.map((l) => {
               const vendor = mockStore.state.vendors.find((v) => v.id === l.vendorId);
               const licType = mockStore.state.licenseTypes.find((lt) => lt.id === l.licenseTypeId);
               const totalSeats = Number(l.totalSeats || 1);
@@ -2079,7 +2085,7 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('v_expiring_licenses')) {
-            const mapped = mockStore.state.licenses
+            const mapped = tenantLicenses
               .filter((l) => l.expiresAt || l.endDate)
               .map((l) => {
                 const expDate = l.endDate || l.expiresAt;
@@ -2087,11 +2093,12 @@ export function createMockPrismaClient(): any {
                   1,
                   Math.round((new Date(expDate as any).getTime() - Date.now()) / (24 * 3600 * 1000))
                 );
+                const vendor = mockStore.state.vendors.find((v) => v.id === l.vendorId);
                 return {
                   license_id: l.id,
                   tenant_id: l.tenantId,
                   license_name: l.name || l.licenseKey,
-                  vendor_name: 'Enterprise Vendor',
+                  vendor_name: vendor?.name || 'Enterprise Vendor',
                   total_seats: l.totalSeats,
                   active_allocations: l.allocatedSeats ?? 0,
                   start_date: l.startDate || l.createdAt,
@@ -2120,24 +2127,34 @@ export function createMockPrismaClient(): any {
           }
 
           if (sqlText.includes('monthly_costs')) {
+            if (tenantLicenses.length === 0) {
+              return [];
+            }
+            const totalSpend = tenantLicenses.reduce((s, l) => s + Number(l.cost || 0), 0);
+            const m1 = Math.round(totalSpend * 0.3);
+            const m2 = Math.round(totalSpend * 0.35);
+            const m3 = Math.max(0, totalSpend - m1 - m2);
             return [
-              { month_year: '2026-08', monthly_spend: 1200, running_total_spend: 1200 },
-              { month_year: '2026-09', monthly_spend: 1150, running_total_spend: 2350 },
-              { month_year: '2026-10', monthly_spend: 1248, running_total_spend: 3598 },
+              { month_year: '2026-08', monthly_spend: m1, running_total_spend: m1 },
+              { month_year: '2026-09', monthly_spend: m2, running_total_spend: m1 + m2 },
+              { month_year: '2026-10', monthly_spend: m3, running_total_spend: totalSpend },
             ];
           }
 
           if (sqlText.includes('asset_downloads')) {
-            return mockStore.state.assets.slice(0, 10).map((a, idx) => ({
+            return tenantAssets.slice(0, 10).map((a, idx) => ({
               asset_id: a.id,
               asset_name: a.name,
-              asset_code: a.assetCode || `AST-${100 + idx}`,
+              asset_code: a.code || a.assetCode || `AST-${100 + idx}`,
               download_count: Math.max(1, 15 - idx * 2),
               rank: idx + 1,
             }));
           }
 
           if (sqlText.includes('mv_monthly_access_stats')) {
+            if (tenantAssets.length === 0) {
+              return [];
+            }
             return [
               {
                 month_year: '2026-08',
@@ -2146,8 +2163,8 @@ export function createMockPrismaClient(): any {
                 view_count: 42,
                 checkin_count: 7,
                 total_access_events: 71,
-                active_accessing_users: 4,
-                distinct_assets_accessed: 5,
+                active_accessing_users: Math.max(1, tenantUsers.length),
+                distinct_assets_accessed: tenantAssets.length,
               },
               {
                 month_year: '2026-09',
@@ -2156,8 +2173,8 @@ export function createMockPrismaClient(): any {
                 view_count: 58,
                 checkin_count: 10,
                 total_access_events: 98,
-                active_accessing_users: 5,
-                distinct_assets_accessed: 6,
+                active_accessing_users: Math.max(1, tenantUsers.length),
+                distinct_assets_accessed: tenantAssets.length,
               },
               {
                 month_year: '2026-10',
@@ -2166,29 +2183,35 @@ export function createMockPrismaClient(): any {
                 view_count: 73,
                 checkin_count: 14,
                 total_access_events: 126,
-                active_accessing_users: 6,
-                distinct_assets_accessed: 6,
+                active_accessing_users: Math.max(1, tenantUsers.length),
+                distinct_assets_accessed: tenantAssets.length,
               },
             ];
           }
 
           if (sqlText.includes('v_vendor_spend')) {
-            return mockStore.state.vendors.map((v) => ({
-              vendor_id: v.id,
-              vendor_name: v.name,
-              contact_email: v.supportEmail || v.contactEmail,
-              license_count: 1,
-              total_initial_cost: 750,
-              total_renewal_cost: 0,
-              grand_total_spend: 750,
-              total_seats_contracted: 35,
-              avg_cost_per_seat: 21.43,
-            }));
+            return tenantVendors.map((v) => {
+              const vLicenses = tenantLicenses.filter((l) => l.vendorId === v.id);
+              const initialCost = vLicenses.reduce((s, l) => s + Number(l.cost || 0), 0);
+              const seats = vLicenses.reduce((s, l) => s + Number(l.totalSeats || 0), 0);
+              return {
+                vendor_id: v.id,
+                vendor_name: v.name,
+                contact_email: v.supportEmail || v.contactEmail,
+                license_count: vLicenses.length,
+                total_initial_cost: initialCost,
+                total_renewal_cost: 0,
+                grand_total_spend: initialCost,
+                total_seats_contracted: seats,
+                avg_cost_per_seat: seats > 0 ? Number((initialCost / seats).toFixed(2)) : 0,
+              };
+            });
           }
 
           if (sqlText.includes('v_tenant_summary')) {
             return mockStore.state.tenants.map((t) => {
               const plan = mockStore.state.plans.find((p) => p.id === t.planId) || mockStore.state.plans[0];
+              const tLicenses = mockStore.state.licenses.filter((l) => l.tenantId === t.id);
               return {
                 tenant_id: t.id,
                 tenant_name: t.name,
@@ -2199,9 +2222,9 @@ export function createMockPrismaClient(): any {
                 max_users: plan?.maxUsers || 250,
                 asset_count: mockStore.state.assets.filter((a) => a.tenantId === t.id).length,
                 max_assets: plan?.maxAssets || 5000,
-                license_count: mockStore.state.licenses.filter((l) => l.tenantId === t.id).length,
-                active_seats_count: 6,
-                total_license_spend: 3598,
+                license_count: tLicenses.length,
+                active_seats_count: tLicenses.reduce((s, l) => s + Number(l.allocatedSeats || 0), 0),
+                total_license_spend: tLicenses.reduce((s, l) => s + Number(l.cost || 0), 0),
                 onboarded_at: t.createdAt,
               };
             });
