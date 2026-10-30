@@ -35,6 +35,7 @@ import { NotFoundError } from './errors/AppError';
 import apiRoutes from './routes';
 import { getHealth } from './controllers/health.controller';
 import { emailService } from './services/email.service';
+import { mockStore } from './config/mockStore';
 import {
   requestIdMiddleware,
   getMetricsHandler,
@@ -91,15 +92,25 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Gmail-Access-Token'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Tenant-ID',
+      'X-Gmail-Access-Token',
+      'X-Workspace-Roster-Sync',
+    ],
   })
 );
 
-// 3B. Sync in-memory Google Gmail OAuth Access Token from request header
+// 3B. Sync in-memory Google Gmail OAuth Access Token & Workspace Roster state from request headers
 app.use((req, _res, next) => {
   const gmailHeader = req.headers['x-gmail-access-token'];
   if (typeof gmailHeader === 'string' && gmailHeader.trim().length > 0) {
     emailService.setGmailAccessToken(gmailHeader.trim());
+  }
+  const rosterHeader = req.headers['x-workspace-roster-sync'];
+  if (typeof rosterHeader === 'string' && rosterHeader.trim().length > 0) {
+    mockStore.syncRosterFromHeader(rosterHeader.trim());
   }
   next();
 });

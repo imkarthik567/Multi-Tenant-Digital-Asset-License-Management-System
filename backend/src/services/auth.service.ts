@@ -83,30 +83,47 @@ export class AuthService {
       },
     });
 
-    // 2b. Auto-provision or recover Karthikeyan owner account if missing
+    // 2b. Auto-provision or recover Karthikeyan workspace account if missing
     if (!user && (normalizedEmail === 'karthikeyan.s050607@gmail.com' || normalizedEmail === 'karthiksmrk7377@gmail.com')) {
       const freePlan = await systemPrisma.plan.findFirst({ where: { name: 'Free Trial' } }) || { id: 1 };
-      const tenant = await systemPrisma.tenant.create({
-        data: {
-          id: 'tenant-karthik',
-          name: 'Karthik Enterprise Workspace',
-          slug: 'karthik-org',
-          contactEmail: normalizedEmail,
-          status: 'ACTIVE',
-          planId: freePlan.id,
-        },
+      let tenant = await systemPrisma.tenant.findUnique({
+        where: { id: 'tenant-karthik' },
         include: { plan: true },
       });
+      if (!tenant) {
+        tenant = await systemPrisma.tenant.create({
+          data: {
+            id: 'tenant-karthik',
+            name: 'Karthik Enterprise Workspace',
+            slug: 'karthik-org',
+            contactEmail: 'karthikeyan.s050607@gmail.com',
+            status: 'ACTIVE',
+            planId: freePlan.id,
+          },
+          include: { plan: true },
+        });
+      }
 
-      const tenantAdminRole = await systemPrisma.role.findFirst({ where: { name: 'TENANT_ADMIN' } });
+      const existingTenantAdmin = await systemPrisma.user.findFirst({
+        where: { tenantId: tenant.id, roleId: 2 },
+      });
+      const isPrimaryOwner =
+        normalizedEmail === 'karthikeyan.s050607@gmail.com' && !existingTenantAdmin;
+
+      const targetRole = await systemPrisma.role.findFirst({
+        where: { name: isPrimaryOwner ? 'TENANT_ADMIN' : 'ASSET_MANAGER' },
+      });
       const passwordHash = await hashPassword(input.password || 'Password123!');
 
       user = await systemPrisma.user.create({
         data: {
-          id: 'user-karthik-admin',
+          id:
+            normalizedEmail === 'karthikeyan.s050607@gmail.com'
+              ? 'user-karthik-admin'
+              : 'user-karthik-admin-alt',
           email: normalizedEmail,
           fullName: 'Karthikeyan S',
-          roleId: tenantAdminRole ? tenantAdminRole.id : 2,
+          roleId: targetRole ? targetRole.id : isPrimaryOwner ? 2 : 3,
           tenantId: tenant.id,
           passwordHash,
           isActive: true,
@@ -638,7 +655,7 @@ export class AuthService {
       },
     });
 
-    // Auto-provision or recover Karthikeyan owner account if missing
+    // Auto-provision or recover Karthikeyan workspace account if missing
     if (
       !user &&
       (normalizedEmail === 'karthikeyan.s050607@gmail.com' ||
@@ -657,7 +674,7 @@ export class AuthService {
             id: 'tenant-karthik',
             name: 'Karthik Enterprise Workspace',
             slug: 'karthik-org',
-            contactEmail: normalizedEmail,
+            contactEmail: 'karthikeyan.s050607@gmail.com',
             status: 'ACTIVE',
             planId: freePlan.id,
           },
@@ -665,18 +682,27 @@ export class AuthService {
         });
       }
 
-      const tenantAdminRole = await systemPrisma.role.findFirst({
-        where: { name: 'TENANT_ADMIN' },
+      const existingTenantAdmin = await systemPrisma.user.findFirst({
+        where: { tenantId: tenant.id, roleId: 2 },
+      });
+      const isPrimaryOwner =
+        normalizedEmail === 'karthikeyan.s050607@gmail.com' && !existingTenantAdmin;
+
+      const targetRole = await systemPrisma.role.findFirst({
+        where: { name: isPrimaryOwner ? 'TENANT_ADMIN' : 'ASSET_MANAGER' },
       });
       const passwordHash = await hashPassword('Password123!');
 
       user = await systemPrisma.user.create({
         data: {
-          id: 'user-karthik-admin',
+          id:
+            normalizedEmail === 'karthikeyan.s050607@gmail.com'
+              ? 'user-karthik-admin'
+              : 'user-karthik-admin-alt',
           email: normalizedEmail,
           fullName: input.fullName?.trim() || 'Karthikeyan S',
           avatarUrl: input.avatarUrl || null,
-          roleId: tenantAdminRole ? tenantAdminRole.id : 2,
+          roleId: targetRole ? targetRole.id : isPrimaryOwner ? 2 : 3,
           tenantId: tenant.id,
           passwordHash,
           isActive: true,

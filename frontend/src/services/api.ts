@@ -6,7 +6,12 @@
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiResponse } from '../types';
-import { handleFallbackRequest } from './localFallback';
+import {
+  handleFallbackRequest,
+  getRosterSyncHeader,
+  recordRosterSyncEntry,
+  syncServerUsersToFallbackStore,
+} from './localFallback';
 import { getCachedGmailToken } from './gmailAuth';
 
 const rawBase = (import.meta as any).env?.VITE_API_URL;
@@ -170,6 +175,15 @@ apiClient.interceptors.request.use(
         config.headers['X-Gmail-Access-Token'] = gmailToken;
       }
     }
+    const rosterSync = getRosterSyncHeader();
+    if (rosterSync) {
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set('X-Workspace-Roster-Sync', rosterSync);
+      } else {
+        config.headers = config.headers || {};
+        config.headers['X-Workspace-Roster-Sync'] = rosterSync;
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -300,6 +314,9 @@ export const api = {
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('GET', url, undefined, configOrParams?.params ?? configOrParams) as T;
       }
+      if (url.startsWith('/users') && Array.isArray((response.data as any)?.data)) {
+        syncServerUsersToFallbackStore((response.data as any).data);
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {
@@ -319,6 +336,23 @@ export const api = {
       const response = await apiClient.post<T>(url, data, config);
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('POST', url, data) as T;
+      }
+      if (url === '/users' && (response.data as any)?.data?.email) {
+        const created = (response.data as any).data;
+        const rName =
+          typeof created.role === 'object' && created.role?.name
+            ? created.role.name
+            : created.role || (data as any)?.roleName || 'MEMBER';
+        recordRosterSyncEntry({
+          id: created.id,
+          email: created.email,
+          fullName: created.fullName,
+          roleName: rName,
+          roleId: created.roleId,
+          tenantId: created.tenantId,
+          isActive: created.isActive !== false,
+        });
+        syncServerUsersToFallbackStore([created], created.tenantId);
       }
       return response.data;
     } catch (err) {
@@ -350,6 +384,25 @@ export const api = {
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('PATCH', url, data) as T;
       }
+      if (url.startsWith('/users/')) {
+        handleFallbackRequest('PATCH', url, data);
+        const updated = (response.data as any)?.data;
+        if (updated && updated.email) {
+          const rName =
+            typeof updated.role === 'object' && updated.role?.name
+              ? updated.role.name
+              : updated.role || (data as any)?.roleName;
+          recordRosterSyncEntry({
+            id: updated.id,
+            email: updated.email,
+            fullName: updated.fullName,
+            roleName: rName,
+            roleId: updated.roleId,
+            tenantId: updated.tenantId,
+            isActive: updated.isActive,
+          });
+        }
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {
@@ -367,6 +420,9 @@ export const api = {
       const response = await apiClient.delete<T>(url, config);
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('DELETE', url, undefined, configOrParams?.params ?? configOrParams) as T;
+      }
+      if (url.startsWith('/users/')) {
+        handleFallbackRequest('DELETE', url);
       }
       return response.data;
     } catch (err) {

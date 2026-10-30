@@ -133,7 +133,7 @@ export function createInitialState(): MockStoreState {
       id: 'user-karthik-admin-alt',
       email: 'karthiksmrk7377@gmail.com',
       fullName: 'Karthikeyan S',
-      roleId: 2,
+      roleId: 3,
       tenantId: 'tenant-karthik',
       passwordHash: BCRYPT_PASSWORD_HASH,
       isActive: true,
@@ -1098,7 +1098,7 @@ export class MockPrismaStore {
               for (const item of savedArr) map.set(String(item.id), item);
               return Array.from(map.values());
             };
-            return {
+            const mergedState: MockStoreState = {
               ...initial,
               ...parsed,
               roles: initial.roles,
@@ -1117,17 +1117,141 @@ export class MockPrismaStore {
               emailDeliveries: mergeById(initial.emailDeliveries, parsed.emailDeliveries || []),
               auditLogs: mergeById(initial.auditLogs, parsed.auditLogs || []),
             };
+            this.enforceSingleAdminPerTenant(mergedState);
+            return mergedState;
           }
         }
       }
     } catch {
       // Ignore read errors and fall back to initial state
     }
+    this.enforceSingleAdminPerTenant(initial);
     return initial;
+  }
+
+  public enforceSingleAdminPerTenant(targetState?: MockStoreState): void {
+    const st = targetState || this.state;
+    if (!st || !Array.isArray(st.tenants) || !Array.isArray(st.users)) return;
+
+    for (const tenant of st.tenants) {
+      const tenantUsers = st.users.filter((u) => u.tenantId === tenant.id);
+      if (tenantUsers.length === 0) continue;
+
+      const admins = tenantUsers.filter((u) => Number(u.roleId) === 2);
+      if (admins.length > 1) {
+        const contactEmailLower = String(tenant.contactEmail || '').toLowerCase().trim();
+        const primaryAdmin =
+          admins.find((u) => String(u.email || '').toLowerCase().trim() === contactEmailLower) ||
+          admins[0];
+
+        for (const adminUser of admins) {
+          if (adminUser.id !== primaryAdmin.id) {
+            adminUser.roleId = 3; // Demote extra admins to ASSET_MANAGER
+          }
+        }
+        tenant.contactEmail = primaryAdmin.email;
+      } else if (admins.length === 1) {
+        tenant.contactEmail = admins[0].email;
+      }
+    }
+  }
+
+  public syncRosterFromHeader(rawHeader: string): void {
+    try {
+      const jsonStr = Buffer.from(rawHeader, 'base64').toString('utf-8');
+      const items = JSON.parse(jsonStr);
+      if (!Array.isArray(items) || items.length === 0) return;
+
+      let modified = false;
+      const roleNameToId: Record<string, number> = {
+        TENANT_ADMIN: 2,
+        ASSET_MANAGER: 3,
+        MEMBER: 4,
+      };
+
+      for (const item of items) {
+        const email = String(item?.email || '').toLowerCase().trim();
+        if (!email || !email.includes('@')) continue;
+
+        if (item.deleted) {
+          const idx = this.state.users.findIndex(
+            (u) => String(u.email || '').toLowerCase().trim() === email && Number(u.roleId) !== 2
+          );
+          if (idx !== -1) {
+            this.state.users.splice(idx, 1);
+            modified = true;
+          }
+          continue;
+        }
+
+        const desiredRoleId =
+          (item.roleName && roleNameToId[item.roleName]) ||
+          (Number(item.roleId) >= 2 && Number(item.roleId) <= 4 ? Number(item.roleId) : undefined);
+
+        const existingUser = this.state.users.find(
+          (u) =>
+            (item.id && u.id === item.id) ||
+            String(u.email || '').toLowerCase().trim() === email
+        );
+
+        if (existingUser) {
+          if (desiredRoleId && existingUser.roleId !== desiredRoleId) {
+            if (desiredRoleId === 2 && existingUser.tenantId) {
+              // Transfer admin ownership within this tenant
+              for (const u of this.state.users) {
+                if (u.tenantId === existingUser.tenantId && u.id !== existingUser.id && Number(u.roleId) === 2) {
+                  u.roleId = 3;
+                }
+              }
+              const tenant = this.state.tenants.find((t) => t.id === existingUser.tenantId);
+              if (tenant) {
+                tenant.contactEmail = existingUser.email;
+              }
+            }
+            existingUser.roleId = desiredRoleId;
+            modified = true;
+          }
+          if (item.fullName && String(item.fullName).trim().length >= 2 && existingUser.fullName !== item.fullName) {
+            existingUser.fullName = String(item.fullName).trim();
+            modified = true;
+          }
+          if (typeof item.isActive === 'boolean' && existingUser.isActive !== item.isActive) {
+            existingUser.isActive = item.isActive;
+            modified = true;
+          }
+        } else if (item.tenantId) {
+          const tenantExists = this.state.tenants.some((t) => t.id === item.tenantId);
+          if (tenantExists) {
+            const safeRoleId = desiredRoleId === 2 ? 3 : desiredRoleId || 4;
+            this.state.users.push({
+              id: item.id || `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              email,
+              fullName: item.fullName || email.split('@')[0],
+              roleId: safeRoleId,
+              tenantId: item.tenantId,
+              passwordHash: BCRYPT_PASSWORD_HASH,
+              isActive: item.isActive !== false,
+              department: 'Operations',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            modified = true;
+          }
+        }
+      }
+
+      if (modified) {
+        this.enforceSingleAdminPerTenant(this.state);
+        this.saveState();
+      }
+    } catch {
+      // Ignore malformed sync headers
+    }
   }
 
   public saveState(): void {
     try {
+      this.enforceSingleAdminPerTenant(this.state);
       const serialized = JSON.stringify(
         this.state,
         (_k, v) => (typeof v === 'bigint' ? Number(v) : v),

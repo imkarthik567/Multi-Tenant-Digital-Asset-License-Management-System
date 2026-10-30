@@ -8,10 +8,11 @@ import {
   Search,
   X,
   Check,
-  ChevronDown,
+  ShieldCheck,
   RefreshCw,
   AlertCircle,
   Edit3,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { User, RoleName } from '../../types';
@@ -41,25 +42,25 @@ export const ROLE_CONFIG: Record<
   SUPER_ADMIN: {
     label: 'Super Admin',
     description: 'Global system supervisor with root authority',
-    badgeClass: 'bg-purple-950/50 text-purple-300 border-purple-800/50 hover:bg-purple-900/40',
+    badgeClass: 'bg-purple-950/50 text-purple-300 border-purple-800/50',
     dotClass: 'bg-purple-400',
   },
   TENANT_ADMIN: {
     label: 'Admin',
-    description: 'Full workspace authority over members, policies & billing',
-    badgeClass: 'bg-indigo-950/50 text-indigo-300 border-indigo-800/50 hover:bg-indigo-900/40',
+    description: 'Sole workspace owner with full authority over members, policies & billing',
+    badgeClass: 'bg-indigo-950/50 text-indigo-300 border-indigo-800/50',
     dotClass: 'bg-indigo-400',
   },
   ASSET_MANAGER: {
     label: 'Asset Manager',
     description: 'Manage digital assets, metadata and license seats',
-    badgeClass: 'bg-sky-950/50 text-sky-300 border-sky-800/50 hover:bg-sky-900/40',
+    badgeClass: 'bg-sky-950/50 text-sky-300 border-sky-800/50',
     dotClass: 'bg-sky-400',
   },
   MEMBER: {
     label: 'Member',
     description: 'Standard access to browse assets and use assigned licenses',
-    badgeClass: 'bg-white/[0.04] text-slate-300 border-white/[0.08] hover:bg-white/[0.08]',
+    badgeClass: 'bg-white/[0.04] text-slate-300 border-white/[0.08]',
     dotClass: 'bg-slate-400',
   },
 };
@@ -126,7 +127,8 @@ export const UserListPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
 
   const [isInviteDrawerOpen, setIsInviteDrawerOpen] = useState(false);
-  const [roleDropdownUserId, setRoleDropdownUserId] = useState<string | null>(null);
+  const [roleModalUser, setRoleModalUser] = useState<User | null>(null);
+  const [selectedModalRole, setSelectedModalRole] = useState<RoleName>('MEMBER');
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
   const [editEmailUser, setEditEmailUser] = useState<User | null>(null);
   const [editEmailForm, setEditEmailForm] = useState({ fullName: '', email: '' });
@@ -161,29 +163,6 @@ export const UserListPage: React.FC = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!roleDropdownUserId) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        !(e.target as HTMLElement).closest('[data-role-badge-btn]')
-      ) {
-        setRoleDropdownUserId(null);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setRoleDropdownUserId(null);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [roleDropdownUserId]);
 
   useEffect(() => {
     if (!isInviteDrawerOpen) return;
@@ -293,15 +272,70 @@ export const UserListPage: React.FC = () => {
     },
   });
 
+  const isCurrentUserAdmin =
+    getRoleName(currentUser?.role) === 'TENANT_ADMIN' ||
+    getRoleName(currentUser?.role) === 'SUPER_ADMIN';
+
   const changeRoleMutation = useMutation({
     mutationFn: ({ userId, roleName }: { userId: string; roleName: RoleName }) =>
       api.patch(`/users/${userId}/role`, { roleName }),
-    onSuccess: (_, vars) => {
-      toast.success(`Role updated to ${ROLE_CONFIG[vars.roleName]?.label || vars.roleName}`);
-      setRoleDropdownUserId(null);
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+    onMutate: async ({ userId, roleName }) => {
+      await queryClient.cancelQueries({ queryKey: ['users'] });
+      const previousQueries = queryClient.getQueriesData<{ data: User[]; meta: any }>({
+        queryKey: ['users'],
+      });
+
+      queryClient.setQueriesData<{ data: User[]; meta: any }>(
+        { queryKey: ['users'] },
+        (old) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((u) => {
+              if (u.id === userId) {
+                return {
+                  ...u,
+                  role:
+                    typeof u.role === 'object' && u.role !== null
+                      ? { ...u.role, name: roleName }
+                      : { id: roleName === 'TENANT_ADMIN' ? 2 : roleName === 'ASSET_MANAGER' ? 3 : 4, name: roleName },
+                };
+              }
+              if (roleName === 'TENANT_ADMIN' && getRoleName(u.role) === 'TENANT_ADMIN') {
+                return {
+                  ...u,
+                  role:
+                    typeof u.role === 'object' && u.role !== null
+                      ? { ...u.role, name: 'ASSET_MANAGER' }
+                      : { id: 3, name: 'ASSET_MANAGER' },
+                };
+              }
+              return u;
+            }),
+          };
+        }
+      );
+
+      setRoleModalUser(null);
+      return { previousQueries };
     },
-    onError: (err: any) => {
+    onSuccess: (_, vars) => {
+      if (vars.roleName === 'TENANT_ADMIN') {
+        toast.success('Admin ownership transferred. Previous Admin is now Asset Manager.');
+      } else {
+        toast.success(`Role updated to ${ROLE_CONFIG[vars.roleName]?.label || vars.roleName}`);
+      }
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+      if (vars.roleName === 'TENANT_ADMIN' || vars.userId === currentUser?.id) {
+        void refreshProfile().catch(() => {});
+      }
+    },
+    onError: (err: any, _vars, context) => {
+      if (context?.previousQueries) {
+        for (const [key, data] of context.previousQueries) {
+          queryClient.setQueryData(key, data);
+        }
+      }
       toast.error(err.message || 'Failed to update role');
     },
   });
@@ -309,11 +343,35 @@ export const UserListPage: React.FC = () => {
   const toggleStatusMutation = useMutation({
     mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
       api.patch(`/users/${userId}/status`, { isActive }),
+    onMutate: async ({ userId, isActive }) => {
+      await queryClient.cancelQueries({ queryKey: ['users'] });
+      const previousQueries = queryClient.getQueriesData<{ data: User[]; meta: any }>({
+        queryKey: ['users'],
+      });
+
+      queryClient.setQueriesData<{ data: User[]; meta: any }>(
+        { queryKey: ['users'] },
+        (old) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((u) => (u.id === userId ? { ...u, isActive } : u)),
+          };
+        }
+      );
+
+      return { previousQueries };
+    },
     onSuccess: (_, vars) => {
       toast.success(vars.isActive ? 'Member activated' : 'Member deactivated');
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (err: any) => {
+    onError: (err: any, _vars, context) => {
+      if (context?.previousQueries) {
+        for (const [key, data] of context.previousQueries) {
+          queryClient.setQueryData(key, data);
+        }
+      }
       toast.error(err.message || 'Failed to update status');
     },
   });
@@ -622,7 +680,8 @@ export const UserListPage: React.FC = () => {
                   const roleName = getRoleName(u.role);
                   const roleMeta = ROLE_CONFIG[roleName] || ROLE_CONFIG.MEMBER;
                   const isCurrent = currentUser?.id === u.id;
-                  const isDropdownOpen = roleDropdownUserId === u.id;
+                  const isRowAdmin =
+                    roleName === 'TENANT_ADMIN' || roleName === 'SUPER_ADMIN';
 
                   return (
                     <tr
@@ -657,62 +716,92 @@ export const UserListPage: React.FC = () => {
                         {u.email}
                       </td>
 
-                      {/* Role Selector */}
-                      <td className="py-3.5 px-4 relative">
-                        <button
-                          type="button"
-                          data-role-badge-btn
-                          onClick={() =>
-                            setRoleDropdownUserId(isDropdownOpen ? null : u.id)
-                          }
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer select-none ${roleMeta.badgeClass}`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${roleMeta.dotClass}`} />
-                          <span>{roleMeta.label}</span>
-                          <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
-                        </button>
-
-                        {isDropdownOpen && (
-                          <div
-                            ref={dropdownRef}
-                            className="absolute left-4 top-11 z-30 w-60 p-1.5 bg-[#0f172a] border border-white/[0.1] rounded-xl shadow-2xl"
-                          >
-                            {TENANT_ASSIGNABLE_ROLES.map((r) => {
-                              const opt = ROLE_CONFIG[r];
-                              const isSelectedRole = roleName === r;
-
-                              return (
-                                <button
-                                  key={r}
-                                  type="button"
-                                  onClick={() =>
+                      {/* Zero-Scroll Inline Role Control */}
+                      <td className="py-3.5 px-4">
+                        {isRowAdmin ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-600/25 text-indigo-200 border border-indigo-500/50 shadow-xs select-none">
+                            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span>{roleMeta.label}</span>
+                            <span className="text-[10px] text-indigo-300/80 font-medium">
+                              · Owner
+                            </span>
+                          </span>
+                        ) : isCurrentUserAdmin ? (
+                          <div className="inline-flex items-center gap-2">
+                            <div
+                              className="inline-flex items-center p-1 rounded-lg bg-[#04070f] border border-white/[0.09]"
+                              role="group"
+                              aria-label={`Role for ${u.fullName}`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (roleName !== 'MEMBER') {
                                     changeRoleMutation.mutate({
                                       userId: u.id,
-                                      roleName: r,
-                                    })
+                                      roleName: 'MEMBER',
+                                    });
                                   }
-                                  className={`w-full text-left p-2 rounded-lg text-xs transition-colors flex items-start justify-between gap-2 ${
-                                    isSelectedRole
-                                      ? 'bg-indigo-600/20 text-indigo-200 font-medium'
-                                      : 'hover:bg-white/[0.05] text-slate-300'
-                                  }`}
-                                >
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className={`w-1.5 h-1.5 rounded-full ${opt.dotClass}`} />
-                                      <span>{opt.label}</span>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
-                                      {opt.description}
-                                    </p>
-                                  </div>
-                                  {isSelectedRole && (
-                                    <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
-                                  )}
-                                </button>
-                              );
-                            })}
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all cursor-pointer ${
+                                  roleName === 'MEMBER'
+                                    ? 'bg-emerald-600 text-white font-semibold border border-emerald-400/50 shadow-sm shadow-emerald-950/60'
+                                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] font-normal border border-transparent'
+                                }`}
+                              >
+                                {roleName === 'MEMBER' ? (
+                                  <Check className="w-3 h-3 stroke-[2.5] shrink-0" />
+                                ) : (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0" />
+                                )}
+                                <span>Member</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (roleName !== 'ASSET_MANAGER') {
+                                    changeRoleMutation.mutate({
+                                      userId: u.id,
+                                      roleName: 'ASSET_MANAGER',
+                                    });
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all cursor-pointer ${
+                                  roleName === 'ASSET_MANAGER'
+                                    ? 'bg-sky-600 text-white font-semibold border border-sky-400/50 shadow-sm shadow-sky-950/60'
+                                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] font-normal border border-transparent'
+                                }`}
+                              >
+                                {roleName === 'ASSET_MANAGER' ? (
+                                  <Check className="w-3 h-3 stroke-[2.5] shrink-0" />
+                                ) : (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0" />
+                                )}
+                                <span>Asset Manager</span>
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRoleModalUser(u);
+                                setSelectedModalRole(roleName);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-400 hover:text-indigo-200 hover:bg-indigo-950/50 border border-white/[0.07] hover:border-indigo-500/40 transition-colors cursor-pointer"
+                              title="Transfer Admin ownership or view role permissions"
+                            >
+                              <ArrowRightLeft className="w-3 h-3 shrink-0" />
+                              <span>Transfer Admin</span>
+                            </button>
                           </div>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border select-none ${roleMeta.badgeClass}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${roleMeta.dotClass}`} />
+                            <span>{roleMeta.label}</span>
+                          </span>
                         )}
                       </td>
 
@@ -918,7 +1007,6 @@ export const UserListPage: React.FC = () => {
                   >
                     <option value="MEMBER">Member</option>
                     <option value="ASSET_MANAGER">Asset Manager</option>
-                    <option value="TENANT_ADMIN">Admin</option>
                   </Select>
                 </form>
               ) : (
@@ -1107,6 +1195,99 @@ export const UserListPage: React.FC = () => {
             className="font-mono text-xs"
           />
         </form>
+      </Modal>
+
+      {/* Modal: Manage Role & Ownership Transfer */}
+      <Modal
+        isOpen={Boolean(roleModalUser)}
+        onClose={() => setRoleModalUser(null)}
+        title="Role & Workspace Ownership"
+        description={
+          roleModalUser
+            ? `Configure access level for ${roleModalUser.fullName} (${roleModalUser.email})`
+            : ''
+        }
+        maxWidth="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setRoleModalUser(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              isLoading={changeRoleMutation.isPending}
+              disabled={
+                !roleModalUser ||
+                getRoleName(roleModalUser.role) === selectedModalRole
+              }
+              onClick={() => {
+                if (!roleModalUser) return;
+                changeRoleMutation.mutate({
+                  userId: roleModalUser.id,
+                  roleName: selectedModalRole,
+                });
+              }}
+            >
+              {selectedModalRole === 'TENANT_ADMIN'
+                ? 'Transfer Admin Ownership'
+                : 'Apply Role'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2.5">
+          {(['MEMBER', 'ASSET_MANAGER', 'TENANT_ADMIN'] as RoleName[]).map((r) => {
+            const opt = ROLE_CONFIG[r];
+            const isSelected = selectedModalRole === r;
+            const isOwnershipOption = r === 'TENANT_ADMIN';
+
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setSelectedModalRole(r)}
+                className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start justify-between gap-3 cursor-pointer ${
+                  isSelected
+                    ? isOwnershipOption
+                      ? 'bg-indigo-950/40 border-indigo-500/60 text-white'
+                      : 'bg-white/[0.06] border-indigo-500/50 text-white'
+                    : 'bg-[#050811] border-white/[0.07] hover:border-white/[0.15] text-slate-300'
+                }`}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${opt.dotClass}`} />
+                    <span className="text-xs font-semibold text-white">
+                      {isOwnershipOption
+                        ? 'Admin (Transfer Workspace Ownership)'
+                        : opt.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed pl-4">
+                    {isOwnershipOption
+                      ? 'Promotes this member to the sole Workspace Admin and automatically transitions your account to Asset Manager.'
+                      : opt.description}
+                  </p>
+                </div>
+
+                <div
+                  className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                    isSelected
+                      ? 'border-indigo-400 bg-indigo-600 text-white'
+                      : 'border-slate-600'
+                  }`}
+                >
+                  {isSelected && <Check className="w-2.5 h-2.5" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </Modal>
 
       {/* Confirm Dialog: Remove Member */}

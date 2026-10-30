@@ -6,6 +6,7 @@
 // ==============================================================================
 
 const STORAGE_KEY = 'assetvault_fallback_store_v1';
+const ROSTER_SYNC_KEY = 'assetvault_roster_sync_v1';
 
 const DEFAULT_PERMISSIONS = [
   'tenants:read_own',
@@ -42,6 +43,111 @@ const DEFAULT_PERMISSIONS = [
   'audit_logs:read',
   'reports:read',
 ];
+
+const ASSET_MANAGER_PERMISSIONS = [
+  'tenants:read_own',
+  'users:read',
+  'vendors:read',
+  'vendors:write',
+  'categories:read',
+  'categories:write',
+  'tags:read',
+  'tags:write',
+  'assets:read',
+  'assets:create',
+  'assets:update',
+  'assets:download',
+  'assets:checkout',
+  'licenses:read',
+  'licenses:create',
+  'licenses:update',
+  'licenses:renew',
+  'licenses:reveal_key',
+  'allocations:read',
+  'allocations:allocate_any',
+  'allocations:allocate_self',
+  'allocations:release_any',
+  'allocations:release_self',
+  'notifications:read_own',
+  'reports:read',
+];
+
+const MEMBER_PERMISSIONS = [
+  'tenants:read_own',
+  'assets:read',
+  'assets:download',
+  'assets:checkout',
+  'licenses:read',
+  'allocations:read',
+  'allocations:allocate_self',
+  'allocations:release_self',
+  'notifications:read_own',
+];
+
+export function getPermissionsForRole(roleInput: any): string[] {
+  const roleName =
+    typeof roleInput === 'object' && roleInput?.name
+      ? String(roleInput.name)
+      : String(roleInput || 'MEMBER');
+  if (roleName === 'SUPER_ADMIN' || roleName === 'TENANT_ADMIN') {
+    return DEFAULT_PERMISSIONS;
+  }
+  if (roleName === 'ASSET_MANAGER') {
+    return ASSET_MANAGER_PERMISSIONS;
+  }
+  return MEMBER_PERMISSIONS;
+}
+
+export interface RosterSyncEntry {
+  id?: string;
+  email: string;
+  fullName?: string;
+  roleName?: string;
+  roleId?: number;
+  tenantId?: string;
+  isActive?: boolean;
+  deleted?: boolean;
+}
+
+export function recordRosterSyncEntry(entry: RosterSyncEntry): void {
+  try {
+    const email = String(entry.email || '').toLowerCase().trim();
+    if (!email || !email.includes('@')) return;
+    const raw = localStorage.getItem(ROSTER_SYNC_KEY);
+    const list: RosterSyncEntry[] = raw ? JSON.parse(raw) : [];
+    const filtered = Array.isArray(list)
+      ? list.filter((item) => String(item.email || '').toLowerCase().trim() !== email)
+      : [];
+
+    // If promoting to TENANT_ADMIN, demote any previous TENANT_ADMIN in the same tenant in sync list
+    if (entry.roleName === 'TENANT_ADMIN' || entry.roleId === 2) {
+      for (const existing of filtered) {
+        if (
+          (!entry.tenantId || !existing.tenantId || existing.tenantId === entry.tenantId) &&
+          (existing.roleName === 'TENANT_ADMIN' || existing.roleId === 2)
+        ) {
+          existing.roleName = 'ASSET_MANAGER';
+          existing.roleId = 3;
+        }
+      }
+    }
+
+    filtered.push({ ...entry, email });
+    localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(filtered.slice(-50)));
+  } catch {}
+}
+
+export function getRosterSyncHeader(): string | null {
+  try {
+    const raw = localStorage.getItem(ROSTER_SYNC_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    return btoa(unescape(encodeURIComponent(JSON.stringify(parsed))));
+  } catch {
+    return null;
+  }
+}
 
 interface FallbackStore {
   tenants: any[];
@@ -100,9 +206,9 @@ function getInitialStore(): FallbackStore {
       {
         id: 'user-karthik-smrk',
         email: 'karthiksmrk7377@gmail.com',
-        fullName: 'Karthik S',
-        role: 'TENANT_ADMIN',
-        roleId: 2,
+        fullName: 'Karthikeyan S',
+        role: 'ASSET_MANAGER',
+        roleId: 3,
         tenantId: 'tenant-karthik',
         isActive: true,
         isSuperAdmin: false,
@@ -264,22 +370,112 @@ function getInitialStore(): FallbackStore {
   };
 }
 
+function getUserRoleString(u: any): string {
+  if (typeof u?.role === 'object' && u.role?.name) return u.role.name;
+  if (typeof u?.role === 'string') return u.role;
+  if (Number(u?.roleId) === 2) return 'TENANT_ADMIN';
+  if (Number(u?.roleId) === 3) return 'ASSET_MANAGER';
+  return 'MEMBER';
+}
+
+function enforceSingleAdminInStore(store: FallbackStore): void {
+  if (!store || !Array.isArray(store.tenants) || !Array.isArray(store.users)) return;
+  for (const tenant of store.tenants) {
+    const tenantUsers = store.users.filter((u) => u.tenantId === tenant.id);
+    if (tenantUsers.length === 0) continue;
+
+    const admins = tenantUsers.filter(
+      (u) => getUserRoleString(u) === 'TENANT_ADMIN' || Number(u.roleId) === 2
+    );
+    if (admins.length > 1) {
+      const contactEmailLower = String(tenant.contactEmail || '').toLowerCase().trim();
+      const primaryAdmin =
+        admins.find((u) => String(u.email || '').toLowerCase().trim() === contactEmailLower) ||
+        admins[0];
+
+      for (const adminUser of admins) {
+        if (adminUser.id !== primaryAdmin.id) {
+          adminUser.role = 'ASSET_MANAGER';
+          adminUser.roleId = 3;
+        } else {
+          adminUser.role = 'TENANT_ADMIN';
+          adminUser.roleId = 2;
+        }
+      }
+      tenant.contactEmail = primaryAdmin.email;
+    } else if (admins.length === 1) {
+      admins[0].role = 'TENANT_ADMIN';
+      admins[0].roleId = 2;
+      tenant.contactEmail = admins[0].email;
+    }
+  }
+}
+
 function loadStore(): FallbackStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.users)) return parsed;
+      if (parsed && Array.isArray(parsed.users)) {
+        enforceSingleAdminInStore(parsed);
+        return parsed;
+      }
     }
   } catch {}
   const initial = getInitialStore();
+  enforceSingleAdminInStore(initial);
   saveStore(initial);
   return initial;
 }
 
 function saveStore(store: FallbackStore): void {
   try {
+    enforceSingleAdminInStore(store);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  } catch {}
+}
+
+export function syncServerUsersToFallbackStore(users: any[], tenantId?: string): void {
+  if (!Array.isArray(users) || users.length === 0) return;
+  try {
+    const store = loadStore();
+    for (const srvUser of users) {
+      if (!srvUser || !srvUser.email) continue;
+      const emailLower = String(srvUser.email).toLowerCase().trim();
+      const roleStr = getUserRoleString(srvUser);
+      const roleId =
+        roleStr === 'TENANT_ADMIN' ? 2 : roleStr === 'ASSET_MANAGER' ? 3 : 4;
+      const existing = store.users.find(
+        (u) => u.id === srvUser.id || String(u.email || '').toLowerCase().trim() === emailLower
+      );
+      if (existing) {
+        existing.id = srvUser.id || existing.id;
+        existing.fullName = srvUser.fullName || existing.fullName;
+        existing.role = roleStr;
+        existing.roleId = roleId;
+        existing.isActive = srvUser.isActive !== false;
+        if (srvUser.tenantId || tenantId) {
+          existing.tenantId = srvUser.tenantId || tenantId;
+        }
+        if (roleStr === 'TENANT_ADMIN' && existing.tenantId) {
+          const tenant = store.tenants.find((t) => t.id === existing.tenantId);
+          if (tenant) tenant.contactEmail = existing.email;
+        }
+      } else {
+        store.users.push({
+          id: srvUser.id || `user-${Date.now()}`,
+          email: emailLower,
+          fullName: srvUser.fullName || emailLower.split('@')[0],
+          role: roleStr,
+          roleId,
+          tenantId: srvUser.tenantId || tenantId || store.tenants[0]?.id || 'tenant-karthik',
+          isActive: srvUser.isActive !== false,
+          isSuperAdmin: false,
+          createdAt: srvUser.createdAt || new Date().toISOString(),
+        });
+      }
+    }
+    saveStore(store);
   } catch {}
 }
 
@@ -299,19 +495,31 @@ export function handleFallbackRequest(
     let tenant = store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
 
     if (!user) {
-      const namePart = email.split('@')[0]?.replace(/[._0-9]+/g, ' ').trim() || 'Enterprise Admin';
+      const namePart = email.split('@')[0]?.replace(/[._0-9]+/g, ' ').trim() || 'Enterprise Member';
       const displayFullName = namePart
         .split(' ')
         .filter(Boolean)
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ') || 'Karthikeyan S';
 
+      const hasExistingAdmin = store.users.some(
+        (u) => u.tenantId === tenant.id && (getUserRoleString(u) === 'TENANT_ADMIN' || Number(u.roleId) === 2)
+      );
+      const assignedRole =
+        !hasExistingAdmin && email === 'karthikeyan.s050607@gmail.com'
+          ? 'TENANT_ADMIN'
+          : email === 'karthiksmrk7377@gmail.com'
+          ? 'ASSET_MANAGER'
+          : 'MEMBER';
+      const assignedRoleId =
+        assignedRole === 'TENANT_ADMIN' ? 2 : assignedRole === 'ASSET_MANAGER' ? 3 : 4;
+
       user = {
         id: `user-${Date.now()}`,
         email,
         fullName: displayFullName,
-        role: 'TENANT_ADMIN',
-        roleId: 2,
+        role: assignedRole,
+        roleId: assignedRoleId,
         tenantId: tenant.id,
         isActive: true,
         isSuperAdmin: false,
@@ -321,7 +529,8 @@ export function handleFallbackRequest(
       saveStore(store);
     }
 
-    const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role, tenantId: tenant.id }))}`;
+    const roleStr = getUserRoleString(user);
+    const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: roleStr, tenantId: tenant.id }))}`;
     return {
       status: 'success',
       data: {
@@ -329,7 +538,8 @@ export function handleFallbackRequest(
         refreshToken: `fallback-rt-${Date.now()}`,
         user: {
           ...user,
-          permissions: DEFAULT_PERMISSIONS,
+          role: roleStr,
+          permissions: getPermissionsForRole(roleStr),
           tenant,
         },
       },
@@ -387,7 +597,8 @@ export function handleFallbackRequest(
 
     if (user) {
       const tenant = store.tenants.find((t) => t.id === user.tenantId) || store.tenants[0];
-      const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role, tenantId: tenant.id }))}`;
+      const roleStr = getUserRoleString(user);
+      const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: roleStr, tenantId: tenant.id }))}`;
       return {
         status: 'success',
         data: {
@@ -397,7 +608,8 @@ export function handleFallbackRequest(
           tenant,
           user: {
             ...user,
-            permissions: DEFAULT_PERMISSIONS,
+            role: roleStr,
+            permissions: getPermissionsForRole(roleStr),
             tenant,
           },
         },
@@ -499,15 +711,17 @@ export function handleFallbackRequest(
       }
     } catch {}
     const user = cachedUser || store.users[0];
+    const roleStr = getUserRoleString(user);
     const tenant = store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
     return {
       status: 'success',
       data: {
         ...user,
+        role: roleStr,
         name: user.fullName,
         tenant,
         plan: tenant.plan,
-        permissions: DEFAULT_PERMISSIONS,
+        permissions: getPermissionsForRole(roleStr),
       },
     };
   }
@@ -706,7 +920,209 @@ export function handleFallbackRequest(
   }
 
   if (cleanUrl.startsWith('/users')) {
-    return makePaginated(store.users);
+    let activeTenantId = store.tenants[0]?.id || 'tenant-karthik';
+    try {
+      const rawSession = localStorage.getItem('assetvault_session_cache');
+      if (rawSession) {
+        const parsed = JSON.parse(rawSession);
+        if (parsed?.tenant?.id) activeTenantId = parsed.tenant.id;
+        else if (parsed?.user?.tenantId) activeTenantId = parsed.user.tenantId;
+      }
+    } catch {}
+
+    // POST /users/bulk-email
+    if (method === 'POST' && cleanUrl.includes('/bulk-email')) {
+      const rawText = String(body?.rawText || '');
+      const matches = rawText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [];
+      const createdUsers: any[] = [];
+      for (const m of matches) {
+        const email = m.trim().toLowerCase();
+        if (store.users.some((u) => u.email.toLowerCase() === email)) continue;
+        const fullName = email
+          .split('@')[0]
+          .replace(/[._-]+/g, ' ')
+          .replace(/\b\w/g, (l) => l.toUpperCase());
+        const newUser = {
+          id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          email,
+          fullName,
+          role: 'MEMBER',
+          roleId: 4,
+          tenantId: activeTenantId,
+          isActive: true,
+          isSuperAdmin: false,
+          createdAt: new Date().toISOString(),
+        };
+        store.users.push(newUser);
+        recordRosterSyncEntry({
+          id: newUser.id,
+          email: newUser.email,
+          fullName: newUser.fullName,
+          roleName: 'MEMBER',
+          roleId: 4,
+          tenantId: activeTenantId,
+          isActive: true,
+        });
+        createdUsers.push(newUser);
+      }
+      saveStore(store);
+      return {
+        status: 'success',
+        data: {
+          createdCount: createdUsers.length,
+          createdUsers,
+        },
+      };
+    }
+
+    // POST /users
+    if (method === 'POST' && cleanUrl === '/users') {
+      const email = String(body?.email || '').trim().toLowerCase();
+      const fullName =
+        String(body?.fullName || '').trim() ||
+        email
+          .split('@')[0]
+          .replace(/[._-]+/g, ' ')
+          .replace(/\b\w/g, (l) => l.toUpperCase());
+      const requestedRole = body?.roleName || 'MEMBER';
+      const safeRole = requestedRole === 'TENANT_ADMIN' ? 'ASSET_MANAGER' : requestedRole;
+      const roleId = safeRole === 'ASSET_MANAGER' ? 3 : 4;
+
+      const created = {
+        id: `user-${Date.now()}`,
+        email,
+        fullName,
+        role: safeRole,
+        roleId,
+        tenantId: activeTenantId,
+        isActive: true,
+        isSuperAdmin: false,
+        createdAt: new Date().toISOString(),
+      };
+      store.users.push(created);
+      saveStore(store);
+      recordRosterSyncEntry({
+        id: created.id,
+        email: created.email,
+        fullName: created.fullName,
+        roleName: safeRole,
+        roleId,
+        tenantId: activeTenantId,
+        isActive: true,
+      });
+      return { status: 'success', data: created };
+    }
+
+    // PATCH /users/:id/role
+    const roleMatch = cleanUrl.match(/^\/users\/([^/]+)\/role$/);
+    if (method === 'PATCH' && roleMatch) {
+      const targetUserId = roleMatch[1];
+      const newRoleName = String(body?.roleName || 'MEMBER');
+      const targetUser = store.users.find((u) => u.id === targetUserId);
+      if (targetUser) {
+        const userTenantId = targetUser.tenantId || activeTenantId;
+        if (newRoleName === 'TENANT_ADMIN') {
+          for (const u of store.users) {
+            if (u.tenantId === userTenantId && u.id !== targetUser.id && getUserRoleString(u) === 'TENANT_ADMIN') {
+              u.role = 'ASSET_MANAGER';
+              u.roleId = 3;
+              recordRosterSyncEntry({
+                id: u.id,
+                email: u.email,
+                fullName: u.fullName,
+                roleName: 'ASSET_MANAGER',
+                roleId: 3,
+                tenantId: userTenantId,
+                isActive: u.isActive,
+              });
+            }
+          }
+          const tenant = store.tenants.find((t) => t.id === userTenantId);
+          if (tenant) {
+            tenant.contactEmail = targetUser.email;
+          }
+        }
+        targetUser.role = newRoleName;
+        targetUser.roleId =
+          newRoleName === 'TENANT_ADMIN' ? 2 : newRoleName === 'ASSET_MANAGER' ? 3 : 4;
+        saveStore(store);
+        recordRosterSyncEntry({
+          id: targetUser.id,
+          email: targetUser.email,
+          fullName: targetUser.fullName,
+          roleName: newRoleName,
+          roleId: targetUser.roleId,
+          tenantId: userTenantId,
+          isActive: targetUser.isActive,
+        });
+        return { status: 'success', data: targetUser };
+      }
+    }
+
+    // PATCH /users/:id/status
+    const statusMatch = cleanUrl.match(/^\/users\/([^/]+)\/status$/);
+    if (method === 'PATCH' && statusMatch) {
+      const targetUserId = statusMatch[1];
+      const targetUser = store.users.find((u) => u.id === targetUserId);
+      if (targetUser) {
+        targetUser.isActive = Boolean(body?.isActive);
+        saveStore(store);
+        recordRosterSyncEntry({
+          id: targetUser.id,
+          email: targetUser.email,
+          fullName: targetUser.fullName,
+          roleName: getUserRoleString(targetUser),
+          roleId: targetUser.roleId,
+          tenantId: targetUser.tenantId,
+          isActive: targetUser.isActive,
+        });
+        return { status: 'success', data: targetUser };
+      }
+    }
+
+    // PATCH /users/:id
+    const updateMatch = cleanUrl.match(/^\/users\/([^/]+)$/);
+    if (method === 'PATCH' && updateMatch) {
+      const targetUserId = updateMatch[1];
+      const targetUser = store.users.find((u) => u.id === targetUserId);
+      if (targetUser) {
+        if (body?.fullName) targetUser.fullName = String(body.fullName).trim();
+        if (body?.email) targetUser.email = String(body.email).trim().toLowerCase();
+        saveStore(store);
+        recordRosterSyncEntry({
+          id: targetUser.id,
+          email: targetUser.email,
+          fullName: targetUser.fullName,
+          roleName: getUserRoleString(targetUser),
+          roleId: targetUser.roleId,
+          tenantId: targetUser.tenantId,
+          isActive: targetUser.isActive,
+        });
+        return { status: 'success', data: targetUser };
+      }
+    }
+
+    // DELETE /users/:id
+    if (method === 'DELETE' && updateMatch) {
+      const targetUserId = updateMatch[1];
+      const idx = store.users.findIndex((u) => u.id === targetUserId);
+      if (idx !== -1) {
+        const removed = store.users[idx];
+        if (getUserRoleString(removed) !== 'TENANT_ADMIN') {
+          store.users.splice(idx, 1);
+          saveStore(store);
+          recordRosterSyncEntry({
+            id: removed.id,
+            email: removed.email,
+            deleted: true,
+          });
+        }
+        return { status: 'success', message: 'User removed' };
+      }
+    }
+
+    const tenantUsers = store.users.filter((u) => !u.tenantId || u.tenantId === activeTenantId);
+    return makePaginated(tenantUsers.length > 0 ? tenantUsers : store.users);
   }
 
   if (cleanUrl.startsWith('/notifications')) {

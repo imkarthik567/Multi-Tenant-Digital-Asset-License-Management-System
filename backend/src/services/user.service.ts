@@ -49,7 +49,15 @@ export class UserService {
       throw new ConflictError(`User with email '${normalizedEmail}' already exists.`);
     }
 
-    const targetRoleName = data.roleName || 'MEMBER';
+    let targetRoleName = data.roleName || 'MEMBER';
+    if (targetRoleName === 'TENANT_ADMIN') {
+      const existingAdmin = mockStore.state.users.find(
+        (u) => u.tenantId === tenantId && Number(u.roleId) === 2
+      );
+      if (existingAdmin) {
+        targetRoleName = 'ASSET_MANAGER';
+      }
+    }
     const role = await prismaClient.role.findUnique({
       where: { name: targetRoleName },
     });
@@ -79,14 +87,16 @@ export class UserService {
       isActive: true,
     });
 
-    await emailService.dispatchMemberOnboardingEmail({
-      tenantId,
-      userId: createdUser.id,
-      email: normalizedEmail,
-      fullName: autoDerivedName,
-      roleName: role.name,
-      generatedPassword: rawPassword,
-    });
+    void emailService
+      .dispatchMemberOnboardingEmail({
+        tenantId,
+        userId: createdUser.id,
+        email: normalizedEmail,
+        fullName: autoDerivedName,
+        roleName: role.name,
+        generatedPassword: rawPassword,
+      })
+      .catch(() => {});
 
     return {
       ...createdUser,
@@ -234,6 +244,18 @@ export class UserService {
       delete updatePayload.roleName;
     }
 
+    if (Number(updatePayload.roleId) === 2 && existingUser.tenantId) {
+      for (const u of mockStore.state.users) {
+        if (u.tenantId === existingUser.tenantId && u.id !== id && Number(u.roleId) === 2) {
+          u.roleId = 3;
+        }
+      }
+      const tenant = mockStore.state.tenants.find((t) => t.id === existingUser.tenantId);
+      if (tenant) {
+        tenant.contactEmail = updatePayload.email || existingUser.email;
+      }
+    }
+
     const updated = await userRepository.update(prismaClient, id, updatePayload);
 
     // Sync any in-memory allocations for this user so seat allocations reflect the updated email/name
@@ -260,23 +282,27 @@ export class UserService {
         : 'MEMBER';
 
     if (isEmailChanged && updated.email) {
-      await emailService.dispatchMemberOnboardingEmail({
-        tenantId: updated.tenantId || existingUser.tenantId || 'tenant-acme-corp',
-        userId: updated.id,
-        email: updated.email,
-        fullName: updated.fullName || deriveNameFromEmail(updated.email),
-        roleName: newRoleName,
-        isEmailUpdate: true,
-      });
+      void emailService
+        .dispatchMemberOnboardingEmail({
+          tenantId: updated.tenantId || existingUser.tenantId || 'tenant-acme-corp',
+          userId: updated.id,
+          email: updated.email,
+          fullName: updated.fullName || deriveNameFromEmail(updated.email),
+          roleName: newRoleName,
+          isEmailUpdate: true,
+        })
+        .catch(() => {});
     } else if (updated.email && previousRoleName !== newRoleName) {
-      await emailService.dispatchRoleChangeEmail({
-        tenantId: updated.tenantId || existingUser.tenantId || 'tenant-acme-corp',
-        userId: updated.id,
-        email: updated.email,
-        fullName: updated.fullName || deriveNameFromEmail(updated.email),
-        previousRole: previousRoleName,
-        newRole: newRoleName,
-      });
+      void emailService
+        .dispatchRoleChangeEmail({
+          tenantId: updated.tenantId || existingUser.tenantId || 'tenant-acme-corp',
+          userId: updated.id,
+          email: updated.email,
+          fullName: updated.fullName || deriveNameFromEmail(updated.email),
+          previousRole: previousRoleName,
+          newRole: newRoleName,
+        })
+        .catch(() => {});
     }
 
     return updated;
@@ -337,10 +363,45 @@ export class UserService {
       const previousRoleName =
         currentUser.role?.name ||
         (currentUser.roleId === 2
-          ? 'ADMIN'
+          ? 'TENANT_ADMIN'
           : currentUser.roleId === 3
-          ? 'MANAGER'
+          ? 'ASSET_MANAGER'
           : 'MEMBER');
+
+      // Prevent demoting the sole Admin without transferring ownership to another member
+      if (Number(currentUser.roleId) === 2 && targetRole.name !== 'TENANT_ADMIN') {
+        const otherAdmins = mockStore.state.users.filter(
+          (u) => u.tenantId === tenantId && u.id !== userId && Number(u.roleId) === 2
+        );
+        if (otherAdmins.length === 0) {
+          throw new BadRequestError(
+            'Each workspace must have one Admin. Promote another member to Admin to transfer ownership.'
+          );
+        }
+      }
+
+      // If promoting a member to TENANT_ADMIN, atomically demote existing Admin(s) in this tenant to ASSET_MANAGER
+      if (targetRole.name === 'TENANT_ADMIN' || Number(targetRole.id) === 2) {
+        const assetManagerRole =
+          (await tx.role.findUnique({ where: { name: 'ASSET_MANAGER' } })) || { id: 3 };
+        const previousAdmins = mockStore.state.users.filter(
+          (u) => u.tenantId === tenantId && u.id !== userId && Number(u.roleId) === 2
+        );
+        for (const prevAdmin of previousAdmins) {
+          await tx.user.update({
+            where: { id: prevAdmin.id },
+            data: { roleId: assetManagerRole.id },
+          });
+          await tx.refreshToken.updateMany({
+            where: { userId: prevAdmin.id, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+        }
+        const tenantRecord = mockStore.state.tenants.find((t) => t.id === tenantId);
+        if (tenantRecord && currentUser.email) {
+          tenantRecord.contactEmail = currentUser.email;
+        }
+      }
 
       const updatedUser = await tx.user.update({
         where: { id: userId },
@@ -354,6 +415,9 @@ export class UserService {
         },
       });
 
+      mockStore.enforceSingleAdminPerTenant();
+      mockStore.saveState();
+
       // Revoke refresh tokens so user gets updated role claim on re-login
       await tx.refreshToken.updateMany({
         where: { userId, revokedAt: null },
@@ -361,15 +425,17 @@ export class UserService {
       });
 
       if (updatedUser.email && previousRoleName !== targetRole.name) {
-        await emailService.dispatchRoleChangeEmail({
-          tenantId,
-          userId: updatedUser.id,
-          email: updatedUser.email,
-          fullName: updatedUser.fullName || deriveNameFromEmail(updatedUser.email),
-          previousRole: previousRoleName,
-          newRole: targetRole.name,
-          reason,
-        });
+        void emailService
+          .dispatchRoleChangeEmail({
+            tenantId,
+            userId: updatedUser.id,
+            email: updatedUser.email,
+            fullName: updatedUser.fullName || deriveNameFromEmail(updatedUser.email),
+            previousRole: previousRoleName,
+            newRole: targetRole.name,
+            reason,
+          })
+          .catch(() => {});
       }
 
       return updatedUser;
