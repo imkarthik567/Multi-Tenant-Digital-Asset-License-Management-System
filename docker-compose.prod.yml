@@ -7,6 +7,7 @@ version: '3.8'
 
 services:
   db:
+    image: postgres:16-alpine
     restart: always
     deploy:
       resources:
@@ -22,7 +23,6 @@ services:
   api:
     image: ${DOCKERHUB_USERNAME:-assetvault}/assetvault-api:1.0.0
     restart: always
-    build: !reset null
     deploy:
       resources:
         limits:
@@ -37,7 +37,6 @@ services:
   worker:
     image: ${DOCKERHUB_USERNAME:-assetvault}/assetvault-api:1.0.0
     restart: always
-    build: !reset null
     deploy:
       resources:
         limits:
@@ -52,7 +51,6 @@ services:
   web:
     image: ${DOCKERHUB_USERNAME:-assetvault}/assetvault-web:1.0.0
     restart: always
-    build: !reset null
     deploy:
       resources:
         limits:

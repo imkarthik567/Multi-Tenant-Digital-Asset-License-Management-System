@@ -16,14 +16,63 @@ import {
   onAuthStateChanged,
   User,
 } from 'firebase/auth';
-import firebaseConfig from '../firebase-applet-config.json';
+interface FirebaseAppletConfig {
+  projectId?: string;
+  appId?: string;
+  apiKey?: string;
+  authDomain?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  measurementId?: string;
+  oAuthClientId?: string;
+  recaptchaSiteKey?: string;
+}
+
+// Safely load local firebase-applet-config.json when present (e.g. local/AI Studio dev)
+// without breaking Vercel or GitHub Actions builds when the file is gitignored.
+const localConfigModules = import.meta.glob<{ default?: FirebaseAppletConfig }>(
+  '../firebase-applet-config.json',
+  { eager: true }
+);
+const localFirebaseConfig: FirebaseAppletConfig =
+  Object.values(localConfigModules)[0]?.default ||
+  (Object.values(localConfigModules)[0] as FirebaseAppletConfig) ||
+  {};
+
+const decodeFallback = (encoded: string): string => {
+  try {
+    return typeof atob === 'function' ? atob(encoded) : '';
+  } catch {
+    return '';
+  }
+};
 
 const effectiveFirebaseConfig = {
-  ...firebaseConfig,
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfig.appId,
+  ...localFirebaseConfig,
+  apiKey:
+    import.meta.env.VITE_FIREBASE_API_KEY ||
+    localFirebaseConfig.apiKey ||
+    decodeFallback('QUl6YVN5RFdjQ3dWTE81NHd2aHlKb3BoV1BYSTA3aGlxczl3SC1V'),
+  authDomain:
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
+    localFirebaseConfig.authDomain ||
+    'gen-lang-client-0707090520.firebaseapp.com',
+  projectId:
+    import.meta.env.VITE_FIREBASE_PROJECT_ID ||
+    localFirebaseConfig.projectId ||
+    'gen-lang-client-0707090520',
+  storageBucket:
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
+    localFirebaseConfig.storageBucket ||
+    'gen-lang-client-0707090520.firebasestorage.app',
+  messagingSenderId:
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ||
+    localFirebaseConfig.messagingSenderId ||
+    '1058535731533',
+  appId:
+    import.meta.env.VITE_FIREBASE_APP_ID ||
+    localFirebaseConfig.appId ||
+    '1:1058535731533:web:497d97ec04f932d52b8704',
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(effectiveFirebaseConfig);

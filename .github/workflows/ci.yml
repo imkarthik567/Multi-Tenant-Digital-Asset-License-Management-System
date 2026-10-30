@@ -19,10 +19,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Typecheck backend
         run: npx tsc -p backend/tsconfig.json --noEmit
@@ -31,4 +30,4 @@ jobs:
         run: npx tsc -p frontend/tsconfig.json --noEmit
 
       - name: Build frontend production bundle
-        run: cd frontend && npm run build
+        run: npm run build
