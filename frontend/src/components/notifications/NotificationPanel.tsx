@@ -32,8 +32,7 @@ import { Notification, AutomatedEmailLog } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { NotificationStreamClient } from '../../services/notificationStream';
 import { Badge, Skeleton } from '../ui';
-import { GmailSenderBanner } from './GmailSenderBanner';
-import { getCachedGmailToken, googleSignIn, getConnectedGoogleEmail } from '../../services/gmailAuth';
+import { getCachedGmailToken, authorizeGmailSendWithGoogle } from '../../services/gmailAuth';
 
 export interface NotificationPanelProps {
   isOpen: boolean;
@@ -461,11 +460,12 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
 
       // Only open Google OAuth popup if neither backend Gmail (SMTP/OAuth) nor local token is connected
       if (!token && !statusData.connected) {
-        token = await googleSignIn('karthiksmrk7377@gmail.com');
-        const sender = getConnectedGoogleEmail();
+        const authRes = await authorizeGmailSendWithGoogle(statusData.senderEmail || undefined);
+        token = authRes.accessToken;
         await api.post('/notifications/gmail-connect', {
-          accessToken: token,
-          senderEmail: sender,
+          accessToken: authRes.accessToken,
+          senderEmail: authRes.email,
+          senderName: authRes.fullName,
           flushPending: false,
         });
       }
@@ -682,8 +682,6 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
           >
             {activeTab === 'emails' ? (
               <div className="space-y-3">
-                <GmailSenderBanner compact />
-
                 {isEmailLogsLoading ? (
                   <div className="space-y-3 pt-2">
                     {Array.from({ length: 4 }).map((_, i) => (

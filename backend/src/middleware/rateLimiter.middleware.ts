@@ -6,6 +6,14 @@ export const globalRateLimiter = rateLimit({
   max: env.NODE_ENV === 'test' ? 10000 : env.NODE_ENV === 'development' ? 1000 : env.RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) =>
+    req.path === '/health' ||
+    req.path === '/api/health' ||
+    req.path === '/api/v1/health' ||
+    req.path === '/ready' ||
+    req.path === '/api/ready' ||
+    req.path === '/api/v1/ready' ||
+    req.path === '/metrics',
   message: {
     error: {
       code: 'TOO_MANY_REQUESTS',

@@ -460,39 +460,42 @@ export const UserListPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Silent Background Gmail Synchronizer */}
-      <GmailSenderBanner />
-
-      {/* Clean Minimalist Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">
-            Team
+            Team &amp; Access Management
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Manage workspace members, roles, and access permissions.
+            Manage workspace members, assign role permissions, and automate credential delivery.
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          iconLeft={<UserPlus className="w-4 h-4" />}
-          onClick={() => {
-            setOnboardMode('single');
-            setInviteForm({
-              email: '',
-              fullName: '',
-              password: generateSecurePassword(),
-              roleName: 'MEMBER',
-            });
-            setInviteErrors({});
-            setIsInviteDrawerOpen(true);
-          }}
-        >
-          Add Member
-        </Button>
+        <div className="flex items-center gap-2.5 self-start sm:self-center">
+          {/* Compact Admin Mail Configuration Icon Button */}
+          <GmailSenderBanner variant="header-button" />
+
+          <Button
+            variant="primary"
+            size="sm"
+            iconLeft={<UserPlus className="w-4 h-4" />}
+            onClick={() => {
+              setOnboardMode('single');
+              setInviteForm({
+                email: '',
+                fullName: '',
+                password: generateSecurePassword(),
+                roleName: 'MEMBER',
+              });
+              setInviteErrors({});
+              setIsInviteDrawerOpen(true);
+            }}
+          >
+            Add Member
+          </Button>
+        </div>
       </div>
+
 
       {/* Aligned Search & Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
@@ -965,6 +968,15 @@ export const UserListPage: React.FC = () => {
                 </form>
               )}
 
+              {/* Onboarding notification indicator */}
+              <div className="px-6 py-2.5 bg-indigo-950/20 border-t border-indigo-900/30 text-[11px] text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-indigo-300 font-medium">
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  Credentials &amp; Welcome Email: Dispatched Immediately
+                </span>
+                <span className="font-mono text-slate-400">SMTP Active</span>
+              </div>
+
               <div className="p-4 border-t border-white/[0.07] flex items-center justify-end gap-2">
                 <Button
                   variant="secondary"
@@ -985,8 +997,8 @@ export const UserListPage: React.FC = () => {
                   }
                 >
                   {onboardMode === 'single'
-                    ? 'Add Member'
-                    : `Import ${detectedBulkEmails.length || ''} Members`}
+                    ? 'Add & Auto-Onboard'
+                    : `Auto-Onboard ${detectedBulkEmails.length || ''} Members`}
                 </Button>
               </div>
             </div>

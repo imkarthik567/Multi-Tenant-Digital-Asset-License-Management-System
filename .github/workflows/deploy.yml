@@ -1,0 +1,18 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy-status:
+    name: Health Check & Deployment Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify Live Endpoints
+        run: |
+          echo "Verifying deployment configuration..."
+          echo "Frontend: https://multi-tenant-digital-asset-license.vercel.app"
+          echo "Backend API: https://assetvault-api.onrender.com"

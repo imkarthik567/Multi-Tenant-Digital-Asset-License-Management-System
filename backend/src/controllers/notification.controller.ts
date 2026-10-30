@@ -63,7 +63,11 @@ export class NotificationController {
   });
 
   public getGmailStatus = asyncHandler(async (req: Request, res: Response) => {
-    const status = emailService.getGmailStatus(req.user!.tenantId || null);
+    const status = emailService.getGmailStatus(
+      req.user!.tenantId || null,
+      req.user!.email || null,
+      (req.user as any)?.fullName || null
+    );
     sendResponse(res, 200, status);
   });
 
@@ -72,14 +76,23 @@ export class NotificationController {
     const accessToken =
       (typeof req.body?.accessToken === 'string' && req.body.accessToken.trim()) ||
       (typeof headerToken === 'string' && headerToken.trim()) ||
-      null;
+      'universal-relay';
     const senderEmail =
-      typeof req.body?.senderEmail === 'string' ? req.body.senderEmail.trim() : null;
+      (typeof req.body?.senderEmail === 'string' && req.body.senderEmail.trim()) ||
+      req.user?.email ||
+      null;
+    const senderName =
+      (typeof req.body?.senderName === 'string' && req.body.senderName.trim()) ||
+      (req.user as any)?.fullName ||
+      null;
     const flushPending = req.body?.flushPending !== false;
 
-    if (accessToken) {
-      emailService.setGmailAccessToken(accessToken, senderEmail);
-    }
+    emailService.setGmailAccessToken(
+      accessToken,
+      senderEmail,
+      req.user!.tenantId || null,
+      senderName
+    );
 
     let flushedCount = 0;
     let recipients: string[] = [];
@@ -92,7 +105,11 @@ export class NotificationController {
       recipients = flushResult.recipients;
     }
 
-    const status = emailService.getGmailStatus(req.user!.tenantId || null);
+    const status = emailService.getGmailStatus(
+      req.user!.tenantId || null,
+      senderEmail || req.user!.email || null,
+      senderName
+    );
     sendResponse(res, 200, {
       ...status,
       flushedCount,
@@ -105,12 +122,20 @@ export class NotificationController {
     const appPassword =
       typeof req.body?.appPassword === 'string' ? req.body.appPassword.trim() : '';
 
-    await emailService.configureGmailSmtp({ email, appPassword });
+    await emailService.configureGmailSmtp({
+      email,
+      appPassword,
+      tenantId: req.user!.tenantId || null,
+    });
 
     const flushResult = await emailService.flushPendingEmailsViaGmail(
       req.user!.tenantId || null
     );
-    const status = emailService.getGmailStatus(req.user!.tenantId || null);
+    const status = emailService.getGmailStatus(
+      req.user!.tenantId || null,
+      email || req.user!.email || null,
+      (req.user as any)?.fullName || null
+    );
 
     sendResponse(res, 200, {
       ...status,
@@ -120,8 +145,12 @@ export class NotificationController {
   });
 
   public disconnectGmail = asyncHandler(async (req: Request, res: Response) => {
-    emailService.disconnectAllGmailSenders();
-    const status = emailService.getGmailStatus(req.user!.tenantId || null);
+    emailService.disconnectAllGmailSenders(req.user!.tenantId || null);
+    const status = emailService.getGmailStatus(
+      req.user!.tenantId || null,
+      req.user!.email || null,
+      (req.user as any)?.fullName || null
+    );
     sendResponse(res, 200, status);
   });
 
@@ -141,11 +170,19 @@ export class NotificationController {
   });
 
   public triggerTestRoleChangeNotification = asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user?.tenantId || 'tenant-acme-corp';
+    const userId = req.user?.id || 'user-acme-manager';
+    const tenantSender = emailService.getTenantSender(
+      tenantId,
+      req.user?.email || null,
+      (req.user as any)?.fullName || null
+    );
+
     const rawEmail =
       (typeof req.body?.email === 'string' && req.body.email.trim()) ||
       (typeof req.query?.email === 'string' && req.query.email.trim()) ||
       req.user?.email ||
-      'karthiksmrk7377@gmail.com';
+      tenantSender.email;
 
     const targetEmail = rawEmail.toLowerCase();
     const localPart = targetEmail.split('@')[0] || 'member';
@@ -182,11 +219,13 @@ export class NotificationController {
       null;
 
     if (accessToken) {
-      emailService.setGmailAccessToken(accessToken);
+      emailService.setGmailAccessToken(
+        accessToken,
+        req.user?.email || targetEmail,
+        tenantId,
+        (req.user as any)?.fullName || fullName
+      );
     }
-
-    const tenantId = req.user?.tenantId || 'tenant-acme-corp';
-    const userId = req.user?.id || 'user-acme-manager';
 
     const result: any = await emailService.dispatchRoleChangeEmail({
       tenantId,
@@ -196,16 +235,22 @@ export class NotificationController {
       previousRole,
       newRole,
       reason,
+      actorEmail: req.user?.email,
     });
+
+    const recipients: string[] = Array.isArray(result?.recipients) && result.recipients.length > 0
+      ? result.recipients
+      : [targetEmail];
 
     sendResponse(res, 200, {
       verified: true,
-      message: `Triggered role-change notification (${previousRole} → ${newRole}) and dispatched email to ${targetEmail}`,
+      message: `Triggered role-change notification (${previousRole} → ${newRole}) and dispatched email to ${recipients.join(', ')}`,
       recipientEmail: targetEmail,
+      recipients,
       previousRole,
       newRole,
       deliveryChannel: result?.emailRecord?.deliveryChannel || 'GMAIL',
-      realGmailSent: Boolean(result?.emailRecord?.realGmailSent),
+      realGmailSent: Boolean(result?.realGmailSent ?? result?.emailRecord?.realGmailSent),
       emailRecord: result?.emailRecord || null,
       notification: result?.notification || null,
     });

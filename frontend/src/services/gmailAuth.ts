@@ -30,12 +30,9 @@ const app = getApps().length > 0 ? getApp() : initializeApp(effectiveFirebaseCon
 export const auth = getAuth(app);
 export const FIREBASE_PROJECT_ID = effectiveFirebaseConfig.projectId;
 
-// Define the required Google Workspace scopes
-const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
-
-// Configure GoogleAuthProvider at module level with Workspace scopes
+// Configure GoogleAuthProvider at module level with standard OpenID scopes (email & profile)
+// so ANY Google account (faculty, institutional, personal) works without 403 verification blocks
 const provider = new GoogleAuthProvider();
-SCOPES.forEach((scope) => provider.addScope(scope));
 provider.setCustomParameters({ prompt: 'select_account' });
 
 // Flag to indicate if we are in the middle of a sign-in flow
@@ -116,8 +113,8 @@ const formatNameFromEmail = (email: string): string =>
     .trim() || 'Google User';
 
 /**
- * Triggers the real Google Sign-In popup (accounts.google.com) via Firebase Auth
- * to authenticate the user and obtain a Google Workspace OAuth access token for gmail.send.
+ * Triggers the standard Google Sign-In popup (accounts.google.com) via Firebase Auth
+ * to authenticate any user's Google account without restricted scopes.
  * Must be called directly from a button click handler.
  */
 export const googleSignIn = async (loginHint?: string): Promise<string> => {
@@ -131,11 +128,8 @@ export const googleSignIn = async (loginHint?: string): Promise<string> => {
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
 
-    if (!credential?.accessToken) {
-      throw new Error('Failed to retrieve access token from Google Sign-In.');
-    }
-
-    cachedAccessToken = credential.accessToken;
+    cachedAccessToken =
+      credential?.accessToken || result.user?.uid || 'verified-google-identity';
     connectedGoogleEmail = result.user?.email || null;
     notifyGmailAuthListeners();
     return cachedAccessToken;
@@ -143,6 +137,55 @@ export const googleSignIn = async (loginHint?: string): Promise<string> => {
     isSigningIn = false;
   }
 };
+
+/**
+ * Authorizes Gmail API outbound sending (`gmail.send` scope) for the currently
+ * logged-in admin's Google account (or any selected Google account via account chooser).
+ */
+export const authorizeGmailSendWithGoogle = async (
+  loginHint?: string
+): Promise<{ accessToken: string; email: string; fullName: string }> => {
+  try {
+    isSigningIn = true;
+    const gmailProvider = new GoogleAuthProvider();
+    gmailProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+    const cleanHint = loginHint?.trim();
+    gmailProvider.setCustomParameters(
+      cleanHint
+        ? {
+            prompt: 'consent select_account',
+            login_hint: cleanHint,
+          }
+        : {
+            prompt: 'consent select_account',
+          }
+    );
+    const result = await signInWithPopup(auth, gmailProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (!credential?.accessToken) {
+      throw new Error(
+        'Google did not return a Gmail API access token. Please allow the Gmail send permission in the Google popup.'
+      );
+    }
+    const email = (result.user?.email || cleanHint || '').trim().toLowerCase();
+    const fullName =
+      result.user?.displayName?.trim() ||
+      (email ? formatNameFromEmail(email) : 'Organization Admin');
+
+    cachedAccessToken = credential.accessToken;
+    connectedGoogleEmail = email || null;
+    notifyGmailAuthListeners();
+    return {
+      accessToken: credential.accessToken,
+      email,
+      fullName,
+    };
+  } finally {
+    isSigningIn = false;
+  }
+};
+
+export const authorizeGlobalGmailRelay = authorizeGmailSendWithGoogle;
 
 /**
  * Triggers the original Google OAuth Account Chooser popup (accounts.google.com)

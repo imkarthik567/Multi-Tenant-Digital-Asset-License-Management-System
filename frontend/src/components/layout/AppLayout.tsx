@@ -10,6 +10,7 @@ import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { GeminiChatWidget } from '../ai/GeminiChatWidget';
+import { GmailSenderBanner } from '../notifications/GmailSenderBanner';
 
 const LOCAL_STORAGE_COLLAPSE_KEY = 'assetvault_sidebar_collapsed';
 
@@ -60,6 +61,9 @@ export const AppLayout: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* One-Time Admin Outbound Email Setup Modal */}
+      <GmailSenderBanner variant="auto-prompt" />
 
       {/* Floating Multi-Turn Gemini Chatbot */}
       <GeminiChatWidget />

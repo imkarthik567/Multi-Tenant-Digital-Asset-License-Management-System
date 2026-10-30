@@ -39,6 +39,12 @@ frontend/.env.*
 *.crt
 *.p12
 service-account*.json
+*firebase-applet-config.json
+firebase-applet-config.json
+*.gmail-relay-config.json
+.gmail-relay-config.json
+*.mock-store-state.json
+.mock-store-state.json
 
 # Database Dumps and Backups
 /backups/

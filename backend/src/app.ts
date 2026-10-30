@@ -146,10 +146,7 @@ if (env.NODE_ENV !== 'test') {
   );
 }
 
-// 8. Global API Rate Limiting
-app.use('/api', globalRateLimiter);
-
-// 9. Health & Observability Endpoints
+// 8. Health & Observability Endpoints (Probes run without rate limit hurdles)
 app.get('/health', getHealth);
 app.get('/api/health', getHealth);
 app.get('/api/v1/health', getHealth);
@@ -157,6 +154,9 @@ app.get('/ready', getReadinessHandler);
 app.get('/api/ready', getReadinessHandler);
 app.get('/api/v1/ready', getReadinessHandler);
 app.get('/metrics', getMetricsHandler);
+
+// 9. Global API Rate Limiting
+app.use('/api', globalRateLimiter);
 
 // 10. Mount Primary API Router
 app.use('/api', apiRoutes);

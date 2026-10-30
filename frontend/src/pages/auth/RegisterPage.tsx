@@ -232,6 +232,12 @@ export const RegisterPage: React.FC = () => {
         });
 
         if (result.user) {
+          try {
+            localStorage.setItem('assetvault_org_just_created', 'true');
+            if (result.user.tenantId) {
+              localStorage.removeItem(`assetvault_gmail_setup_prompted_${result.user.tenantId}`);
+            }
+          } catch {}
           toast.success(
             `Signed in as ${result.user.fullName}!`,
             'Welcome to AssetVault'
@@ -358,6 +364,10 @@ export const RegisterPage: React.FC = () => {
         contactEmail: data.contactEmail,
         password: data.password,
       });
+
+      try {
+        localStorage.setItem('assetvault_org_just_created', 'true');
+      } catch {}
 
       toast.success(
         `Organization ${data.tenantName} and Master Admin provisioned successfully!`,
