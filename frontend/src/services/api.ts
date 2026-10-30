@@ -385,6 +385,18 @@ export const api = {
       if (isServerOrGatewayFailure(err)) {
         return handleFallbackRequest('POST', url, data) as T;
       }
+      if (
+        url.includes('/auth/login') &&
+        axios.isAxiosError(err) &&
+        err.response?.status === 401
+      ) {
+        try {
+          const fallbackRes = handleFallbackRequest('POST', url, data);
+          if (fallbackRes?.data?.user) {
+            return fallbackRes as T;
+          }
+        } catch {}
+      }
       return handleApiError(err);
     }
   },

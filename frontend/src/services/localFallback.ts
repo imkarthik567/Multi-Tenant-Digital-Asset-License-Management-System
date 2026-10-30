@@ -312,6 +312,16 @@ function getInitialStore(): FallbackStore {
         createdAt: now,
       },
       {
+        id: 'tenant-vit',
+        name: 'VIT VELLORE',
+        slug: 'vit-vellore',
+        contactEmail: 'karthiksmrk7377@gmail.com',
+        status: 'ACTIVE',
+        planId: 3,
+        plan: { id: 3, name: 'Enterprise', maxUsers: 500, maxAssets: 50000, monthlyPrice: 199 },
+        createdAt: now,
+      },
+      {
         id: 'tenant-acme-corp',
         name: 'Acme Corporation',
         slug: 'acme',
@@ -333,6 +343,30 @@ function getInitialStore(): FallbackStore {
         isActive: true,
         isSuperAdmin: false,
         department: 'Executive Leadership',
+        createdAt: now,
+      },
+      {
+        id: 'user-karthik-vit-admin',
+        email: 'karthiksmrk7377@gmail.com',
+        fullName: 'Karthikeyan S',
+        role: 'TENANT_ADMIN',
+        roleId: 2,
+        tenantId: 'tenant-vit',
+        isActive: true,
+        isSuperAdmin: false,
+        department: 'Executive Leadership',
+        createdAt: now,
+      },
+      {
+        id: 'user-kar-vit-member',
+        email: 'karthikeyan.s2024c@vitstudent.ac.in',
+        fullName: 'Kar',
+        role: 'MEMBER',
+        roleId: 4,
+        tenantId: 'tenant-vit',
+        isActive: true,
+        isSuperAdmin: false,
+        department: 'Engineering',
         createdAt: now,
       },
       {
@@ -798,28 +832,39 @@ export function handleFallbackRequest(
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
           .join(' ') || 'Organization Admin';
 
-      const newTenantId = email === 'karthikeyan.s050607@gmail.com' ? 'tenant-karthik' : `tenant-${Date.now()}`;
-      tenant = store.tenants.find((t) => t.id === newTenantId);
+      const isVitMember = email === 'karthikeyan.s2024c@vitstudent.ac.in';
+      const isVitAdmin = email === 'karthiksmrk7377@gmail.com';
+      const targetTenantId =
+        email === 'karthikeyan.s050607@gmail.com'
+          ? 'tenant-karthik'
+          : isVitMember || isVitAdmin
+          ? 'tenant-vit'
+          : store.tenants[0]?.id || `tenant-${Date.now()}`;
+
+      tenant = store.tenants.find((t) => t.id === targetTenantId);
       if (!tenant) {
         tenant = {
-          id: newTenantId,
-          name: `${displayFullName} Workspace`,
-          slug: `org-${Date.now()}`,
-          contactEmail: email,
+          id: targetTenantId,
+          name: isVitMember || isVitAdmin ? 'VIT VELLORE' : `${displayFullName} Workspace`,
+          slug: isVitMember || isVitAdmin ? 'vit-vellore' : `org-${Date.now()}`,
+          contactEmail: isVitMember || isVitAdmin ? 'karthiksmrk7377@gmail.com' : email,
           status: 'ACTIVE',
-          planId: 1,
-          plan: { id: 1, name: 'Free Trial', maxUsers: 10, maxAssets: 100, monthlyPrice: 0 },
+          planId: 3,
+          plan: { id: 3, name: 'Enterprise', maxUsers: 500, maxAssets: 50000, monthlyPrice: 199 },
           createdAt: new Date().toISOString(),
         };
         store.tenants.unshift(tenant);
       }
 
+      const assignedRole = isVitMember ? 'MEMBER' : 'TENANT_ADMIN';
+      const assignedRoleId = isVitMember ? 4 : 2;
+
       user = {
-        id: `user-${Date.now()}`,
+        id: isVitMember ? 'user-kar-vit-member' : `user-${Date.now()}`,
         email,
-        fullName: displayFullName,
-        role: 'TENANT_ADMIN',
-        roleId: 2,
+        fullName: isVitMember ? 'Kar' : displayFullName,
+        role: assignedRole,
+        roleId: assignedRoleId,
         tenantId: tenant.id,
         isActive: true,
         isSuperAdmin: false,

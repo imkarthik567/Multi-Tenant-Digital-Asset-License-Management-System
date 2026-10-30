@@ -226,11 +226,12 @@ export const UserListPage: React.FC = () => {
   }, [rawUsersList, searchQuery]);
 
   const inviteMutation = useMutation({
-    mutationFn: (data: { email: string; fullName: string; roleName?: RoleName }) =>
+    mutationFn: (data: { email: string; fullName: string; roleName?: RoleName; password?: string }) =>
       api.post('/users', {
         email: data.email.trim().toLowerCase(),
         fullName: data.fullName.trim(),
         roleName: data.roleName || 'MEMBER',
+        password: data.password || undefined,
       }),
     onSuccess: (_res, vars) => {
       toast.success(
@@ -460,6 +461,7 @@ export const UserListPage: React.FC = () => {
       fullName: trimmedName,
       email: trimmedEmail,
       roleName: inviteForm.roleName,
+      password: inviteForm.password,
     });
   };
 
