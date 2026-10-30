@@ -270,10 +270,19 @@ export const handleApiError = (err: unknown): never => {
 const isServerOrGatewayFailure = (err: unknown): boolean => {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status;
+    const data = err.response?.data;
+    // Network failure or 5xx server error
     if (!status || status >= 500) return true;
+    // Static host (e.g. Vercel static build without backend function) returning 404/405 without structured backend error code
+    if ((status === 404 || status === 405) && !(data && typeof data === 'object' && data.error?.code)) {
+      return true;
+    }
   }
   return false;
 };
+
+const isHtmlResponse = (data: unknown): boolean =>
+  typeof data === 'string' && data.trim().startsWith('<');
 
 // Typed Convenience API Wrapper
 export const api = {
@@ -288,6 +297,9 @@ export const api = {
 
       const config = isAxiosConfig ? configOrParams : { params: configOrParams };
       const response = await apiClient.get<T>(url, config);
+      if (isHtmlResponse(response.data)) {
+        return handleFallbackRequest('GET', url, undefined, configOrParams?.params ?? configOrParams) as T;
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {
@@ -305,6 +317,9 @@ export const api = {
         ? { headers: configOrHeaders }
         : undefined;
       const response = await apiClient.post<T>(url, data, config);
+      if (isHtmlResponse(response.data)) {
+        return handleFallbackRequest('POST', url, data) as T;
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {
@@ -317,6 +332,9 @@ export const api = {
   async put<T = any>(url: string, data?: unknown, config?: any): Promise<T> {
     try {
       const response = await apiClient.put<T>(url, data, config);
+      if (isHtmlResponse(response.data)) {
+        return handleFallbackRequest('PUT', url, data) as T;
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {
@@ -329,6 +347,9 @@ export const api = {
   async patch<T = any>(url: string, data?: unknown, config?: any): Promise<T> {
     try {
       const response = await apiClient.patch<T>(url, data, config);
+      if (isHtmlResponse(response.data)) {
+        return handleFallbackRequest('PATCH', url, data) as T;
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {
@@ -344,6 +365,9 @@ export const api = {
         ? configOrParams
         : { params: configOrParams };
       const response = await apiClient.delete<T>(url, config);
+      if (isHtmlResponse(response.data)) {
+        return handleFallbackRequest('DELETE', url, undefined, configOrParams?.params ?? configOrParams) as T;
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {

@@ -98,6 +98,18 @@ function getInitialStore(): FallbackStore {
         createdAt: now,
       },
       {
+        id: 'user-karthik-smrk',
+        email: 'karthiksmrk7377@gmail.com',
+        fullName: 'Karthik S',
+        role: 'TENANT_ADMIN',
+        roleId: 2,
+        tenantId: 'tenant-karthik',
+        isActive: true,
+        isSuperAdmin: false,
+        department: 'Executive Leadership',
+        createdAt: now,
+      },
+      {
         id: 'user-tenant-admin',
         email: 'admin@acme.com',
         fullName: 'Acme Administrator',
@@ -368,9 +380,125 @@ export function handleFallbackRequest(
     };
   }
 
+  // 2b. POST /auth/google-sso
+  if (method === 'POST' && cleanUrl.includes('/auth/google-sso')) {
+    const email = String(body?.email || 'karthiksmrk7377@gmail.com').toLowerCase().trim();
+    let user = store.users.find((u) => u.email.toLowerCase() === email);
+
+    if (user) {
+      const tenant = store.tenants.find((t) => t.id === user.tenantId) || store.tenants[0];
+      const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role, tenantId: tenant.id }))}`;
+      return {
+        status: 'success',
+        data: {
+          requiresOnboarding: false,
+          accessToken: token,
+          refreshToken: `fallback-rt-${Date.now()}`,
+          tenant,
+          user: {
+            ...user,
+            permissions: DEFAULT_PERMISSIONS,
+            tenant,
+          },
+        },
+      };
+    }
+
+    const derivedFullName =
+      body?.fullName?.trim() ||
+      email
+        .split('@')[0]
+        .replace(/[._-]+/g, ' ')
+        .replace(/\b\w/g, (l: string) => l.toUpperCase()) ||
+      'Enterprise User';
+
+    if (!body?.tenantName || String(body.tenantName).trim().length < 2) {
+      return {
+        status: 'success',
+        data: {
+          requiresOnboarding: true,
+          profile: {
+            email,
+            fullName: derivedFullName,
+            avatarUrl: body?.avatarUrl || null,
+          },
+        },
+      };
+    }
+
+    const tenantId = `tenant-${Date.now()}`;
+    const tenant = {
+      id: tenantId,
+      name: String(body.tenantName).trim(),
+      slug: body?.slug || `org-${Date.now()}`,
+      contactEmail: body?.contactEmail || email,
+      status: 'ACTIVE',
+      planId: 3,
+      plan: { id: 3, name: 'Enterprise', maxUsers: 500, maxAssets: 50000, monthlyPrice: 199 },
+      createdAt: new Date().toISOString(),
+    };
+
+    user = {
+      id: `user-${Date.now()}`,
+      email,
+      fullName: derivedFullName,
+      avatarUrl: body?.avatarUrl || null,
+      role: 'TENANT_ADMIN',
+      roleId: 2,
+      tenantId,
+      isActive: true,
+      isSuperAdmin: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    store.tenants.unshift(tenant);
+    store.users.unshift(user);
+    saveStore(store);
+
+    const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role, tenantId: tenant.id }))}`;
+    return {
+      status: 'success',
+      data: {
+        requiresOnboarding: false,
+        accessToken: token,
+        refreshToken: `fallback-rt-${Date.now()}`,
+        tenant,
+        user: {
+          ...user,
+          permissions: DEFAULT_PERMISSIONS,
+          tenant,
+        },
+      },
+    };
+  }
+
+  // 2c. POST /auth/refresh
+  if (method === 'POST' && cleanUrl.includes('/auth/refresh')) {
+    const user = store.users[0];
+    const tenant = store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
+    const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role, tenantId: tenant.id }))}`;
+    return {
+      status: 'success',
+      data: {
+        accessToken: token,
+        refreshToken: `fallback-rt-${Date.now()}`,
+      },
+    };
+  }
+
   // 3. GET /auth/me
   if (method === 'GET' && cleanUrl.includes('/auth/me')) {
-    const user = store.users[0];
+    let cachedUser: any = null;
+    try {
+      const rawSession = localStorage.getItem('assetvault_session_cache');
+      if (rawSession) {
+        const parsed = JSON.parse(rawSession);
+        if (parsed?.user?.email) {
+          cachedUser = store.users.find((u) => u.email.toLowerCase() === parsed.user.email.toLowerCase()) || parsed.user;
+        }
+      }
+    } catch {}
+    const user = cachedUser || store.users[0];
     const tenant = store.tenants.find((t) => t.id === user?.tenantId) || store.tenants[0];
     return {
       status: 'success',
