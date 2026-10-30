@@ -87,7 +87,7 @@ export class UserService {
       isActive: true,
     });
 
-    void emailService
+    await emailService
       .dispatchMemberOnboardingEmail({
         tenantId,
         userId: createdUser.id,
@@ -282,7 +282,7 @@ export class UserService {
         : 'MEMBER';
 
     if (isEmailChanged && updated.email) {
-      void emailService
+      await emailService
         .dispatchMemberOnboardingEmail({
           tenantId: updated.tenantId || existingUser.tenantId || 'tenant-acme-corp',
           userId: updated.id,
@@ -293,7 +293,7 @@ export class UserService {
         })
         .catch(() => {});
     } else if (updated.email && previousRoleName !== newRoleName) {
-      void emailService
+      await emailService
         .dispatchRoleChangeEmail({
           tenantId: updated.tenantId || existingUser.tenantId || 'tenant-acme-corp',
           userId: updated.id,
@@ -425,7 +425,7 @@ export class UserService {
       });
 
       if (updatedUser.email && previousRoleName !== targetRole.name) {
-        void emailService
+        await emailService
           .dispatchRoleChangeEmail({
             tenantId,
             userId: updatedUser.id,

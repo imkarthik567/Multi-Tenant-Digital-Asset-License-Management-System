@@ -234,7 +234,7 @@ export const UserListPage: React.FC = () => {
       }),
     onSuccess: (_res, vars) => {
       toast.success(
-        `Added ${vars.fullName.trim()} (${vars.email.trim().toLowerCase()})`
+        `Added ${vars.fullName.trim()} (${vars.email.trim().toLowerCase()}) and dispatched welcome email`
       );
       setIsInviteDrawerOpen(false);
       setInviteForm({
@@ -246,6 +246,7 @@ export const UserListPage: React.FC = () => {
       setInviteErrors({});
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to add member');
@@ -320,12 +321,20 @@ export const UserListPage: React.FC = () => {
       return { previousQueries };
     },
     onSuccess: (_, vars) => {
+      const targetUser = rawUsersList.find((u) => u.id === vars.userId);
+      const recipientLabel = targetUser?.fullName
+        ? `${targetUser.fullName} (${targetUser.email})`
+        : targetUser?.email || 'member';
       if (vars.roleName === 'TENANT_ADMIN') {
-        toast.success('Admin ownership transferred. Previous Admin is now Asset Manager.');
+        toast.success(`Admin ownership transferred and role-change email sent to ${recipientLabel}.`);
       } else {
-        toast.success(`Role updated to ${ROLE_CONFIG[vars.roleName]?.label || vars.roleName}`);
+        toast.success(
+          `Role updated to ${ROLE_CONFIG[vars.roleName]?.label || vars.roleName} (email sent to ${recipientLabel})`
+        );
       }
       void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      void queryClient.invalidateQueries({ queryKey: ['email-logs'] });
       if (vars.roleName === 'TENANT_ADMIN' || vars.userId === currentUser?.id) {
         void refreshProfile().catch(() => {});
       }

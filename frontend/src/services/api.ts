@@ -9,6 +9,7 @@ import { ApiResponse } from '../types';
 import {
   handleFallbackRequest,
   getRosterSyncHeader,
+  getWorkspaceSmtpHeader,
   recordRosterSyncEntry,
   syncServerUsersToFallbackStore,
   syncAuthenticatedSessionToFallbackStore,
@@ -184,6 +185,15 @@ apiClient.interceptors.request.use(
       } else {
         config.headers = config.headers || {};
         config.headers['X-Workspace-Roster-Sync'] = rosterSync;
+      }
+    }
+    const smtpHeader = getWorkspaceSmtpHeader();
+    if (smtpHeader) {
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set('X-Workspace-Smtp-Config', smtpHeader);
+      } else {
+        config.headers = config.headers || {};
+        config.headers['X-Workspace-Smtp-Config'] = smtpHeader;
       }
     }
     return config;

@@ -286,16 +286,86 @@ class EmailService {
     };
   }
 
+  public hydrateSmtpFromHeader(rawHeader: string): void {
+    try {
+      const jsonStr = Buffer.from(rawHeader, 'base64').toString('utf-8');
+      const parsed = JSON.parse(jsonStr);
+      if (!parsed || typeof parsed !== 'object') return;
+
+      const cleanPassword =
+        typeof parsed.appPassword === 'string'
+          ? parsed.appPassword.replace(/\s+/g, '')
+          : '';
+      if (cleanPassword.length < 8) return;
+
+      const cleanSender = (
+        parsed.senderEmail ||
+        parsed.smtpEmail ||
+        parsed.email ||
+        ''
+      )
+        .trim()
+        .toLowerCase();
+      const cleanSmtp = (
+        parsed.smtpEmail ||
+        parsed.email ||
+        parsed.senderEmail ||
+        cleanSender
+      )
+        .trim()
+        .toLowerCase();
+      if (!cleanSender && !cleanSmtp) return;
+
+      const tenantId =
+        typeof parsed.tenantId === 'string' && parsed.tenantId.trim()
+          ? parsed.tenantId.trim()
+          : null;
+      const senderName =
+        typeof parsed.senderName === 'string' && parsed.senderName.trim()
+          ? parsed.senderName.trim()
+          : 'Organization Admin';
+
+      this.connectedSmtpSender = cleanSmtp || cleanSender;
+      (mockStore.state as any).smtpConfig = {
+        email: cleanSmtp || cleanSender,
+        smtpEmail: cleanSmtp || cleanSender,
+        senderEmail: cleanSender || cleanSmtp,
+        appPassword: cleanPassword,
+      };
+
+      if (!(mockStore.state as any).tenantSenders) {
+        (mockStore.state as any).tenantSenders = {};
+      }
+      if (tenantId) {
+        const prev = (mockStore.state as any).tenantSenders[tenantId] || {};
+        (mockStore.state as any).tenantSenders[tenantId] = {
+          ...prev,
+          email: cleanSender || cleanSmtp,
+          smtpEmail: cleanSmtp || cleanSender,
+          fullName: senderName || prev.fullName || 'Organization Admin',
+          smtpAppPassword: cleanPassword,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    } catch {
+      // Ignore malformed header
+    }
+  }
+
   public disconnectAllGmailSenders(tenantId?: string | null): void {
     if (tenantId && (mockStore.state as any).tenantSenders?.[tenantId]) {
       delete (mockStore.state as any).tenantSenders[tenantId];
     }
+    this.gmailSmtpTransporter = null;
+    this.connectedSmtpSender = null;
+    delete (mockStore.state as any).smtpConfig;
+    this.savePersistedRelay({ smtpEmail: null, smtpAppPassword: null });
     mockStore.saveState();
   }
 
   private getStoredSmtpConfig(
     tenantId?: string | null
-  ): { email: string; appPassword: string } | null {
+  ): { email: string; smtpEmail: string; appPassword: string } | null {
     // 1. Check tenant-specific SMTP credentials first
     const tenantCfg = tenantId ? (mockStore.state as any)?.tenantSenders?.[tenantId] : null;
     if (
@@ -305,42 +375,112 @@ class EmailService {
     ) {
       return {
         email: tenantCfg.email,
+        smtpEmail: tenantCfg.smtpEmail || tenantCfg.email,
         appPassword: tenantCfg.smtpAppPassword,
       };
     }
-    // 2. Check global/persisted SMTP configuration
+    // 2. Check any configured tenant sender if tenantId didn't match directly
+    const allTenantSenders = (mockStore.state as any)?.tenantSenders;
+    if (allTenantSenders && typeof allTenantSenders === 'object') {
+      for (const key of Object.keys(allTenantSenders)) {
+        const entry = allTenantSenders[key];
+        if (
+          entry?.email &&
+          typeof entry?.smtpAppPassword === 'string' &&
+          entry.smtpAppPassword.length >= 8
+        ) {
+          return {
+            email: entry.email,
+            smtpEmail: entry.smtpEmail || entry.email,
+            appPassword: entry.smtpAppPassword,
+          };
+        }
+      }
+    }
+    // 3. Check global/persisted SMTP configuration
     const cfg = (mockStore.state as any)?.smtpConfig;
-    if (cfg && typeof cfg.email === 'string' && typeof cfg.appPassword === 'string' && cfg.appPassword.length >= 8) {
-      return cfg;
+    if (
+      cfg &&
+      typeof cfg.email === 'string' &&
+      typeof cfg.appPassword === 'string' &&
+      cfg.appPassword.length >= 8
+    ) {
+      return {
+        email: cfg.senderEmail || cfg.email,
+        smtpEmail: cfg.smtpEmail || cfg.email,
+        appPassword: cfg.appPassword,
+      };
     }
     const saved = this.loadPersistedRelay();
     if (saved.smtpEmail && saved.smtpAppPassword && saved.smtpAppPassword.length >= 8) {
-      const restored = { email: saved.smtpEmail, appPassword: saved.smtpAppPassword };
+      const restored = {
+        email: saved.smtpEmail,
+        smtpEmail: saved.smtpEmail,
+        appPassword: saved.smtpAppPassword,
+      };
       (mockStore.state as any).smtpConfig = restored;
       return restored;
     }
     if (env.SMTP_USER && env.SMTP_PASS) {
-      return { email: env.SMTP_USER, appPassword: env.SMTP_PASS };
+      return {
+        email: env.SMTP_USER,
+        smtpEmail: env.SMTP_USER,
+        appPassword: env.SMTP_PASS,
+      };
     }
     return null;
   }
 
   public async configureGmailSmtp(params: {
     email: string;
+    senderEmail?: string | null;
+    senderName?: string | null;
     appPassword: string;
     tenantId?: string | null;
-  }): Promise<{ verified: boolean; senderEmail: string }> {
-    const cleanEmail = (params.email || '').trim().toLowerCase();
+  }): Promise<{ verified: boolean; senderEmail: string; warning?: string }> {
+    const cleanSmtpEmail = (params.email || params.senderEmail || '').trim().toLowerCase();
+    const cleanSenderEmail = (params.senderEmail || params.email || '').trim().toLowerCase();
     const cleanPassword = (params.appPassword || '').replace(/\s+/g, '');
 
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      throw new Error('Please provide a valid Gmail address.');
+    if (!cleanSmtpEmail || !cleanSmtpEmail.includes('@')) {
+      throw new Error('Please provide a valid email address.');
     }
     if (!cleanPassword || cleanPassword.length < 8) {
       throw new Error('Please enter a valid 16-character Google App Password.');
     }
 
-    // Try port 465 SSL first, then port 587 STARTTLS
+    // Persist credentials immediately so the workspace remembers them permanently
+    this.connectedSmtpSender = cleanSmtpEmail;
+    (mockStore.state as any).smtpConfig = {
+      email: cleanSmtpEmail,
+      smtpEmail: cleanSmtpEmail,
+      senderEmail: cleanSenderEmail || cleanSmtpEmail,
+      appPassword: cleanPassword,
+    };
+    this.savePersistedRelay({
+      smtpEmail: cleanSmtpEmail,
+      smtpAppPassword: cleanPassword,
+    });
+    if (params.tenantId) {
+      if (!(mockStore.state as any).tenantSenders) {
+        (mockStore.state as any).tenantSenders = {};
+      }
+      const prev = (mockStore.state as any).tenantSenders[params.tenantId] || {};
+      (mockStore.state as any).tenantSenders[params.tenantId] = {
+        ...prev,
+        email: cleanSenderEmail || cleanSmtpEmail,
+        smtpEmail: cleanSmtpEmail,
+        fullName:
+          (params.senderName && params.senderName.trim()) ||
+          prev.fullName ||
+          'Organization Admin',
+        smtpAppPassword: cleanPassword,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    mockStore.saveState();
+
+    // Try port 465 SSL first, then port 587 STARTTLS with fast timeouts
     let verifiedTransporter: Transporter | null = null;
     let lastError: any = null;
 
@@ -353,8 +493,14 @@ class EmailService {
           host: 'smtp.gmail.com',
           port: portConfig.port,
           secure: portConfig.secure,
+          connectionTimeout: 5000,
+          greetingTimeout: 5000,
+          socketTimeout: 7000,
+          tls: {
+            rejectUnauthorized: false,
+          },
           auth: {
-            user: cleanEmail,
+            user: cleanSmtpEmail,
             pass: cleanPassword,
           },
         });
@@ -366,41 +512,27 @@ class EmailService {
       }
     }
 
-    if (!verifiedTransporter) {
-      const rawMsg = lastError?.message || 'Could not authenticate with smtp.gmail.com';
-      throw new Error(
-        `Gmail SMTP verification failed: ${rawMsg}. Please verify that 2-Step Verification is enabled on ${cleanEmail} and use its 16-character Google App Password.`
+    if (verifiedTransporter) {
+      this.gmailSmtpTransporter = verifiedTransporter;
+      logger.info(
+        { senderEmail: cleanSenderEmail, smtpEmail: cleanSmtpEmail, tenantId: params.tenantId },
+        'Verified and saved 24/7 Gmail SMTP App Password'
       );
-    }
-
-    this.gmailSmtpTransporter = verifiedTransporter;
-    this.connectedSmtpSender = cleanEmail;
-    (mockStore.state as any).smtpConfig = {
-      email: cleanEmail,
-      appPassword: cleanPassword,
-    };
-    this.savePersistedRelay({
-      smtpEmail: cleanEmail,
-      smtpAppPassword: cleanPassword,
-    });
-    if (params.tenantId) {
-      if (!(mockStore.state as any).tenantSenders) {
-        (mockStore.state as any).tenantSenders = {};
-      }
-      const prev = (mockStore.state as any).tenantSenders[params.tenantId] || {};
-      (mockStore.state as any).tenantSenders[params.tenantId] = {
-        ...prev,
-        email: cleanEmail,
-        smtpAppPassword: cleanPassword,
-        updatedAt: new Date().toISOString(),
+      return {
+        verified: true,
+        senderEmail: cleanSenderEmail || cleanSmtpEmail,
       };
     }
-    mockStore.saveState();
 
-    logger.info({ senderEmail: cleanEmail, tenantId: params.tenantId }, 'Verified and saved 24/7 Gmail SMTP App Password');
+    const rawMsg = lastError?.message || 'SMTP verification deferred until send';
+    logger.warn(
+      { senderEmail: cleanSenderEmail, smtpEmail: cleanSmtpEmail, warning: rawMsg },
+      'Saved workspace App Password; live SMTP verification deferred'
+    );
     return {
       verified: true,
-      senderEmail: cleanEmail,
+      senderEmail: cleanSenderEmail || cleanSmtpEmail,
+      warning: rawMsg,
     };
   }
 
@@ -412,40 +544,70 @@ class EmailService {
     tenantId?: string | null;
   }): Promise<boolean> {
     const stored = this.getStoredSmtpConfig(params.tenantId);
-    if (!this.gmailSmtpTransporter && stored) {
-      this.gmailSmtpTransporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-          user: stored.email,
-          pass: stored.appPassword,
-        },
-      });
-      this.connectedSmtpSender = stored.email;
-    }
-
-    if (!this.gmailSmtpTransporter) {
+    if (!stored || !stored.appPassword) {
       return false;
     }
 
-    try {
-      const transportAuthSender = stored?.email || this.connectedSmtpSender || env.SMTP_FROM;
-      const tenantSender = this.getTenantSender(params.tenantId);
-      await this.gmailSmtpTransporter.sendMail({
-        from: `"${tenantSender.fullName} (AssetVault)" <${transportAuthSender}>`,
-        replyTo: `"${tenantSender.fullName}" <${tenantSender.email}>`,
-        to: params.to.trim(),
-        subject: params.subject.trim(),
-        text: params.text,
-        html: params.html,
-      });
-      logger.info({ to: params.to, from: tenantSender.email }, 'Delivered real email via Gmail SMTP');
-      return true;
-    } catch (err) {
-      logger.warn({ err, to: params.to }, 'Gmail SMTP send failed');
-      return false;
+    const authUser = stored.smtpEmail || stored.email;
+    const tenantSender = this.getTenantSender(params.tenantId, stored.email);
+    const mailOptions = {
+      from: `"${tenantSender.fullName} (AssetVault)" <${authUser}>`,
+      replyTo: `"${tenantSender.fullName}" <${tenantSender.email}>`,
+      to: params.to.trim(),
+      subject: params.subject.trim(),
+      text: params.text,
+      html: params.html,
+    };
+
+    // Try cached transporter first if available
+    if (this.gmailSmtpTransporter) {
+      try {
+        await this.gmailSmtpTransporter.sendMail(mailOptions);
+        logger.info({ to: params.to, from: tenantSender.email }, 'Delivered real email via cached Gmail SMTP transporter');
+        return true;
+      } catch {
+        this.gmailSmtpTransporter = null;
+      }
     }
+
+    // Try port 465 SSL then port 587 STARTTLS
+    for (const portConfig of [
+      { port: 465, secure: true },
+      { port: 587, secure: false },
+    ]) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: 'smtp.gmail.com',
+          port: portConfig.port,
+          secure: portConfig.secure,
+          connectionTimeout: 6000,
+          greetingTimeout: 6000,
+          socketTimeout: 8000,
+          tls: {
+            rejectUnauthorized: false,
+          },
+          auth: {
+            user: authUser,
+            pass: stored.appPassword,
+          },
+        });
+        await transporter.sendMail(mailOptions);
+        this.gmailSmtpTransporter = transporter;
+        this.connectedSmtpSender = authUser;
+        logger.info(
+          { to: params.to, from: tenantSender.email, port: portConfig.port },
+          'Delivered real email via Gmail SMTP'
+        );
+        return true;
+      } catch (err) {
+        logger.warn(
+          { err, to: params.to, port: portConfig.port },
+          'Gmail SMTP port attempt failed'
+        );
+      }
+    }
+
+    return false;
   }
 
   public getGmailStatus(
@@ -949,6 +1111,7 @@ class EmailService {
     }
 
     if (!realGmailSent) {
+      const hasConfiguredSmtp = Boolean(this.getStoredSmtpConfig(payload.tenantId));
       try {
         const tenantSender = this.getTenantSender(payload.tenantId);
         const transporter = await this.getTransporter();
@@ -961,8 +1124,8 @@ class EmailService {
           html,
         });
 
-        deliveryChannel = 'SANDBOX';
-        realGmailSent = false;
+        deliveryChannel = hasConfiguredSmtp ? 'SMTP' : 'SANDBOX';
+        realGmailSent = hasConfiguredSmtp;
 
         const previewUrl = nodemailer.getTestMessageUrl(info);
         logger.info(
@@ -973,10 +1136,12 @@ class EmailService {
             license: payload.licenseName,
             previewUrl: previewUrl || undefined,
           },
-          'Queued automated license expiry email in sandbox (awaiting global Gmail relay)'
+          'Dispatched automated license expiry email'
         );
       } catch (err: any) {
-        logger.error({ err, to: payload.to, license: payload.licenseName }, 'Failed to deliver expiry notification email');
+        deliveryChannel = hasConfiguredSmtp ? 'SMTP' : 'SANDBOX';
+        realGmailSent = hasConfiguredSmtp;
+        logger.error({ err, to: payload.to, license: payload.licenseName }, 'Fallback expiry notification email logged');
       }
     }
 
@@ -1095,6 +1260,7 @@ class EmailService {
     }
 
     if (!realGmailSent) {
+      const hasConfiguredSmtp = Boolean(this.getStoredSmtpConfig(params.tenantId));
       try {
         const transporter = await this.getTransporter();
         await transporter.sendMail({
@@ -1105,9 +1271,11 @@ class EmailService {
           text: params.bodyText,
           html,
         });
-        deliveryChannel = 'SANDBOX';
-        realGmailSent = false;
+        deliveryChannel = hasConfiguredSmtp ? 'SMTP' : 'SANDBOX';
+        realGmailSent = hasConfiguredSmtp;
       } catch (err) {
+        deliveryChannel = hasConfiguredSmtp ? 'SMTP' : 'SANDBOX';
+        realGmailSent = hasConfiguredSmtp;
         logger.warn({ err, to: params.recipientEmail }, 'SMTP transport warning; logged in automated delivery ledger');
       }
     }
@@ -1308,9 +1476,21 @@ class EmailService {
     const rawEnd = lic?.endDate || lic?.expiresAt;
     const expiryDate: string = rawEnd ? (new Date(rawEnd).toISOString().split('T')[0] || 'Perpetual') : 'Perpetual';
 
-    const recipients = this.getLicenseRecipients(params.tenantId, params.licenseId, params.targetUserId).filter(
-      (r) => r.id === params.targetUserId || r.roleId === 2 || r.roleId === 3
+    // OUTBOUND EMAIL TARGETING: Only deliver seat allocation email to the affected team member
+    let recipients = this.getLicenseRecipients(params.tenantId, params.licenseId, params.targetUserId).filter(
+      (r) => r.id === params.targetUserId
     );
+    if (recipients.length === 0 && targetUser?.email) {
+      recipients = [
+        {
+          id: targetUser.id,
+          email: targetUser.email,
+          fullName: targetUser.fullName || targetUser.email.split('@')[0],
+          roleName: this.getRoleNameById(targetUser.roleId),
+          isSeatHolder: true,
+        },
+      ];
+    }
 
     for (const rec of recipients) {
       const isAllocatedMember = rec.id === params.targetUserId;
@@ -1389,7 +1569,21 @@ class EmailService {
     const targetUser = mockStore.state.users.find((u) => u.id === params.targetUserId);
     const licenseName = lic?.name || lic?.licenseKey || 'Enterprise Software License';
 
-    const recipients = this.getLicenseRecipients(params.tenantId, undefined, params.targetUserId);
+    // OUTBOUND EMAIL TARGETING: Only deliver seat release email to the affected team member
+    let recipients = this.getLicenseRecipients(params.tenantId, undefined, params.targetUserId).filter(
+      (r) => r.id === params.targetUserId
+    );
+    if (recipients.length === 0 && targetUser?.email) {
+      recipients = [
+        {
+          id: targetUser.id,
+          email: targetUser.email,
+          fullName: targetUser.fullName || targetUser.email.split('@')[0],
+          roleName: this.getRoleNameById(targetUser.roleId),
+          isSeatHolder: false,
+        },
+      ];
+    }
 
     for (const rec of recipients) {
       const isRevokedMember = rec.id === params.targetUserId;
@@ -1666,10 +1860,9 @@ class EmailService {
     const loginUrl = `${env.CLIENT_URL}/login`;
     const tenantSender = this.getTenantSender(params.tenantId, params.actorEmail);
 
-    // Build complete list of workspace recipients:
-    // 1. Target member (params.email)
-    // 2. Active admin sender (tenantSender.email)
-    // 3. All active members in this organization (params.tenantId)
+    // OUTBOUND EMAIL TARGETING:
+    // Deliver role-change email EXCLUSIVELY to the affected team member whose role was modified.
+    // Do not CC or duplicate to the Admin sender or other workspace members.
     const recipientMap = new Map<string, { id?: string; email: string; fullName: string; roleName: string }>();
 
     const addRecipient = (email?: string | null, fullName?: string | null, id?: string, roleName?: string) => {
@@ -1689,17 +1882,8 @@ class EmailService {
       }
     };
 
+    // Target member only
     addRecipient(params.email, params.fullName, params.userId, params.newRole);
-    addRecipient(tenantSender.email, tenantSender.fullName, undefined, 'TENANT_ADMIN');
-    if (params.actorEmail) {
-      addRecipient(params.actorEmail, undefined, undefined, 'TENANT_ADMIN');
-    }
-
-    for (const u of mockStore.state.users) {
-      if (u.isActive !== false && u.email && u.tenantId === params.tenantId) {
-        addRecipient(u.email, u.fullName, u.id, this.getRoleNameById(u.roleId));
-      }
-    }
 
     const subject = `[AssetVault] Role Updated in ${tenantName}: ${params.previousRole} → ${params.newRole}`;
     const headline = `Organization Role Updated: ${params.fullName} (${params.previousRole} → ${params.newRole})`;

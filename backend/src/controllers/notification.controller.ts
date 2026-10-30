@@ -119,11 +119,17 @@ export class NotificationController {
 
   public configureGmailSmtpAndFlush = asyncHandler(async (req: Request, res: Response) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    const senderEmail =
+      typeof req.body?.senderEmail === 'string' && req.body.senderEmail.trim()
+        ? req.body.senderEmail.trim()
+        : email || req.user?.email || '';
     const appPassword =
       typeof req.body?.appPassword === 'string' ? req.body.appPassword.trim() : '';
 
-    await emailService.configureGmailSmtp({
-      email,
+    const smtpResult = await emailService.configureGmailSmtp({
+      email: email || senderEmail,
+      senderEmail,
+      senderName: (req.user as any)?.fullName || null,
       appPassword,
       tenantId: req.user!.tenantId || null,
     });
@@ -133,12 +139,14 @@ export class NotificationController {
     );
     const status = emailService.getGmailStatus(
       req.user!.tenantId || null,
-      email || req.user!.email || null,
+      senderEmail || email || req.user!.email || null,
       (req.user as any)?.fullName || null
     );
 
     sendResponse(res, 200, {
       ...status,
+      verified: smtpResult.verified,
+      warning: smtpResult.warning,
       flushedCount: flushResult.flushedCount,
       recipients: flushResult.recipients,
     });

@@ -98,15 +98,20 @@ app.use(
       'X-Tenant-ID',
       'X-Gmail-Access-Token',
       'X-Workspace-Roster-Sync',
+      'X-Workspace-Smtp-Config',
     ],
   })
 );
 
-// 3B. Sync in-memory Google Gmail OAuth Access Token & Workspace Roster state from request headers
+// 3B. Sync in-memory Google Gmail OAuth Access Token, SMTP Config & Workspace Roster state from request headers
 app.use((req, _res, next) => {
   const gmailHeader = req.headers['x-gmail-access-token'];
   if (typeof gmailHeader === 'string' && gmailHeader.trim().length > 0) {
     emailService.setGmailAccessToken(gmailHeader.trim());
+  }
+  const smtpHeader = req.headers['x-workspace-smtp-config'];
+  if (typeof smtpHeader === 'string' && smtpHeader.trim().length > 0) {
+    emailService.hydrateSmtpFromHeader(smtpHeader.trim());
   }
   const rosterHeader = req.headers['x-workspace-roster-sync'];
   if (typeof rosterHeader === 'string' && rosterHeader.trim().length > 0) {

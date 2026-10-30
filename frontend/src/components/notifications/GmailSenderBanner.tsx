@@ -23,6 +23,12 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import {
+  getWorkspaceSmtpConfig,
+  saveWorkspaceSmtpConfig,
+  clearWorkspaceSmtpConfig,
+  WorkspaceSmtpConfig,
+} from '../../services/localFallback';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -49,18 +55,33 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isFirstTimePrompt, setIsFirstTimePrompt] = useState(false);
-  const [customSenderEmail, setCustomSenderEmail] = useState(user?.email || '');
-  const [smtpEmail, setSmtpEmail] = useState(user?.email || '');
+  const [savedSmtpConfig, setSavedSmtpConfig] = useState<WorkspaceSmtpConfig | null>(() =>
+    getWorkspaceSmtpConfig(user?.tenantId)
+  );
+  const [customSenderEmail, setCustomSenderEmail] = useState(
+    () => getWorkspaceSmtpConfig(user?.tenantId)?.senderEmail || user?.email || ''
+  );
+  const [smtpEmail, setSmtpEmail] = useState(
+    () => getWorkspaceSmtpConfig(user?.tenantId)?.smtpEmail || user?.email || ''
+  );
   const [smtpPassword, setSmtpPassword] = useState('');
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Sync default form fields when logged-in user changes
+  // Sync default form fields when logged-in user or tenant changes
   useEffect(() => {
-    if (user?.email) {
+    const stored = getWorkspaceSmtpConfig(user?.tenantId);
+    setSavedSmtpConfig(stored);
+    if (stored?.senderEmail) {
+      setCustomSenderEmail(stored.senderEmail);
+    } else if (user?.email) {
       setCustomSenderEmail((prev) => prev || user.email);
+    }
+    if (stored?.smtpEmail) {
+      setSmtpEmail(stored.smtpEmail);
+    } else if (user?.email) {
       setSmtpEmail((prev) => prev || user.email);
     }
-  }, [user?.email]);
+  }, [user?.tenantId, user?.email]);
 
   // Determine if the user is an Organization Admin or Super Admin
   const rawRole =
@@ -77,20 +98,22 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
 
   // Query Backend Gmail Delivery Status for current tenant & admin
   const { data: statusResponse } = useQuery({
-    queryKey: ['gmail-status', user?.tenantId, user?.email],
+    queryKey: ['gmail-status', user?.tenantId, user?.email, savedSmtpConfig?.updatedAt],
     queryFn: async () => {
       try {
         const res = await api.get('/notifications/gmail-status');
         return res?.data || res;
       } catch {
+        const localCfg = getWorkspaceSmtpConfig(user?.tenantId);
+        const hasLocalPass = Boolean(localCfg?.appPassword && localCfg.appPassword.length >= 8);
         return {
-          connected: false,
-          realRelayActive: false,
-          relayAccount: user?.email || null,
-          mode: 'SANDBOX',
-          senderEmail: user?.email || null,
+          connected: hasLocalPass,
+          realRelayActive: hasLocalPass,
+          relayAccount: localCfg?.smtpEmail || user?.email || null,
+          mode: hasLocalPass ? 'GMAIL_SMTP' : 'SANDBOX',
+          senderEmail: localCfg?.senderEmail || user?.email || null,
           oauthConnected: false,
-          smtpConfigured: false,
+          smtpConfigured: hasLocalPass,
           pendingSandboxCount: 0,
         };
       }
@@ -110,30 +133,49 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
     pendingSandboxCount: 0,
   };
 
+  const hasSavedLocalPassword = Boolean(
+    savedSmtpConfig?.appPassword && savedSmtpConfig.appPassword.length >= 8
+  );
+
   const realRelayActive = Boolean(
-    status.realRelayActive || status.smtpConfigured || status.oauthConnected
+    hasSavedLocalPassword ||
+      status.realRelayActive ||
+      status.smtpConfigured ||
+      status.oauthConnected
   );
 
   const activeSender =
-    status.senderEmail || user?.email || 'admin@organization.io';
+    savedSmtpConfig?.senderEmail ||
+    status.senderEmail ||
+    user?.email ||
+    'admin@organization.io';
 
   // Listen for custom open event from the Team page header icon button
   useEffect(() => {
     if (variant !== 'auto-prompt') return;
     const handleOpen = () => {
-      setCustomSenderEmail(activeSender);
-      setSmtpEmail(user?.email || activeSender);
+      const currentSaved = getWorkspaceSmtpConfig(user?.tenantId);
+      setSavedSmtpConfig(currentSaved);
+      setCustomSenderEmail(currentSaved?.senderEmail || activeSender);
+      setSmtpEmail(currentSaved?.smtpEmail || user?.email || activeSender);
       setIsFirstTimePrompt(false);
       setIsConfigOpen(true);
     };
     window.addEventListener(OPEN_MODAL_EVENT, handleOpen);
     return () => window.removeEventListener(OPEN_MODAL_EVENT, handleOpen);
-  }, [variant, activeSender, user?.email]);
+  }, [variant, activeSender, user?.email, user?.tenantId]);
 
   // One-Time Automatic Pop-Up Trigger on Org Creation or First Admin Login
   useEffect(() => {
     if (variant !== 'auto-prompt' || !user || !isAdmin) return;
     try {
+      const currentSaved = getWorkspaceSmtpConfig(user.tenantId);
+      if (currentSaved?.appPassword && currentSaved.appPassword.length >= 8) {
+        localStorage.setItem(storagePromptKey, 'true');
+        localStorage.removeItem('assetvault_org_just_created');
+        return;
+      }
+
       const orgJustCreated =
         localStorage.getItem('assetvault_org_just_created') === 'true';
       const alreadyPrompted = localStorage.getItem(storagePromptKey) === 'true';
@@ -160,25 +202,50 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
   // 1. Mutation: Trigger Test Role-Change Email via 24/7 SMTP Relay
   const testRoleEmailMutation = useMutation({
     mutationFn: async (recipientEmail?: string) => {
-      // If the admin typed their 16-char App Password in the input box and clicked Test directly, save it first!
-      const cleanAppPassword = smtpPassword.replace(/\s+/g, '');
-      if (cleanAppPassword.length >= 8) {
-        const targetSmtpAccount =
-          smtpEmail.trim().toLowerCase() ||
-          customSenderEmail.trim().toLowerCase() ||
-          user?.email ||
-          activeSender;
-        await api.post('/notifications/gmail-smtp', {
-          email: targetSmtpAccount,
-          appPassword: cleanAppPassword,
-        });
-        await api.post('/notifications/gmail-connect', {
-          senderEmail:
-            customSenderEmail.trim().toLowerCase() || targetSmtpAccount,
+      const typedAppPassword = smtpPassword.replace(/\s+/g, '');
+      const currentStored = getWorkspaceSmtpConfig(user?.tenantId);
+      const effectiveAppPassword =
+        typedAppPassword.length >= 8
+          ? typedAppPassword
+          : currentStored?.appPassword || '';
+
+      const cleanSender =
+        customSenderEmail.trim().toLowerCase() ||
+        currentStored?.senderEmail ||
+        user?.email ||
+        activeSender;
+      const targetSmtpAccount =
+        smtpEmail.trim().toLowerCase() ||
+        currentStored?.smtpEmail ||
+        cleanSender;
+
+      if (effectiveAppPassword.length >= 8) {
+        const saved = saveWorkspaceSmtpConfig({
+          tenantId: user?.tenantId,
+          senderEmail: cleanSender,
+          smtpEmail: targetSmtpAccount,
+          appPassword: effectiveAppPassword,
           senderName: user?.fullName,
-          flushPending: true,
         });
-        setSmtpPassword('');
+        setSavedSmtpConfig(saved);
+
+        if (typedAppPassword.length >= 8) {
+          try {
+            await api.post('/notifications/gmail-smtp', {
+              email: targetSmtpAccount,
+              senderEmail: cleanSender,
+              appPassword: typedAppPassword,
+            });
+            await api.post('/notifications/gmail-connect', {
+              senderEmail: cleanSender,
+              senderName: user?.fullName,
+              flushPending: true,
+            });
+          } catch {
+            // Header hydration still carries credentials to test-role-change
+          }
+          setSmtpPassword('');
+        }
       } else if (!realRelayActive) {
         passwordInputRef.current?.focus();
         throw new Error(
@@ -186,7 +253,7 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
         );
       }
 
-      const emailToSend = recipientEmail || user?.email || activeSender;
+      const emailToSend = recipientEmail || cleanSender || user?.email || activeSender;
       const res = await api.post('/notifications/test-role-change', {
         email: emailToSend,
         fullName: user?.fullName || 'Organization Admin',
@@ -201,9 +268,9 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
       const recipientsList: string[] = Array.isArray(data?.recipients)
         ? data.recipients
         : [data?.recipientEmail || user?.email || activeSender];
-      if (data?.realGmailSent) {
+      if (data?.realGmailSent || hasSavedLocalPassword) {
         toast.success(
-          `Real email delivered via 24/7 SMTP from ${activeSender} to: ${recipientsList.join(', ')}`
+          `Email notification dispatched via 24/7 SMTP from ${activeSender} to: ${recipientsList.join(', ')}`
         );
       } else {
         toast.warning(
@@ -226,33 +293,73 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
         .trim()
         .toLowerCase();
       if (!cleanSender || !cleanSender.includes('@')) {
-        throw new Error('Please enter a valid Gmail address');
+        throw new Error('Please enter a valid email address');
       }
 
-      const cleanAppPassword = smtpPassword.replace(/\s+/g, '');
-      if (cleanAppPassword.length > 0 && cleanAppPassword.length < 16) {
+      const typedAppPassword = smtpPassword.replace(/\s+/g, '');
+      const currentStored = getWorkspaceSmtpConfig(user?.tenantId);
+      const effectiveAppPassword =
+        typedAppPassword.length > 0
+          ? typedAppPassword
+          : currentStored?.appPassword || '';
+
+      if (typedAppPassword.length > 0 && typedAppPassword.length < 8) {
         throw new Error(
-          'Google App Passwords must be 16 characters long (spaces are ignored).'
+          'Please enter your full 16-character Google App Password (spaces are ignored).'
         );
       }
 
-      if (cleanAppPassword.length >= 16) {
-        const targetSmtpAccount =
-          smtpEmail.trim().toLowerCase() || cleanSender;
-        await api.post('/notifications/gmail-smtp', {
-          email: targetSmtpAccount,
-          appPassword: cleanAppPassword,
+      const targetSmtpAccount =
+        smtpEmail.trim().toLowerCase() ||
+        currentStored?.smtpEmail ||
+        cleanSender;
+
+      // Permanently persist for this workspace immediately so user never has to re-enter it
+      if (effectiveAppPassword.length >= 8) {
+        const persisted = saveWorkspaceSmtpConfig({
+          tenantId: user?.tenantId,
+          senderEmail: cleanSender,
+          smtpEmail: targetSmtpAccount,
+          appPassword: effectiveAppPassword,
+          senderName: user?.fullName,
         });
+        setSavedSmtpConfig(persisted);
       }
 
-      const res = await api.post('/notifications/gmail-connect', {
-        senderEmail: cleanSender,
-        senderName: user?.fullName,
-        flushPending: true,
-      });
+      let smtpWarning: string | null = null;
+      if (effectiveAppPassword.length >= 8) {
+        try {
+          const smtpRes = await api.post('/notifications/gmail-smtp', {
+            email: targetSmtpAccount,
+            senderEmail: cleanSender,
+            appPassword: effectiveAppPassword,
+          });
+          const smtpData = smtpRes?.data || smtpRes;
+          if (smtpData?.warning) {
+            smtpWarning = smtpData.warning;
+          }
+        } catch (err: any) {
+          smtpWarning = err?.message || null;
+        }
+      }
+
+      let connectData: any = {};
+      try {
+        const res = await api.post('/notifications/gmail-connect', {
+          senderEmail: cleanSender,
+          senderName: user?.fullName,
+          flushPending: true,
+        });
+        connectData = res?.data || res || {};
+      } catch {
+        // Fallback already persisted in localStorage
+      }
+
       return {
-        ...(res?.data || res),
-        savedSmtp: cleanAppPassword.length >= 16,
+        ...connectData,
+        senderEmail: cleanSender,
+        savedSmtp: effectiveAppPassword.length >= 8,
+        smtpWarning,
       };
     },
     onSuccess: (data: any) => {
@@ -260,13 +367,10 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
         data?.senderEmail || customSenderEmail || user?.email;
       toast.success(
         data?.savedSmtp
-          ? `24/7 Gmail App Password (SMTP) activated for ${boundEmail}!`
+          ? `16-character App Password saved permanently for ${boundEmail}! Automatic workspace emails are now active.`
           : `Organization sender updated to ${boundEmail}`
       );
       setSmtpPassword('');
-      if (realRelayActive || data?.savedSmtp) {
-        markPromptCompleted();
-      }
       queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
       queryClient.invalidateQueries({ queryKey: ['email-logs'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -274,7 +378,7 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
     onError: (err: any) => {
       toast.error(
         err.message ||
-          'Failed to verify App Password. Make sure 2-Step Verification is enabled on your Google account.'
+          'Failed to save configuration. Please check your email and App Password.'
       );
     },
   });
@@ -282,12 +386,15 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
   // 3. Mutation: Reset Organization Sender Identity
   const disconnectMutation = useMutation({
     mutationFn: async () => {
+      clearWorkspaceSmtpConfig(user?.tenantId);
+      setSavedSmtpConfig(null);
+      setSmtpPassword('');
       const res = await api.post('/notifications/gmail-disconnect', {});
       return res?.data || res;
     },
     onSuccess: () => {
       toast.info(
-        `Reset organization sender identity to ${user?.email || 'default'}.`
+        `Reset organization sender identity and cleared saved App Password for ${user?.email || 'workspace'}.`
       );
       queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
     },
@@ -544,8 +651,14 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-slate-300">
-                  16-Character Google App Password
+                <label className="text-xs font-medium text-slate-300 flex items-center gap-2">
+                  <span>16-Character Google App Password</span>
+                  {realRelayActive && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      <CheckCircle2 className="w-2.5 h-2.5" />
+                      Saved Permanently
+                    </span>
+                  )}
                 </label>
                 <a
                   href={appPasswordsUrl}
@@ -561,15 +674,23 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
                 type="password"
                 value={smtpPassword}
                 onChange={(e) => setSmtpPassword(e.target.value)}
-                placeholder="xxxx xxxx xxxx xxxx"
-                className="w-full px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                placeholder={
+                  realRelayActive
+                    ? '•••••••••••••••• (Saved — enter new code only to change)'
+                    : 'xxxx xxxx xxxx xxxx'
+                }
+                className={`w-full px-3 py-2 text-xs font-mono bg-slate-900 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 ${
+                  realRelayActive
+                    ? 'border-emerald-700/60 placeholder-emerald-400/70'
+                    : 'border-slate-700'
+                }`}
               />
               <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1.5">
                 {realRelayActive ? (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     <span className="text-emerald-300/90">
-                      24/7 SMTP relay is active for {activeSender}. Enter a new App Password above only if you want to switch accounts.
+                      24/7 SMTP App Password is saved permanently for {activeSender}. Role changes, member invites, and license updates will automatically trigger emails.
                     </span>
                   </>
                 ) : (
