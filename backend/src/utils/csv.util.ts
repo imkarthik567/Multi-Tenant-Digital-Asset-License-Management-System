@@ -13,6 +13,7 @@ export interface CsvParseResult {
  * Parses raw CSV text into an array of key-value row objects.
  */
 export function parseCsv(text: string): CsvParseResult {
+  text = String(text || '').replace(/^\uFEFF/, '');
   const lines: string[][] = [];
   let currentRow: string[] = [];
   let currentField = '';

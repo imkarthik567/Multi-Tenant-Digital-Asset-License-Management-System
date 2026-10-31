@@ -13,7 +13,14 @@ import { compareVersionsQuerySchema } from '../validators/version.validator';
 
 export class AssetController {
   public listAssets = asyncHandler(async (req: Request, res: Response) => {
-    const params = getPaginationParams(req, 'created_at', ['name', 'assetCode', 'created_at', 'updated_at']);
+    const params = getPaginationParams(req, 'created_at', [
+      'name',
+      'assetCode',
+      'created_at',
+      'updated_at',
+      'updatedAt',
+      'createdAt',
+    ]);
 
     const filter = {
       categoryId: req.query.categoryId as string,
@@ -109,9 +116,15 @@ export class AssetController {
   });
 
   public bulkImport = asyncHandler(async (req: Request, res: Response) => {
-    let csvData = typeof req.body === 'string' ? req.body : req.body?.csv;
+    let csvData =
+      typeof req.body === 'string'
+        ? req.body
+        : req.body?.csv || req.body?.csvText || req.body?.content || req.body?.data;
     if (!csvData && req.file) {
       csvData = req.file.buffer.toString('utf8');
+    }
+    if (!csvData && Buffer.isBuffer(req.body)) {
+      csvData = req.body.toString('utf8');
     }
     const result = await assetService.bulkImport(req.user!.tenantId as string, req.user!.id, csvData || '');
     sendResponse(res, 201, result);

@@ -2802,6 +2802,21 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
               ];
             }
 
+            const loMatch = sqlText.match(/LIMIT\s+(\$?\d+)\s+OFFSET\s+(\$?\d+)/i);
+            if (loMatch && loMatch[1] && loMatch[2]) {
+              const parseVal = (str: string) => {
+                if (str.startsWith('$')) {
+                  const idx = parseInt(str.slice(1), 10) - 1;
+                  return Number(values[idx]);
+                }
+                return parseInt(str, 10);
+              };
+              const limit = parseVal(loMatch[1]);
+              const offset = parseVal(loMatch[2]);
+              if (!isNaN(limit) && !isNaN(offset)) {
+                return rows.slice(offset, offset + limit);
+              }
+            }
             if (/LIMIT\s+/i.test(sqlText) && /OFFSET\s+/i.test(sqlText)) {
               const numVals = values.filter((v): v is number => typeof v === 'number');
               if (numVals.length >= 2) {
@@ -3045,6 +3060,21 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
               ];
             }
 
+            const loMatchLic = sqlText.match(/LIMIT\s+(\$?\d+)\s+OFFSET\s+(\$?\d+)/i);
+            if (loMatchLic && loMatchLic[1] && loMatchLic[2]) {
+              const parseVal = (str: string) => {
+                if (str.startsWith('$')) {
+                  const idx = parseInt(str.slice(1), 10) - 1;
+                  return Number(values[idx]);
+                }
+                return parseInt(str, 10);
+              };
+              const limit = parseVal(loMatchLic[1]);
+              const offset = parseVal(loMatchLic[2]);
+              if (!isNaN(limit) && !isNaN(offset)) {
+                return mapped.slice(offset, offset + limit);
+              }
+            }
             if (/LIMIT\s+/i.test(sqlText) && /OFFSET\s+/i.test(sqlText)) {
               const numVals = values.filter((v): v is number => typeof v === 'number');
               if (numVals.length >= 2) {

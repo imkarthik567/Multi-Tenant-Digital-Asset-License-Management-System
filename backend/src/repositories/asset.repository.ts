@@ -100,7 +100,8 @@ export class AssetRepository {
     let sortColumn = 'created_at';
     if (params.sort === 'name') sortColumn = 'asset_name';
     else if (params.sort === 'assetCode') sortColumn = 'asset_code';
-    else if (params.sort === 'updatedAt') sortColumn = 'updated_at';
+    else if (params.sort === 'updatedAt' || params.sort === 'updated_at') sortColumn = 'updated_at';
+    else if (params.sort === 'createdAt' || params.sort === 'created_at') sortColumn = 'created_at';
 
     const orderDirection = params.order === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
     const orderClause = Prisma.sql`ORDER BY ${Prisma.raw(sortColumn)} ${orderDirection}`;

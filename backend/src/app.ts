@@ -140,6 +140,7 @@ app.use(
 );
 
 // 6. Request Body Size Limiting (Prevents payload-based DoS while allowing voice audio payloads)
+app.use(express.text({ type: ['text/csv', 'text/plain', 'text/*', 'application/octet-stream'], limit: '20mb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser(env.COOKIE_SECRET));

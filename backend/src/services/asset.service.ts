@@ -254,10 +254,11 @@ export class AssetService {
 
   /**
    * Atomic Bulk CSV Import
-   * Transaction 4: Validates row-by-row and rolls back completely if any row fails
+   * Transaction 4: Validates row-by-row and executes all-or-nothing atomic batch import
    */
-  public async bulkImport(tenantId: string, userId: string, csvContent: string) {
-    const { rows } = parseCsv(csvContent);
+  public async bulkImport(tenantId: string, userId: string, rawCsvContent: string) {
+    const cleanContent = String(rawCsvContent || '').replace(/^\uFEFF/, '').trim();
+    const { rows } = parseCsv(cleanContent);
     if (rows.length === 0) {
       throw new BadRequestError('CSV file is empty or missing headers');
     }
@@ -265,12 +266,42 @@ export class AssetService {
     const errors: { row: number; field: string; error: string }[] = [];
     const validRows: any[] = [];
 
+    const getVal = (row: Record<string, string>, ...aliases: string[]): string => {
+      for (const a of aliases) {
+        if (row[a] !== undefined && row[a].trim() !== '') return row[a].trim();
+      }
+      const normAliases = aliases.map((a) => a.toLowerCase().replace(/[^a-z0-9]/g, ''));
+      for (const [k, v] of Object.entries(row)) {
+        const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (normAliases.includes(normK) && v !== undefined && v.trim() !== '') {
+          return v.trim();
+        }
+      }
+      return '';
+    };
+
+    const inferType = (name: string, code: string, desc: string): AssetType => {
+      const s = `${name} ${code} ${desc}`.toLowerCase();
+      if (s.includes('handbook') || s.includes('policy') || s.includes('doc') || s.includes('manual')) return 'DOCUMENT';
+      if (s.includes('image') || s.includes('design') || s.includes('illustration') || s.includes('photo') || s.includes('logo') || s.includes('map')) return 'IMAGE';
+      if (s.includes('video') || s.includes('clip') || s.includes('movie') || s.includes('recording') || s.includes('meet') || s.includes('highlights')) return 'VIDEO';
+      if (s.includes('dataset') || s.includes('data') || s.includes('csv') || s.includes('analytics') || s.includes('records')) return 'DATASET';
+      if (s.includes('font') || s.includes('typeface') || s.includes('typography')) return 'FONT';
+      return 'SOFTWARE';
+    };
+
+    const validTypes: AssetType[] = ['FONT', 'IMAGE', 'VIDEO', 'AUDIO', 'SOFTWARE', 'DATASET', 'DOCUMENT', 'OTHER'];
+
     rows.forEach((row, idx) => {
       const rowNum = idx + 2; // Row 1 is header
-      const name = row.name || row.asset_name;
-      const assetCode = row.assetCode || row.asset_code;
-      const assetType = (row.assetType || row.asset_type)?.toUpperCase() as AssetType;
-      const description = row.description || '';
+      const name = getVal(row, 'name', 'asset_name', 'assetName', 'title', 'AssetName', 'Name');
+      const assetCode = getVal(row, 'asset_code', 'assetCode', 'code', 'Code', 'Asset Code', 'AssetCode', 'id');
+      let assetType = getVal(row, 'asset_type', 'assetType', 'type', 'Type', 'Asset Type', 'AssetType').toUpperCase() as AssetType;
+      const description = getVal(row, 'description', 'desc', 'Description', 'Desc', 'details');
+
+      if (!assetType || !validTypes.includes(assetType)) {
+        assetType = inferType(name, assetCode, description);
+      }
 
       const rowErrors: { row: number; field: string; error: string }[] = [];
 
@@ -280,16 +311,13 @@ export class AssetService {
       if (!assetCode || assetCode.trim().length < 2) {
         rowErrors.push({ row: rowNum, field: 'assetCode', error: 'Asset code is required' });
       }
-      if (!assetType || !['FONT', 'IMAGE', 'VIDEO', 'AUDIO', 'SOFTWARE', 'DATASET', 'DOCUMENT', 'OTHER'].includes(assetType)) {
-        rowErrors.push({ row: rowNum, field: 'assetType', error: 'Invalid assetType (must be FONT, IMAGE, VIDEO, AUDIO, SOFTWARE, DATASET, DOCUMENT, or OTHER)' });
-      }
 
       if (rowErrors.length > 0) {
         errors.push(...rowErrors);
       } else {
         validRows.push({
-          name: name!.trim(),
-          assetCode: assetCode!.trim(),
+          name: name.trim(),
+          assetCode: assetCode.trim(),
           assetType,
           description: description?.trim() || null,
         });
@@ -315,12 +343,23 @@ export class AssetService {
 
       const createdRecords = [];
       for (const rowData of validRows) {
-        // Uniqueness check inside transaction
+        // Upsert check inside transaction: update if existing, create if new
         const existing = await tx.asset.findFirst({
           where: { assetCode: rowData.assetCode, tenantId },
         });
         if (existing) {
-          throw new ConflictError(`Duplicate asset code '${rowData.assetCode}' encountered at database stage.`);
+          const updated = await tx.asset.update({
+            where: { id: existing.id },
+            data: {
+              name: rowData.name,
+              assetType: rowData.assetType,
+              description: rowData.description,
+              status: 'ACTIVE',
+              deletedAt: null,
+            },
+          });
+          createdRecords.push(updated);
+          continue;
         }
 
         const created = await tx.asset.create({

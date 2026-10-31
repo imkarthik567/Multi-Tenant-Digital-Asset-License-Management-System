@@ -306,6 +306,16 @@ export const AssetListPage: React.FC = () => {
     setSearchInput(q);
   }, [q]);
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const trimmed = searchInput.trim();
+      if (trimmed !== q) {
+        updateParams({ q: trimmed || undefined });
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchInput]);
+
   // URL State Updater Helper
   const updateParams = (updates: Record<string, string | number | undefined | null>, resetPage = true) => {
     const next = new URLSearchParams(searchParams);
@@ -1062,9 +1072,14 @@ export const AssetListPage: React.FC = () => {
                 inputSize="sm"
                 placeholder="Search assets by name, code, SKU..."
                 value={searchInput}
-                onChange={(e) => {
-                  setSearchInput(e.target.value);
-                  updateParams({ q: e.target.value || undefined });
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const trimmed = searchInput.trim();
+                    if (trimmed !== q) {
+                      updateParams({ q: trimmed || undefined });
+                    }
+                  }
                 }}
                 iconLeft={<Search className="w-4 h-4 text-slate-500" />}
                 rightAction={

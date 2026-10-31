@@ -4,6 +4,7 @@
 // ==============================================================================
 
 import path from 'path';
+import http from 'http';
 import express from 'express';
 
 // Override any legacy container VITE_API_URL (e.g. http://localhost:5000/api)
@@ -83,7 +84,8 @@ async function bootstrap() {
     });
   }
 
-  app.listen(PORT, HOST, () => {
+  const server = http.createServer({ maxHeaderSize: 65536 }, app);
+  server.listen(PORT, HOST, () => {
     console.log(`🚀 AssetVault application listening on http://${HOST}:${PORT}`);
   });
 }

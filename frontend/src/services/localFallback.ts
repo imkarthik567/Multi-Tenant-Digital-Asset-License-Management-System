@@ -356,6 +356,18 @@ export function recordWorkspaceEntitySync(
         )
       : [];
 
+    const slimData =
+      action === 'upsert' && entityData
+        ? {
+            id: entityId,
+            tenantId,
+            name: entityData.name || entityData.fullName,
+            status: entityData.status,
+            assetCode: entityData.assetCode,
+            roleId: entityData.roleId,
+          }
+        : undefined;
+
     filtered.push({
       email: 'entity@workspace.local',
       tenantId,
@@ -363,9 +375,9 @@ export function recordWorkspaceEntitySync(
       entityType,
       action,
       entityId,
-      entityData: action === 'upsert' ? { ...entityData, id: entityId, tenantId } : undefined,
+      entityData: slimData,
     });
-    localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(filtered.slice(-80)));
+    localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(filtered.slice(-15)));
   } catch {}
 }
 
@@ -423,9 +435,24 @@ export function mergeClientWorkspaceEntities<T = any>(
 
 export function getRosterSyncHeader(): string | null {
   try {
-    const activeTenantId = getCurrentSessionTenantId();
     const raw = localStorage.getItem(ROSTER_SYNC_KEY);
-    const parsed: RosterSyncEntry[] = raw ? JSON.parse(raw) : [];
+    if (!raw) return null;
+    // Self-healing: if legacy stored roster is over 3KB, prune it
+    if (raw.length > 3000) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const pruned = parsed.slice(-10);
+          localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(pruned));
+        } else {
+          localStorage.removeItem(ROSTER_SYNC_KEY);
+        }
+      } catch {
+        localStorage.removeItem(ROSTER_SYNC_KEY);
+        return null;
+      }
+    }
+    const parsed: RosterSyncEntry[] = JSON.parse(localStorage.getItem(ROSTER_SYNC_KEY) || '[]');
     const list = Array.isArray(parsed) ? parsed : [];
     const closedState = getClosedWorkspacesState();
 
@@ -441,13 +468,21 @@ export function getRosterSyncHeader(): string | null {
       }
     }
 
+    const activeTenantId = getCurrentSessionTenantId();
     const activeEntries = activeTenantId
-      ? list.filter((item) => item && !item.closedTenant && item.tenantId === activeTenantId)
-      : list.filter((item) => item && !item.closedTenant && item.tenantId && item.email);
+      ? list.filter((item) => item && !item.closedTenant && item.tenantId === activeTenantId).slice(-10)
+      : list.filter((item) => item && !item.closedTenant && item.tenantId && item.email).slice(-10);
 
     const combined = [...closedEntries, ...activeEntries];
     if (combined.length === 0) return null;
-    return btoa(unescape(encodeURIComponent(JSON.stringify(combined))));
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(combined))));
+    if (encoded.length > 2500) {
+      if (closedEntries.length > 0) {
+        return btoa(unescape(encodeURIComponent(JSON.stringify(closedEntries))));
+      }
+      return null;
+    }
+    return encoded;
   } catch {
     return null;
   }
@@ -1222,6 +1257,14 @@ export function handleFallbackRequest(
   params?: any
 ): any {
   const cleanUrl = url.replace(/^\/api(\/v1)?/, '');
+  const [pathname, queryString] = cleanUrl.split('?');
+  const queryParams: Record<string, any> = { ...params };
+  if (queryString) {
+    const sp = new URLSearchParams(queryString);
+    sp.forEach((v, k) => {
+      if (queryParams[k] === undefined) queryParams[k] = v;
+    });
+  }
   const store = loadStore();
   const { activeTenantId, activeTenant, activeUser } = getActiveSessionContext(store);
 
@@ -1717,9 +1760,10 @@ export function handleFallbackRequest(
   }
 
   // 7. Collections (/assets, /licenses, /allocations, /vendors, /categories, /tags, /users, /notifications, /audit-logs)
+  // 7. Collections (/assets, /licenses, /allocations, /vendors, /categories, /tags, /users, /notifications, /audit-logs)
   const makePaginated = (items: any[]) => {
-    const page = Math.max(1, Number(params?.page || 1));
-    const limit = Math.max(1, Number(params?.limit || 20));
+    const page = Math.max(1, Number(queryParams?.page || params?.page || 1));
+    const limit = Math.max(1, Number(queryParams?.limit || params?.limit || 10));
     const total = items.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const sliced = items.slice((page - 1) * limit, page * limit);
@@ -1737,7 +1781,135 @@ export function handleFallbackRequest(
     };
   };
 
-  if (cleanUrl.startsWith('/assets')) {
+  // Asset Export CSV
+  if (cleanUrl.includes('/assets/export')) {
+    const headers = ['asset_code', 'name', 'asset_type', 'status', 'compliance_status', 'created_at'];
+    const rows = tenantAssets.map((a) => [
+      `"${(a.assetCode || a.asset_code || '').replace(/"/g, '""')}"`,
+      `"${(a.name || a.asset_name || '').replace(/"/g, '""')}"`,
+      `"${a.assetType || a.asset_type || 'SOFTWARE'}"`,
+      `"${a.status || a.asset_status || 'ACTIVE'}"`,
+      `"${a.complianceStatus || a.compliance_status || 'COMPLIANT'}"`,
+      `"${a.createdAt || a.created_at || new Date().toISOString()}"`,
+    ]);
+    return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  }
+
+  // Bulk CSV Import
+  if (method === 'POST' && (cleanUrl.includes('/assets/bulk-import') || pathname === '/assets/bulk-import')) {
+    const csvStr = typeof body === 'string' ? body : '';
+    const lines = csvStr.split('\n').map((l) => l.trim()).filter(Boolean);
+    const importedAssets: any[] = [];
+    if (lines.length > 1) {
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(',').map((p) => p.replace(/^"|"$/g, '').trim());
+        if (parts[0] && parts[1]) {
+          const code = parts[0];
+          const name = parts[1];
+          const rawType = (parts[2] || 'SOFTWARE').toUpperCase();
+          const desc = parts[3] || '';
+          const newAsset = {
+            id: `asset-import-${Date.now()}-${i}`,
+            tenantId: activeTenantId,
+            assetCode: code,
+            name,
+            assetType: rawType,
+            status: 'ACTIVE',
+            description: desc,
+            tags: ['VIT-Campus', 'Production'],
+            complianceStatus: 'COMPLIANT',
+            latestVersionNo: 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          store.assets.unshift(newAsset);
+          importedAssets.push(newAsset);
+        }
+      }
+      saveStore(store);
+    }
+    return {
+      status: 'success',
+      data: {
+        message: `Successfully imported ${importedAssets.length} assets`,
+        assets: importedAssets,
+      },
+    };
+  }
+
+  // Asset Restore from Trash
+  if (method === 'POST' && pathname.includes('/restore') && pathname.startsWith('/assets/')) {
+    const id = pathname.split('/')[2];
+    const asset = store.assets.find(
+      (a) => (a.id === id || a.asset_id === id) && a.tenantId === activeTenantId
+    );
+    if (asset) {
+      asset.status = 'ACTIVE';
+      asset.asset_status = 'ACTIVE';
+      asset.deletedAt = null;
+      saveStore(store);
+      return { status: 'success', data: asset };
+    }
+    return { status: 'success', data: { id, status: 'ACTIVE' } };
+  }
+
+  // Attach Tags
+  if (method === 'POST' && pathname.includes('/tags') && pathname.startsWith('/assets/')) {
+    const id = pathname.split('/')[2];
+    const asset = store.assets.find(
+      (a) => (a.id === id || a.asset_id === id) && a.tenantId === activeTenantId
+    );
+    const newTags = Array.isArray(body?.tagNames)
+      ? body.tagNames
+      : body?.tag
+      ? [body.tag]
+      : Array.isArray(body?.tagIds)
+      ? body.tagIds
+      : [];
+    if (asset && newTags.length > 0) {
+      asset.tags = Array.from(new Set([...(asset.tags || []), ...newTags]));
+      saveStore(store);
+      return { status: 'success', data: asset };
+    }
+    return { status: 'success', data: asset || {} };
+  }
+
+  // Single Asset Soft Delete
+  if (method === 'DELETE' && pathname.startsWith('/assets/')) {
+    const id = pathname.split('/')[2];
+    const asset = store.assets.find(
+      (a) => (a.id === id || a.asset_id === id) && a.tenantId === activeTenantId
+    );
+    if (asset) {
+      asset.status = 'ARCHIVED';
+      asset.asset_status = 'ARCHIVED';
+      asset.deletedAt = new Date().toISOString();
+      saveStore(store);
+      return { status: 'success', data: asset };
+    }
+    return { status: 'success', data: { id, status: 'ARCHIVED' } };
+  }
+
+  // Single Asset Details
+  if (method === 'GET' && pathname.startsWith('/assets/') && pathname !== '/assets') {
+    const id = pathname.split('/')[2];
+    const asset = store.assets.find(
+      (a) => (a.id === id || a.asset_id === id) && a.tenantId === activeTenantId
+    );
+    if (asset) {
+      return {
+        status: 'success',
+        data: {
+          ...asset,
+          complianceStatus: asset.complianceStatus || 'COMPLIANT',
+          coveringLicensesCount: 1,
+        },
+      };
+    }
+  }
+
+  // Asset Catalog Listing & Filtering
+  if (pathname === '/assets' || cleanUrl.startsWith('/assets')) {
     if (method === 'POST') {
       const created = {
         id: `asset-${Date.now()}`,
@@ -1747,8 +1919,10 @@ export function handleFallbackRequest(
         assetType: body?.assetType || 'SOFTWARE',
         status: 'ACTIVE',
         description: body?.description || '',
+        categoryId: body?.categoryId || null,
         tags: Array.isArray(body?.tags) ? body.tags : [],
         complianceStatus: 'COMPLIANT',
+        latestVersionNo: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1756,36 +1930,106 @@ export function handleFallbackRequest(
       saveStore(store);
       return { status: 'success', data: created };
     }
+
     let filteredAssets = [...tenantAssets];
-    if (params?.status) {
+
+    // Status filter
+    const statusParam = String(queryParams?.status || 'ACTIVE').toUpperCase();
+    if (statusParam === 'ACTIVE') {
+      filteredAssets = filteredAssets.filter((a) => a.status !== 'ARCHIVED' && !a.deletedAt);
+    } else if (statusParam === 'ARCHIVED') {
+      filteredAssets = filteredAssets.filter((a) => a.status === 'ARCHIVED' || a.deletedAt);
+    } // 'ALL' keeps both
+
+    // Asset type filter
+    if (queryParams?.assetType) {
+      const typeParam = String(queryParams.assetType).toUpperCase();
       filteredAssets = filteredAssets.filter(
-        (a) => String(a.status || a.asset_status || 'ACTIVE').toUpperCase() === String(params.status).toUpperCase()
+        (a) => String(a.assetType || a.asset_type || '').toUpperCase() === typeParam
       );
     }
-    if (params?.assetType) {
+
+    // Compliance filter
+    if (queryParams?.complianceStatus && queryParams.complianceStatus !== 'ALL') {
+      const compParam = String(queryParams.complianceStatus).toUpperCase();
       filteredAssets = filteredAssets.filter(
-        (a) => String(a.assetType || a.asset_type || 'SOFTWARE').toUpperCase() === String(params.assetType).toUpperCase()
+        (a) => String(a.complianceStatus || a.compliance_status || 'UNLICENSED').toUpperCase() === compParam
       );
     }
-    if (params?.complianceStatus) {
+
+    // Category filter (includes child categories)
+    if (queryParams?.categoryId) {
+      const catId = queryParams.categoryId;
+      const childIds = new Set<string>([
+        catId,
+        ...(store.categories || []).filter((c: any) => c.parentId === catId).map((c: any) => c.id),
+      ]);
       filteredAssets = filteredAssets.filter(
-        (a) => String(a.complianceStatus || a.compliance_status || 'COMPLIANT').toUpperCase() === String(params.complianceStatus).toUpperCase()
+        (a) => childIds.has(a.categoryId || a.category_id)
       );
     }
-    if (params?.categoryId) {
-      filteredAssets = filteredAssets.filter(
-        (a) => (a.categoryId || a.category_id) === params.categoryId
+
+    // Owner filter
+    if (queryParams?.owner || queryParams?.ownerId) {
+      const ownerQuery = String(queryParams.owner || queryParams.ownerId).toLowerCase();
+      filteredAssets = filteredAssets.filter((a) => {
+        const oName = String(a.owner?.fullName || a.owner_name || '').toLowerCase();
+        const oEmail = String(a.owner?.email || a.owner_email || '').toLowerCase();
+        const oId = String(a.ownerId || a.owner_id || '').toLowerCase();
+        return oName.includes(ownerQuery) || oEmail.includes(ownerQuery) || oId === ownerQuery;
+      });
+    }
+
+    // Tag filter
+    if (queryParams?.tag) {
+      const tagLower = String(queryParams.tag).toLowerCase();
+      filteredAssets = filteredAssets.filter((a) =>
+        Array.isArray(a.tags) &&
+        a.tags.some((t: any) => String(typeof t === 'string' ? t : t.name).toLowerCase() === tagLower)
       );
     }
-    if (params?.q) {
-      const qL = String(params.q).toLowerCase();
+
+    // Keyword search (q)
+    if (queryParams?.q) {
+      const qL = String(queryParams.q).toLowerCase().trim();
       filteredAssets = filteredAssets.filter(
         (a) =>
           String(a.name || a.asset_name || '').toLowerCase().includes(qL) ||
           String(a.assetCode || a.asset_code || '').toLowerCase().includes(qL) ||
-          String(a.description || '').toLowerCase().includes(qL)
+          String(a.description || '').toLowerCase().includes(qL) ||
+          (Array.isArray(a.tags) &&
+            a.tags.some((t: any) => String(typeof t === 'string' ? t : t.name).toLowerCase().includes(qL)))
       );
     }
+
+    // Sort order
+    const sortField = queryParams?.sort || 'created_at';
+    const sortDir = (queryParams?.order || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+    filteredAssets.sort((a, b) => {
+      if (sortField === 'name' || sortField === 'asset_name') {
+        return (
+          String(a.name || a.asset_name || '').localeCompare(String(b.name || b.asset_name || '')) * sortDir
+        );
+      }
+      if (sortField === 'assetCode' || sortField === 'asset_code') {
+        return (
+          String(a.assetCode || a.asset_code || '').localeCompare(
+            String(b.assetCode || b.asset_code || ''),
+            undefined,
+            { numeric: true }
+          ) * sortDir
+        );
+      }
+      const tA = new Date(a[sortField] || a.updatedAt || a.created_at || a.createdAt || 0).getTime();
+      const tB = new Date(b[sortField] || b.updatedAt || b.created_at || b.createdAt || 0).getTime();
+      if (tA !== tB) return (tA - tB) * sortDir;
+      return (
+        String(a.assetCode || a.asset_code || '').localeCompare(
+          String(b.assetCode || b.asset_code || '')
+        ) * sortDir
+      );
+    });
+
     return makePaginated(filteredAssets);
   }
 
@@ -1811,7 +2055,25 @@ export function handleFallbackRequest(
       saveStore(store);
       return { status: 'success', data: created };
     }
-    return makePaginated(tenantLicenses);
+
+    let filteredLicenses = [...tenantLicenses];
+    if (queryParams?.status && queryParams.status !== 'ALL') {
+      filteredLicenses = filteredLicenses.filter(
+        (l) => String(l.status || 'ACTIVE').toUpperCase() === String(queryParams.status).toUpperCase()
+      );
+    }
+    if (queryParams?.vendorId) {
+      filteredLicenses = filteredLicenses.filter((l) => l.vendorId === queryParams.vendorId);
+    }
+    if (queryParams?.q) {
+      const qL = String(queryParams.q).toLowerCase().trim();
+      filteredLicenses = filteredLicenses.filter(
+        (l) =>
+          String(l.name || '').toLowerCase().includes(qL) ||
+          String(l.licenseKey || '').toLowerCase().includes(qL)
+      );
+    }
+    return makePaginated(filteredLicenses);
   }
 
   if (cleanUrl.startsWith('/allocations')) {
@@ -1838,13 +2100,27 @@ export function handleFallbackRequest(
 
   if (cleanUrl.startsWith('/categories')) {
     if (cleanUrl.includes('/tree')) {
+      const defaultHierarchical = [
+        { id: 'cat-software', name: 'Software & Enterprise Apps', description: 'Development tools and applications', parentId: null },
+        { id: 'cat-cloud', name: 'Cloud & DevOps Tools', description: 'Infrastructure and deployment tooling', parentId: 'cat-software' },
+        { id: 'cat-design', name: 'Design & Brand Media', description: 'Design systems and multimedia', parentId: null },
+        { id: 'cat-fonts', name: 'Typography & Fonts', description: 'Brand typefaces and typography packs', parentId: 'cat-design' },
+        { id: 'cat-datasets', name: 'Datasets & Analytics', description: 'Research metadata and training datasets', parentId: null },
+        { id: 'cat-docs', name: 'Documentation & Policies', description: 'Operating handbooks and institutional policies', parentId: null },
+      ];
+      const catsToUse = (store.categories && store.categories.length > 0) ? store.categories : defaultHierarchical;
+      const allCatsWithCounts = catsToUse.map((c: any) => ({
+        ...c,
+        assetCount: tenantAssets.filter((a) => (a.categoryId || a.category_id) === c.id).length,
+      }));
+      const rootCats = allCatsWithCounts.filter((c: any) => !c.parentId);
+      const tree = rootCats.map((root: any) => ({
+        ...root,
+        children: allCatsWithCounts.filter((child: any) => child.parentId === root.id),
+      }));
       return {
         status: 'success',
-        data: store.categories.map((c: any) => ({
-          ...c,
-          assetCount: tenantAssets.filter((a) => (a.categoryId || a.category_id) === c.id).length,
-          children: [],
-        })),
+        data: tree.length > 0 ? tree : allCatsWithCounts.map((c: any) => ({ ...c, children: [] })),
       };
     }
     return makePaginated(store.categories);
