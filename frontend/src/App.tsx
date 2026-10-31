@@ -4,7 +4,7 @@
 // Multi-tenant enterprise RBAC router, silent token refresh, & lazy loading
 // ==============================================================================
 
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext';
@@ -16,6 +16,30 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
+import { ForbiddenPage } from './pages/error/ForbiddenPage';
+import { NotFoundPage } from './pages/error/NotFoundPage';
+import { DashboardPage } from './pages/dashboard/DashboardPage';
+import { AssetListPage } from './pages/assets/AssetListPage';
+import { AssetDetailPage } from './pages/assets/AssetDetailPage';
+import { MyLicensesPage } from './pages/licenses/MyLicensesPage';
+import { LicenseListPage } from './pages/licenses/LicenseListPage';
+import { LicenseDetailPage } from './pages/licenses/LicenseDetailPage';
+import { AllocationListPage } from './pages/allocations/AllocationListPage';
+import { VendorListPage } from './pages/vendors/VendorListPage';
+import { CategoryListPage } from './pages/categories/CategoryListPage';
+import { TagListPage } from './pages/tags/TagListPage';
+import { UserListPage } from './pages/users/UserListPage';
+import { NotificationListPage } from './pages/notifications/NotificationListPage';
+import { ReportsPage } from './pages/reports/ReportsPage';
+import { AuditLogPage } from './pages/audit-logs/AuditLogPage';
+import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
+import { TenantListPage } from './pages/platform/TenantListPage';
+import { PlanListPage } from './pages/platform/PlanListPage';
+import { AiAssistantPage } from './pages/ai/AiAssistantPage';
+import {
+  hydrateQueryClientFromStorage,
+  attachQueryCachePersistence,
+} from './utils/queryCachePersistence';
 
 const PUBLIC_PATHS = ['/login', '/register', '/oauth-callback', '/403', '/404'];
 const LAST_ROUTE_STORAGE_KEY = 'assetvault_last_route';
@@ -71,56 +95,21 @@ const PageLoader: React.FC = () => (
   </div>
 );
 
-// Resilient lazy loader that retries once with cache-bust if Vite re-optimizes deps
-function lazyWithRetry<T extends React.ComponentType<any>>(
-  importer: () => Promise<{ default: T }>
-): React.LazyExoticComponent<T> {
-  return lazy(async () => {
-    try {
-      return await importer();
-    } catch (err) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      return await importer();
-    }
-  });
-}
-
-// Lazy Loaded Pages
-const ForbiddenPage = lazyWithRetry(() => import('./pages/error/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage })));
-const NotFoundPage = lazyWithRetry(() => import('./pages/error/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
-
-const DashboardPage = lazyWithRetry(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
-const AssetListPage = lazyWithRetry(() => import('./pages/assets/AssetListPage').then((m) => ({ default: m.AssetListPage })));
-const AssetDetailPage = lazyWithRetry(() => import('./pages/assets/AssetDetailPage').then((m) => ({ default: m.AssetDetailPage })));
-
-const MyLicensesPage = lazyWithRetry(() => import('./pages/licenses/MyLicensesPage').then((m) => ({ default: m.MyLicensesPage })));
-const LicenseListPage = lazyWithRetry(() => import('./pages/licenses/LicenseListPage').then((m) => ({ default: m.LicenseListPage })));
-const LicenseDetailPage = lazyWithRetry(() => import('./pages/licenses/LicenseDetailPage').then((m) => ({ default: m.LicenseDetailPage })));
-const AllocationListPage = lazyWithRetry(() => import('./pages/allocations/AllocationListPage').then((m) => ({ default: m.AllocationListPage })));
-
-const VendorListPage = lazyWithRetry(() => import('./pages/vendors/VendorListPage').then((m) => ({ default: m.VendorListPage })));
-const CategoryListPage = lazyWithRetry(() => import('./pages/categories/CategoryListPage').then((m) => ({ default: m.CategoryListPage })));
-const TagListPage = lazyWithRetry(() => import('./pages/tags/TagListPage').then((m) => ({ default: m.TagListPage })));
-
-const UserListPage = lazyWithRetry(() => import('./pages/users/UserListPage').then((m) => ({ default: m.UserListPage })));
-const NotificationListPage = lazyWithRetry(() => import('./pages/notifications/NotificationListPage').then((m) => ({ default: m.NotificationListPage })));
-const ReportsPage = lazyWithRetry(() => import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
-const AuditLogPage = lazyWithRetry(() => import('./pages/audit-logs/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
-const TenantSettingsPage = lazyWithRetry(() => import('./pages/settings/TenantSettingsPage').then((m) => ({ default: m.TenantSettingsPage })));
-
-const TenantListPage = lazyWithRetry(() => import('./pages/platform/TenantListPage').then((m) => ({ default: m.TenantListPage })));
-const PlanListPage = lazyWithRetry(() => import('./pages/platform/PlanListPage').then((m) => ({ default: m.PlanListPage })));
-const AiAssistantPage = lazyWithRetry(() => import('./pages/ai/AiAssistantPage').then((m) => ({ default: m.AiAssistantPage })));
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
       staleTime: 1000 * 60 * 2, // 2 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes
+      placeholderData: (previousData: any) => previousData,
     },
   },
 });
+
+// Synchronously hydrate React Query cache on module load so Ctrl+R renders data on frame 0
+hydrateQueryClientFromStorage(queryClient);
+attachQueryCachePersistence(queryClient);
 
 export const App: React.FC = () => {
   return (

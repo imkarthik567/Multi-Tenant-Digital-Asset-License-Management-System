@@ -11,10 +11,13 @@ import {
   getRosterSyncHeader,
   getWorkspaceSmtpHeader,
   recordRosterSyncEntry,
+  recordClosedWorkspaceTombstone,
+  clearReleasedEmailTombstone,
   syncServerUsersToFallbackStore,
   syncAuthenticatedSessionToFallbackStore,
 } from './localFallback';
 import { getCachedGmailToken } from './gmailAuth';
+import { clearPersistedQueryCache } from '../utils/queryCachePersistence';
 
 const rawBase = (import.meta as any).env?.VITE_API_URL;
 const isLocalhostOverride =
@@ -360,11 +363,16 @@ export const api = {
           url.includes('/auth/google-sso')) &&
         (response.data as any)?.data
       ) {
-        syncAuthenticatedSessionToFallbackStore((response.data as any).data);
+        const resData = (response.data as any).data;
+        if (resData?.user?.email) {
+          clearReleasedEmailTombstone(resData.user.email);
+        }
+        syncAuthenticatedSessionToFallbackStore(resData);
       }
       const cleanEndpoint = url.replace(/^\/api(\/v1)?/, '');
       if (cleanEndpoint === '/users' && (response.data as any)?.data?.email) {
         const created = (response.data as any).data;
+        clearReleasedEmailTombstone(created.email);
         const cached = getStoredSession();
         const activeTenantId = created.tenantId || cached?.tenant?.id || cached?.user?.tenantId;
         const rName =
@@ -393,6 +401,7 @@ export const api = {
         const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
         for (const created of (response.data as any).data.createdUsers) {
           if (created && created.email) {
+            clearReleasedEmailTombstone(created.email);
             const rName =
               typeof created.role === 'object' && created.role?.name
                 ? created.role.name
@@ -415,28 +424,23 @@ export const api = {
       }
       if (url.includes('/close-organization')) {
         try {
-          localStorage.removeItem('assetvault_roster_sync_v3');
+          const cached = getStoredSession();
+          const closedTenantId = cached?.tenant?.id || cached?.user?.tenantId || null;
+          const releasedEmail =
+            (response.data as any)?.data?.releasedEmail || cached?.user?.email || null;
+          recordClosedWorkspaceTombstone(closedTenantId, releasedEmail);
+          clearPersistedQueryCache(closedTenantId);
           localStorage.removeItem('assetvault_roster_sync_v1');
           localStorage.removeItem('assetvault_auth_session_v1');
           sessionStorage.removeItem('assetvault_auth_session_v1');
+          localStorage.removeItem('assetvault_session_cache');
+          sessionStorage.removeItem('assetvault_session_cache');
         } catch {}
       }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {
         return handleFallbackRequest('POST', url, data) as T;
-      }
-      if (
-        url.includes('/auth/login') &&
-        axios.isAxiosError(err) &&
-        err.response?.status === 401
-      ) {
-        try {
-          const fallbackRes = handleFallbackRequest('POST', url, data);
-          if (fallbackRes?.data?.user) {
-            return fallbackRes as T;
-          }
-        } catch {}
       }
       return handleApiError(err);
     }

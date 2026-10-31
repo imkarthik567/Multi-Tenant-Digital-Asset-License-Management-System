@@ -30,6 +30,7 @@ export interface MockStoreState {
   refreshTokens: any[];
   assetTags: any[];
   closedTenantIds?: string[];
+  releasedEmails?: string[];
 }
 
 export function createInitialState(): MockStoreState {
@@ -1077,6 +1078,7 @@ export function createInitialState(): MockStoreState {
     refreshTokens: [],
     assetTags: [],
     closedTenantIds: [],
+    releasedEmails: [],
   };
 }
 
@@ -1115,22 +1117,37 @@ export class MockPrismaStore {
             const closedSet = new Set<string>(
               Array.isArray(parsed.closedTenantIds) ? parsed.closedTenantIds.map(String) : []
             );
+            const releasedEmailSet = new Set<string>(
+              Array.isArray(parsed.releasedEmails)
+                ? parsed.releasedEmails.map((e: any) => String(e || '').toLowerCase().trim()).filter(Boolean)
+                : []
+            );
             const filteredInitialTenants = initial.tenants.filter((t) => !closedSet.has(String(t.id)));
-            const filteredInitialUsers = initial.users.filter((u) => !closedSet.has(String(u.tenantId)));
+            const filteredInitialUsers = initial.users.filter(
+              (u) =>
+                !closedSet.has(String(u.tenantId)) &&
+                !releasedEmailSet.has(String(u.email || '').toLowerCase().trim())
+            );
             const filteredSavedTenants = (parsed.tenants || []).filter((t: any) => !closedSet.has(String(t.id)));
-            const filteredSavedUsers = (parsed.users || []).filter((u: any) => !closedSet.has(String(u.tenantId)));
+            const filteredSavedUsers = (parsed.users || []).filter(
+              (u: any) =>
+                !closedSet.has(String(u.tenantId)) &&
+                !releasedEmailSet.has(String(u.email || '').toLowerCase().trim())
+            );
 
             const cleanedUsers = mergeById(filteredInitialUsers, filteredSavedUsers).filter(
               (u) =>
                 !(u.id === 'user-karthik-admin-alt' && u.tenantId === 'tenant-karthik') &&
-                !closedSet.has(String(u.tenantId))
+                !closedSet.has(String(u.tenantId)) &&
+                !releasedEmailSet.has(String(u.email || '').toLowerCase().trim())
             );
-            const mergedDeliveries = mergeById(initial.emailDeliveries, parsed.emailDeliveries || []).map(
-              (d: any) =>
+            const mergedDeliveries = mergeById(initial.emailDeliveries, parsed.emailDeliveries || [])
+              .filter((d: any) => !closedSet.has(String(d.tenantId)))
+              .map((d: any) =>
                 String(d.id).startsWith('email-log-')
                   ? { ...d, deliveryChannel: d.deliveryChannel || 'SMTP', realGmailSent: true }
                   : d
-            );
+              );
             const mergedState: MockStoreState = {
               ...initial,
               ...parsed,
@@ -1140,6 +1157,7 @@ export class MockPrismaStore {
               tenants: mergeById(filteredInitialTenants, filteredSavedTenants),
               users: cleanedUsers,
               closedTenantIds: Array.from(closedSet),
+              releasedEmails: Array.from(releasedEmailSet),
               vendors: mergeById(initial.vendors, parsed.vendors || []).filter((v: any) => !closedSet.has(String(v.tenantId))),
               categories: mergeById(initial.categories, parsed.categories || []).filter((c: any) => !closedSet.has(String(c.tenantId))),
               tags: mergeById(initial.tags, parsed.tags || []).filter((tg: any) => !closedSet.has(String(tg.tenantId))),
@@ -1206,8 +1224,36 @@ export class MockPrismaStore {
       for (const item of items) {
         const email = String(item?.email || '').toLowerCase().trim();
         const targetTenantId = item?.tenantId ? String(item.tenantId).trim() : '';
+        if (item?.closedTenant && targetTenantId) {
+          const alreadyClosed = this.state.closedTenantIds?.includes(targetTenantId);
+          if (!alreadyClosed || this.state.tenants.some((t) => t.id === targetTenantId)) {
+            this.closeTenant(targetTenantId);
+            modified = true;
+          }
+          if (email && email.includes('@') && email !== 'closed@workspace.local') {
+            const belongsToActiveOtherTenant = this.state.users.some(
+              (u) =>
+                u.tenantId &&
+                u.tenantId !== targetTenantId &&
+                !this.state.closedTenantIds?.includes(u.tenantId) &&
+                String(u.email || '').toLowerCase().trim() === email
+            );
+            if (!belongsToActiveOtherTenant) {
+              if (!this.state.releasedEmails) this.state.releasedEmails = [];
+              if (!this.state.releasedEmails.includes(email)) {
+                this.state.releasedEmails.push(email);
+                modified = true;
+              }
+            }
+          }
+          continue;
+        }
         if (!email || !email.includes('@') || !targetTenantId) continue;
         if (this.state.closedTenantIds?.includes(targetTenantId)) continue;
+        if (this.state.releasedEmails?.includes(email)) {
+          this.clearReleasedEmail(email);
+          modified = true;
+        }
 
         let tenantObj = this.state.tenants.find((t) => t.id === targetTenantId);
         if (!tenantObj) {
@@ -1332,6 +1378,15 @@ export class MockPrismaStore {
     }
   }
 
+  public clearReleasedEmail(email: string): void {
+    if (!email) return;
+    const norm = email.toLowerCase().trim();
+    if (Array.isArray(this.state.releasedEmails) && this.state.releasedEmails.includes(norm)) {
+      this.state.releasedEmails = this.state.releasedEmails.filter((e) => e !== norm);
+      this.saveState();
+    }
+  }
+
   public closeTenant(tenantId: string): void {
     if (!tenantId) return;
     if (!this.state.closedTenantIds) {
@@ -1340,10 +1395,23 @@ export class MockPrismaStore {
     if (!this.state.closedTenantIds.includes(tenantId)) {
       this.state.closedTenantIds.push(tenantId);
     }
+    if (!this.state.releasedEmails) {
+      this.state.releasedEmails = [];
+    }
 
-    const tenantUserIds = new Set(
-      this.state.users.filter((u) => u.tenantId === tenantId).map((u) => u.id)
-    );
+    const tenantUsers = this.state.users.filter((u) => u.tenantId === tenantId);
+    const tenantUserIds = new Set(tenantUsers.map((u) => u.id));
+    const tenantEmails = tenantUsers
+      .map((u) => String(u.email || '').toLowerCase().trim())
+      .filter(Boolean);
+
+    const tenantObj = this.state.tenants.find((t) => t.id === tenantId);
+    if (tenantObj?.contactEmail) {
+      const contactLower = String(tenantObj.contactEmail).toLowerCase().trim();
+      if (contactLower && !tenantEmails.includes(contactLower)) {
+        tenantEmails.push(contactLower);
+      }
+    }
 
     // Remove allocations
     this.state.allocations = this.state.allocations.filter(
@@ -1372,12 +1440,25 @@ export class MockPrismaStore {
     this.state.tags = this.state.tags.filter((t) => t.tenantId !== tenantId);
     this.state.vendors = this.state.vendors.filter((v) => v.tenantId !== tenantId);
 
-    // Remove notifications, audit logs
+    // Remove notifications, emailDeliveries, audit logs
     this.state.notifications = this.state.notifications.filter((n) => n.tenantId !== tenantId);
+    this.state.emailDeliveries = (this.state.emailDeliveries || []).filter(
+      (d) => d.tenantId !== tenantId
+    );
     this.state.auditLogs = this.state.auditLogs.filter((al) => al.tenantId !== tenantId);
 
     // Remove all users of this tenant - freeing their email completely
     this.state.users = this.state.users.filter((u) => u.tenantId !== tenantId);
+
+    // Record released emails (unless they already belong to another active tenant)
+    for (const em of tenantEmails) {
+      const inAnotherTenant = this.state.users.some(
+        (u) => String(u.email || '').toLowerCase().trim() === em
+      );
+      if (!inAnotherTenant && !this.state.releasedEmails.includes(em)) {
+        this.state.releasedEmails.push(em);
+      }
+    }
 
     // Remove tenant
     this.state.tenants = this.state.tenants.filter((t) => t.id !== tenantId);
@@ -1882,6 +1963,11 @@ export function createMockModelClient(modelName: string): any {
       };
       if (modelName.toLowerCase() === 'user' && newItem.email) {
         const normEmail = String(newItem.email).toLowerCase().trim();
+        if (Array.isArray(mockStore.state.releasedEmails)) {
+          mockStore.state.releasedEmails = mockStore.state.releasedEmails.filter(
+            (e) => e !== normEmail
+          );
+        }
         for (let i = collection.length - 1; i >= 0; i--) {
           const item = collection[i];
           if (

@@ -42,6 +42,8 @@ export class UserService {
       throw new BadRequestError('A valid member email address is required.');
     }
 
+    mockStore.clearReleasedEmail(normalizedEmail);
+
     const existing = await prismaClient.user.findUnique({
       where: { email: normalizedEmail },
     });

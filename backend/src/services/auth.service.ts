@@ -84,11 +84,26 @@ export class AuthService {
       },
     });
 
+    const closedTenantSet = new Set<string>(
+      Array.isArray(mockStore.state.closedTenantIds)
+        ? mockStore.state.closedTenantIds.map(String)
+        : []
+    );
+    const isEmailReleased = Array.isArray(mockStore.state.releasedEmails)
+      ? mockStore.state.releasedEmails.includes(normalizedEmail)
+      : false;
+
+    if (user && user.tenantId && closedTenantSet.has(String(user.tenantId))) {
+      user = null;
+    }
+
     // 2b. Auto-provision or recover workspace account if missing (survives container restarts/stateless deployments)
-    if (!user) {
+    if (!user && !isEmailReleased) {
       // Check in-memory mockStore state
       const foundInMock = mockStore.state.users?.find(
-        (u: any) => String(u.email || '').toLowerCase().trim() === normalizedEmail
+        (u: any) =>
+          String(u.email || '').toLowerCase().trim() === normalizedEmail &&
+          (!u.tenantId || !closedTenantSet.has(String(u.tenantId)))
       );
       if (foundInMock) {
         user = await systemPrisma.user.findUnique({
@@ -101,24 +116,31 @@ export class AuthService {
       }
     }
 
-    if (!user) {
-      // Check if user was invited / sent an onboarding email for a specific tenant
+    if (!user && !isEmailReleased) {
+      // Check if user was invited / sent an onboarding email for a specific active tenant
       const delivery = mockStore.state.emailDeliveries?.find(
-        (d: any) => String(d.recipientEmail || '').toLowerCase().trim() === normalizedEmail
+        (d: any) =>
+          String(d.recipientEmail || '').toLowerCase().trim() === normalizedEmail &&
+          d.tenantId &&
+          !closedTenantSet.has(String(d.tenantId)) &&
+          d.eventType !== 'MEMBER_OFFBOARDED' &&
+          d.eventType !== 'WORKSPACE_CLOSED'
       );
 
-      // Or check if user is the registered contactEmail of an existing tenant
+      // Or check if user is the registered contactEmail of an existing active tenant
       const ownedTenant = mockStore.state.tenants?.find(
-        (t: any) => String(t.contactEmail || '').toLowerCase().trim() === normalizedEmail
+        (t: any) =>
+          String(t.contactEmail || '').toLowerCase().trim() === normalizedEmail &&
+          !closedTenantSet.has(String(t.id))
       );
 
       let tenant: any = null;
-      if (delivery?.tenantId) {
+      if (delivery?.tenantId && !closedTenantSet.has(String(delivery.tenantId))) {
         tenant = await systemPrisma.tenant.findUnique({
           where: { id: delivery.tenantId },
           include: { plan: true },
         });
-      } else if (ownedTenant?.id) {
+      } else if (ownedTenant?.id && !closedTenantSet.has(String(ownedTenant.id))) {
         tenant = await systemPrisma.tenant.findUnique({
           where: { id: ownedTenant.id },
           include: { plan: true },
@@ -127,7 +149,7 @@ export class AuthService {
 
       // Only auto-recover if the user belongs to a specific invited or owned tenant;
       // NEVER merge unknown accounts into VIT VELLORE or any existing tenant!
-      if (tenant) {
+      if (tenant && !closedTenantSet.has(String(tenant.id))) {
         const isTenantOwner =
           normalizedEmail === String(tenant.contactEmail || '').toLowerCase().trim();
 
@@ -177,13 +199,15 @@ export class AuthService {
       }
     }
 
-    // 3. Generic failure if user not found or no password set (OAuth-only account)
+    // 3. Reject if no active organization workspace exists for this email
     if (!user || !user.passwordHash) {
       // Always run dummy bcrypt compare so timing is constant regardless of user existence
       await comparePassword(input.password, DUMMY_BCRYPT_HASH);
       await recordFailedLogin(normalizedEmail, clientIp);
-      logger.warn({ email: normalizedEmail, ip: clientIp }, 'Authentication failed: User not found or no password hash');
-      throw new UnauthorizedError('Invalid email or password');
+      logger.warn({ email: normalizedEmail, ip: clientIp }, 'Authentication failed: User not found or no active workspace');
+      throw new UnauthorizedError(
+        'No active organization workspace exists for this email address. Please create a new workspace or ask an administrator to invite you.'
+      );
     }
 
     // 4. Verify password with BCrypt
@@ -315,6 +339,7 @@ export class AuthService {
       normalizedSlug = `${normalizedSlug}-${Math.random().toString(36).substring(2, 6)}`;
     }
 
+    mockStore.clearReleasedEmail(normalizedEmail);
     const existingUser = await systemPrisma.user.findUnique({
       where: { email: normalizedEmail },
     });
@@ -741,10 +766,21 @@ export class AuthService {
       },
     });
 
-    // Auto-provision or recover Karthikeyan workspace account if missing (and not explicitly closed)
-    const isKarthikTenantClosed = Array.isArray((mockStore.state as any).closedTenantIds)
-      ? (mockStore.state as any).closedTenantIds.includes('tenant-karthik')
+    const closedTenantSet = new Set<string>(
+      Array.isArray(mockStore.state.closedTenantIds)
+        ? mockStore.state.closedTenantIds.map(String)
+        : []
+    );
+    const isEmailReleased = Array.isArray(mockStore.state.releasedEmails)
+      ? mockStore.state.releasedEmails.includes(normalizedEmail)
       : false;
+
+    if (user && user.tenantId && closedTenantSet.has(String(user.tenantId))) {
+      user = null;
+    }
+
+    // Auto-provision or recover Karthikeyan workspace account ONLY if not closed and not released
+    const isKarthikTenantClosed = closedTenantSet.has('tenant-karthik') || isEmailReleased;
     if (!user && normalizedEmail === 'karthikeyan.s050607@gmail.com' && !isKarthikTenantClosed && !input.tenantName) {
       const freePlan =
         (await systemPrisma.plan.findFirst({ where: { name: 'Enterprise' } })) ||
@@ -920,6 +956,8 @@ export class AuthService {
       };
 
     const autoPasswordHash = await hashPassword(`GoogleSSO-${Date.now()}!Aa1`);
+
+    mockStore.clearReleasedEmail(normalizedEmail);
 
     const createdTenant = await systemPrisma.tenant.create({
       data: {

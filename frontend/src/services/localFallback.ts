@@ -119,6 +119,123 @@ export interface RosterSyncEntry {
   password?: string;
   isActive?: boolean;
   deleted?: boolean;
+  closedTenant?: boolean;
+}
+
+const CLOSED_TENANTS_KEY = 'assetvault_closed_tenants_v1';
+
+interface ClosedWorkspacesState {
+  closedTenantIds: string[];
+  releasedEmails: string[];
+}
+
+function getClosedWorkspacesState(): ClosedWorkspacesState {
+  try {
+    const raw = localStorage.getItem(CLOSED_TENANTS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        closedTenantIds: Array.isArray(parsed?.closedTenantIds)
+          ? parsed.closedTenantIds.map(String)
+          : [],
+        releasedEmails: Array.isArray(parsed?.releasedEmails)
+          ? parsed.releasedEmails.map((e: any) => String(e || '').toLowerCase().trim()).filter(Boolean)
+          : [],
+      };
+    }
+  } catch {}
+  return { closedTenantIds: [], releasedEmails: [] };
+}
+
+export function recordClosedWorkspaceTombstone(tenantId?: string | null, adminEmail?: string | null): void {
+  try {
+    const cleanTenantId = String(tenantId || getCurrentSessionTenantId() || '').trim();
+    const cleanEmail = String(adminEmail || '').toLowerCase().trim();
+    const state = getClosedWorkspacesState();
+
+    if (cleanTenantId && !state.closedTenantIds.includes(cleanTenantId)) {
+      state.closedTenantIds.push(cleanTenantId);
+    }
+    if (cleanEmail && cleanEmail.includes('@') && !state.releasedEmails.includes(cleanEmail)) {
+      state.releasedEmails.push(cleanEmail);
+    }
+
+    // Purge from FallbackStore immediately
+    const rawStore = localStorage.getItem(STORAGE_KEY);
+    if (rawStore) {
+      const store = JSON.parse(rawStore);
+      if (store && Array.isArray(store.tenants) && Array.isArray(store.users)) {
+        if (cleanTenantId) {
+          const tenantUsers = store.users.filter((u: any) => u.tenantId === cleanTenantId);
+          for (const tu of tenantUsers) {
+            const em = String(tu.email || '').toLowerCase().trim();
+            if (em && !state.releasedEmails.includes(em)) {
+              state.releasedEmails.push(em);
+            }
+          }
+          store.tenants = store.tenants.filter((t: any) => t.id !== cleanTenantId);
+          store.users = store.users.filter((u: any) => u.tenantId !== cleanTenantId);
+          store.assets = (store.assets || []).filter((a: any) => a.tenantId !== cleanTenantId);
+          store.licenses = (store.licenses || []).filter((l: any) => l.tenantId !== cleanTenantId);
+          store.allocations = (store.allocations || []).filter((al: any) => al.tenantId !== cleanTenantId);
+          store.vendors = (store.vendors || []).filter((v: any) => v.tenantId !== cleanTenantId);
+          store.notifications = (store.notifications || []).filter((n: any) => n.tenantId !== cleanTenantId);
+          store.emailDeliveries = (store.emailDeliveries || []).filter((d: any) => d.tenantId !== cleanTenantId);
+          store.auditLogs = (store.auditLogs || []).filter((aud: any) => aud.tenantId !== cleanTenantId);
+        }
+        if (cleanEmail) {
+          store.users = store.users.filter(
+            (u: any) => String(u.email || '').toLowerCase().trim() !== cleanEmail
+          );
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+      }
+    }
+
+    localStorage.setItem(CLOSED_TENANTS_KEY, JSON.stringify(state));
+
+    // Also update ROSTER_SYNC_KEY so X-Workspace-Roster-Sync transmits the closure tombstone to backend
+    const rawRoster = localStorage.getItem(ROSTER_SYNC_KEY);
+    const list: RosterSyncEntry[] = rawRoster ? JSON.parse(rawRoster) : [];
+    const filtered = Array.isArray(list)
+      ? list.filter((item) => item && item.tenantId !== cleanTenantId)
+      : [];
+    if (cleanTenantId) {
+      filtered.push({
+        email: cleanEmail && cleanEmail.includes('@') ? cleanEmail : 'closed@workspace.local',
+        tenantId: cleanTenantId,
+        closedTenant: true,
+        deleted: true,
+      });
+    }
+    localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(filtered.slice(-50)));
+  } catch {}
+}
+
+export function clearReleasedEmailTombstone(email?: string | null): void {
+  try {
+    const cleanEmail = String(email || '').toLowerCase().trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) return;
+    const state = getClosedWorkspacesState();
+    if (state.releasedEmails.includes(cleanEmail)) {
+      state.releasedEmails = state.releasedEmails.filter((e) => e !== cleanEmail);
+      localStorage.setItem(CLOSED_TENANTS_KEY, JSON.stringify(state));
+    }
+
+    const rawRoster = localStorage.getItem(ROSTER_SYNC_KEY);
+    if (rawRoster) {
+      const list: RosterSyncEntry[] = JSON.parse(rawRoster);
+      if (Array.isArray(list)) {
+        const updated = list.map((item) => {
+          if (item && item.closedTenant && String(item.email || '').toLowerCase().trim() === cleanEmail) {
+            return { ...item, email: 'closed@workspace.local' };
+          }
+          return item;
+        });
+        localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(updated));
+      }
+    }
+  } catch {}
 }
 
 function getCurrentSessionTenantId(): string | null {
@@ -141,6 +258,10 @@ export function recordRosterSyncEntry(entry: RosterSyncEntry): void {
     const tenantId = entry.tenantId || getCurrentSessionTenantId();
     if (!tenantId) return;
 
+    if (!entry.deleted && !entry.closedTenant) {
+      clearReleasedEmailTombstone(email);
+    }
+
     const raw = localStorage.getItem(ROSTER_SYNC_KEY);
     const list: RosterSyncEntry[] = raw ? JSON.parse(raw) : [];
     const filtered = Array.isArray(list)
@@ -148,7 +269,8 @@ export function recordRosterSyncEntry(entry: RosterSyncEntry): void {
           (item) =>
             !(
               String(item.email || '').toLowerCase().trim() === email &&
-              item.tenantId === tenantId
+              item.tenantId === tenantId &&
+              !item.closedTenant
             )
         )
       : [];
@@ -158,6 +280,7 @@ export function recordRosterSyncEntry(entry: RosterSyncEntry): void {
       for (const existing of filtered) {
         if (
           existing.tenantId === tenantId &&
+          !existing.closedTenant &&
           (existing.roleName === 'TENANT_ADMIN' || existing.roleId === 2)
         ) {
           existing.roleName = 'ASSET_MANAGER';
@@ -175,14 +298,29 @@ export function getRosterSyncHeader(): string | null {
   try {
     const activeTenantId = getCurrentSessionTenantId();
     const raw = localStorage.getItem(ROSTER_SYNC_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return null;
-    const scopedEntries = activeTenantId
-      ? parsed.filter((item) => item && item.tenantId === activeTenantId)
-      : parsed.filter((item) => item && item.tenantId && item.email);
-    if (scopedEntries.length === 0) return null;
-    return btoa(unescape(encodeURIComponent(JSON.stringify(scopedEntries))));
+    const parsed: RosterSyncEntry[] = raw ? JSON.parse(raw) : [];
+    const list = Array.isArray(parsed) ? parsed : [];
+    const closedState = getClosedWorkspacesState();
+
+    const closedEntries: RosterSyncEntry[] = list.filter((item) => item && item.closedTenant && item.tenantId);
+    for (const cid of closedState.closedTenantIds) {
+      if (!closedEntries.some((ce) => ce.tenantId === cid)) {
+        closedEntries.push({
+          email: closedState.releasedEmails[0] || 'closed@workspace.local',
+          tenantId: cid,
+          closedTenant: true,
+          deleted: true,
+        });
+      }
+    }
+
+    const activeEntries = activeTenantId
+      ? list.filter((item) => item && !item.closedTenant && item.tenantId === activeTenantId)
+      : list.filter((item) => item && !item.closedTenant && item.tenantId && item.email);
+
+    const combined = [...closedEntries, ...activeEntries];
+    if (combined.length === 0) return null;
+    return btoa(unescape(encodeURIComponent(JSON.stringify(combined))));
   } catch {
     return null;
   }
@@ -676,18 +814,40 @@ function enforceSingleAdminInStore(store: FallbackStore): void {
   }
 }
 
+function applyClosedTombstonesToStore(store: FallbackStore): void {
+  const { closedTenantIds, releasedEmails } = getClosedWorkspacesState();
+  if (closedTenantIds.length === 0 && releasedEmails.length === 0) return;
+  const closedSet = new Set(closedTenantIds);
+  const releasedSet = new Set(releasedEmails);
+  store.tenants = (store.tenants || []).filter((t) => !closedSet.has(String(t.id)));
+  store.users = (store.users || []).filter(
+    (u) =>
+      !closedSet.has(String(u.tenantId)) &&
+      !releasedSet.has(String(u.email || '').toLowerCase().trim())
+  );
+  store.assets = (store.assets || []).filter((a) => !closedSet.has(String(a.tenantId)));
+  store.licenses = (store.licenses || []).filter((l) => !closedSet.has(String(l.tenantId)));
+  store.allocations = (store.allocations || []).filter((al) => !closedSet.has(String(al.tenantId)));
+  store.vendors = (store.vendors || []).filter((v) => !closedSet.has(String(v.tenantId)));
+  store.notifications = (store.notifications || []).filter((n) => !closedSet.has(String(n.tenantId)));
+  store.emailDeliveries = (store.emailDeliveries || []).filter((d) => !closedSet.has(String(d.tenantId)));
+  store.auditLogs = (store.auditLogs || []).filter((aud) => !closedSet.has(String(aud.tenantId)));
+}
+
 function loadStore(): FallbackStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.users) && Array.isArray(parsed.tenants)) {
+        applyClosedTombstonesToStore(parsed);
         enforceSingleAdminInStore(parsed);
         return parsed;
       }
     }
   } catch {}
   const initial = getInitialStore();
+  applyClosedTombstonesToStore(initial);
   enforceSingleAdminInStore(initial);
   saveStore(initial);
   return initial;
@@ -941,9 +1101,17 @@ export function handleFallbackRequest(
   // 1. POST /auth/login
   if (method === 'POST' && cleanUrl.includes('/auth/login')) {
     const email = String(body?.email || '').toLowerCase().trim();
-    const user = store.users.find((u) => String(u.email || '').toLowerCase().trim() === email);
+    const { closedTenantIds, releasedEmails } = getClosedWorkspacesState();
+    const user = store.users.find(
+      (u) =>
+        String(u.email || '').toLowerCase().trim() === email &&
+        !closedTenantIds.includes(String(u.tenantId)) &&
+        !releasedEmails.includes(email)
+    );
     if (!user) {
-      throw new Error('Invalid email or password');
+      throw new Error(
+        'No active organization workspace exists for this email address. Please create a new workspace or ask an administrator to invite you.'
+      );
     }
 
     const tenant = store.tenants.find((t) => t.id === user.tenantId) || {
@@ -978,6 +1146,7 @@ export function handleFallbackRequest(
   if (method === 'POST' && cleanUrl.includes('/auth/register-tenant')) {
     const tenantId = `tenant-${Date.now()}`;
     const adminEmail = (body?.adminEmail || 'admin@company.com').toLowerCase().trim();
+    clearReleasedEmailTombstone(adminEmail);
     const tenantName = body?.tenantName || 'New Enterprise Workspace';
     const adminFullName = body?.adminFullName || 'Organization Admin';
     const tenant = {
@@ -1106,6 +1275,7 @@ export function handleFallbackRequest(
       };
     }
 
+    clearReleasedEmailTombstone(email);
     const tenantId = `tenant-${Date.now()}`;
     const tenant = {
       id: tenantId,
@@ -1246,6 +1416,7 @@ export function handleFallbackRequest(
     }
 
     const closedTenantId = targetTenant.id;
+    const releasedAdminEmail = activeUser?.email || targetTenant.contactEmail || '';
     store.tenants = store.tenants.filter((t) => t.id !== closedTenantId);
     store.users = store.users.filter((u) => u.tenantId !== closedTenantId);
     store.assets = store.assets.filter((a) => a.tenantId !== closedTenantId);
@@ -1253,19 +1424,11 @@ export function handleFallbackRequest(
     store.allocations = store.allocations.filter((al) => al.tenantId !== closedTenantId);
     store.vendors = store.vendors.filter((v) => v.tenantId !== closedTenantId);
     store.notifications = store.notifications.filter((n) => n.tenantId !== closedTenantId);
+    store.emailDeliveries = (store.emailDeliveries || []).filter((d) => d.tenantId !== closedTenantId);
     store.auditLogs = store.auditLogs.filter((aud) => aud.tenantId !== closedTenantId);
     saveStore(store);
 
-    try {
-      const rosterRaw = localStorage.getItem('assetvault_roster_sync_v3');
-      if (rosterRaw) {
-        const roster = JSON.parse(rosterRaw);
-        if (Array.isArray(roster)) {
-          const filtered = roster.filter((r: any) => r.tenantId !== closedTenantId);
-          localStorage.setItem('assetvault_roster_sync_v3', JSON.stringify(filtered));
-        }
-      }
-    } catch {}
+    recordClosedWorkspaceTombstone(closedTenantId, releasedAdminEmail);
 
     try {
       localStorage.removeItem('assetvault_auth_session_v1');
@@ -1277,7 +1440,7 @@ export function handleFallbackRequest(
       data: {
         success: true,
         message: `Organization "${targetTenant.name}" was permanently closed and your email account has been released.`,
-        releasedEmail: activeUser?.email || '',
+        releasedEmail: releasedAdminEmail,
       },
     };
   }
@@ -1595,6 +1758,7 @@ export function handleFallbackRequest(
     // POST /users
     if (method === 'POST' && cleanUrl === '/users') {
       const email = String(body?.email || '').trim().toLowerCase();
+      clearReleasedEmailTombstone(email);
       const fullName =
         String(body?.fullName || '').trim() ||
         email

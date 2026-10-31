@@ -58,12 +58,13 @@ export const CloseOrgModal: React.FC<CloseOrgModalProps> = ({
         type: 'success',
       });
 
-      // Clear tokens and cached session
+      // Clear tokens and cached session (preserve closure tombstone in assetvault_roster_sync_v3)
       try {
         setAccessToken(null);
         localStorage.removeItem('assetvault_auth_session_v1');
         sessionStorage.removeItem('assetvault_auth_session_v1');
-        localStorage.removeItem('assetvault_roster_sync_v3');
+        localStorage.removeItem('assetvault_session_cache');
+        sessionStorage.removeItem('assetvault_session_cache');
         localStorage.removeItem('assetvault_roster_sync_v1');
       } catch {}
 

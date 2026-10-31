@@ -18,6 +18,10 @@ import {
 } from '../services/api';
 import { User, Tenant, RoleName } from '../types';
 import { parseAuthProfile } from '../utils/auth.util';
+import {
+  clearPersistedQueryCache,
+  hydrateQueryClientFromStorage,
+} from '../utils/queryCachePersistence';
 
 interface AuthContextType {
   user: User | null;
@@ -145,6 +149,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setStoredRefreshToken(null);
       setStoredSession(null);
       clearAiChatSessionStorage();
+      clearPersistedQueryCache();
       queryClient.clear();
       setUser(null);
       setTenant(null);
@@ -178,6 +183,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     queryClient.clear();
     const session = parseAuthProfile(res);
     setStoredSession(session);
+    hydrateQueryClientFromStorage(queryClient, session.user.tenantId);
     setUser(session.user);
     setTenant(session.tenant);
     setPermissions(session.permissions);
@@ -236,6 +242,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch {}
     }
     setStoredSession(session);
+    hydrateQueryClientFromStorage(queryClient, session.user.tenantId);
     setUser(session.user);
     setTenant(session.tenant);
     setPermissions(session.permissions);
@@ -309,6 +316,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setStoredRefreshToken(null);
       setStoredSession(null);
       clearAiChatSessionStorage();
+      clearPersistedQueryCache();
       queryClient.clear();
       try {
         sessionStorage.removeItem('assetvault_last_route');
