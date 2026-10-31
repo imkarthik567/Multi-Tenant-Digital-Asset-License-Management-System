@@ -73,13 +73,13 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
     setSavedSmtpConfig(stored);
     if (stored?.senderEmail) {
       setCustomSenderEmail(stored.senderEmail);
-    } else if (user?.email) {
-      setCustomSenderEmail((prev) => prev || user.email);
+    } else {
+      setCustomSenderEmail(user?.email || '');
     }
     if (stored?.smtpEmail) {
       setSmtpEmail(stored.smtpEmail);
-    } else if (user?.email) {
-      setSmtpEmail((prev) => prev || user.email);
+    } else {
+      setSmtpEmail(user?.email || '');
     }
   }, [user?.tenantId, user?.email]);
 
@@ -94,7 +94,7 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
     Boolean(user?.isSuperAdmin);
 
   const tenantScopeKey = user?.tenantId || user?.id || 'default-org';
-  const storagePromptKey = `assetvault_gmail_setup_prompted_${tenantScopeKey}`;
+  const storagePromptKey = `assetvault_gmail_setup_prompted_v2_${tenantScopeKey}`;
 
   // Query Backend Gmail Delivery Status for current tenant & admin
   const { data: statusResponse } = useQuery({
@@ -146,8 +146,8 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
 
   const activeSender =
     savedSmtpConfig?.senderEmail ||
-    status.senderEmail ||
     user?.email ||
+    status.senderEmail ||
     'admin@organization.io';
 
   // Listen for custom open event from the Team page header icon button
@@ -156,7 +156,7 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
     const handleOpen = () => {
       const currentSaved = getWorkspaceSmtpConfig(user?.tenantId);
       setSavedSmtpConfig(currentSaved);
-      setCustomSenderEmail(currentSaved?.senderEmail || activeSender);
+      setCustomSenderEmail(currentSaved?.senderEmail || user?.email || activeSender);
       setSmtpEmail(currentSaved?.smtpEmail || user?.email || activeSender);
       setIsFirstTimePrompt(false);
       setIsConfigOpen(true);
@@ -170,21 +170,20 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
     if (variant !== 'auto-prompt' || !user || !isAdmin) return;
     try {
       const currentSaved = getWorkspaceSmtpConfig(user.tenantId);
-      if (currentSaved?.appPassword && currentSaved.appPassword.length >= 8) {
-        localStorage.setItem(storagePromptKey, 'true');
-        localStorage.removeItem('assetvault_org_just_created');
-        return;
-      }
-
       const orgJustCreated =
         localStorage.getItem('assetvault_org_just_created') === 'true';
       const alreadyPrompted = localStorage.getItem(storagePromptKey) === 'true';
 
+      if (currentSaved?.appPassword && currentSaved.appPassword.length >= 8 && !orgJustCreated) {
+        localStorage.setItem(storagePromptKey, 'true');
+        return;
+      }
+
       if (orgJustCreated || !alreadyPrompted) {
         localStorage.setItem(storagePromptKey, 'true');
         localStorage.removeItem('assetvault_org_just_created');
-        setCustomSenderEmail(user.email || activeSender);
-        setSmtpEmail(user.email || activeSender);
+        setCustomSenderEmail(currentSaved?.senderEmail || user.email || activeSender);
+        setSmtpEmail(currentSaved?.smtpEmail || user.email || activeSender);
         setIsFirstTimePrompt(true);
         setIsConfigOpen(true);
       }

@@ -261,12 +261,25 @@ class EmailService {
 
     if (tenantId && Array.isArray(mockStore.state.users)) {
       const tenantAdmin = mockStore.state.users.find(
-        (u) => u.tenantId === tenantId && u.roleId === 2 && u.email
+        (u) => u.tenantId === tenantId && Number(u.roleId) === 2 && u.email
       );
       if (tenantAdmin) {
         return {
           email: tenantAdmin.email.toLowerCase(),
           fullName: tenantAdmin.fullName || 'Organization Admin',
+        };
+      }
+    }
+
+    if (tenantId && Array.isArray(mockStore.state.tenants)) {
+      const tenant = mockStore.state.tenants.find((t) => t.id === tenantId);
+      if (tenant?.contactEmail && String(tenant.contactEmail).includes('@')) {
+        const cleanContact = String(tenant.contactEmail).trim().toLowerCase();
+        return {
+          email: cleanContact,
+          fullName:
+            (fallbackName && fallbackName.trim()) ||
+            (tenant.name ? `${tenant.name} Admin` : 'Organization Admin'),
         };
       }
     }
@@ -379,7 +392,7 @@ class EmailService {
         appPassword: tenantCfg.smtpAppPassword,
       };
     }
-    // 2. Check any configured tenant sender if tenantId didn't match directly
+    // 2. Check any configured tenant sender if tenantId didn't match directly (shared SMTP relay transport)
     const allTenantSenders = (mockStore.state as any)?.tenantSenders;
     if (allTenantSenders && typeof allTenantSenders === 'object') {
       for (const key of Object.keys(allTenantSenders)) {
@@ -549,7 +562,7 @@ class EmailService {
     }
 
     const authUser = stored.smtpEmail || stored.email;
-    const tenantSender = this.getTenantSender(params.tenantId, stored.email);
+    const tenantSender = this.getTenantSender(params.tenantId);
     const mailOptions = {
       from: `"${tenantSender.fullName} (AssetVault)" <${authUser}>`,
       replyTo: `"${tenantSender.fullName}" <${tenantSender.email}>`,
@@ -867,6 +880,7 @@ class EmailService {
       subject: entry.subject,
       text: entry.bodyText,
       html: entry.bodyHtml,
+      tenantId: entry.tenantId,
       accessTokenOverride,
     });
     let channel: 'GMAIL_API' | 'SMTP' = 'GMAIL_API';
@@ -877,6 +891,7 @@ class EmailService {
         subject: entry.subject,
         text: entry.bodyText,
         html: entry.bodyHtml,
+        tenantId: entry.tenantId,
       });
       channel = 'SMTP';
     }

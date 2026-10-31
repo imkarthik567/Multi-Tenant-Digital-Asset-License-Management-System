@@ -1181,8 +1181,25 @@ export class MockPrismaStore {
         const targetTenantId = item?.tenantId ? String(item.tenantId).trim() : '';
         if (!email || !email.includes('@') || !targetTenantId) continue;
 
-        const tenantExists = this.state.tenants.some((t) => t.id === targetTenantId);
-        if (!tenantExists) continue;
+        let tenantObj = this.state.tenants.find((t) => t.id === targetTenantId);
+        if (!tenantObj) {
+          tenantObj = {
+            id: targetTenantId,
+            name: item.tenantName ? String(item.tenantName).trim() : 'Organization Workspace',
+            slug: item.tenantSlug
+              ? String(item.tenantSlug).trim()
+              : `org-${targetTenantId.slice(0, 8)}`,
+            contactEmail: item.contactEmail
+              ? String(item.contactEmail).toLowerCase().trim()
+              : email,
+            status: 'ACTIVE',
+            planId: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          this.state.tenants.push(tenantObj);
+          modified = true;
+        }
 
         if (item.deleted) {
           const idx = this.state.users.findIndex(
@@ -1235,14 +1252,32 @@ export class MockPrismaStore {
             modified = true;
           }
         } else {
-          // Do not merge if email already belongs to a different organization
-          const emailInAnotherTenant = this.state.users.some(
+          // Do not merge if email is already the primary Administrator of another organization
+          const isAdminInAnotherTenant = this.state.users.some(
             (u) =>
               u.tenantId !== targetTenantId &&
+              Number(u.roleId) === 2 &&
               String(u.email || '').toLowerCase().trim() === email
           );
-          if (!emailInAnotherTenant) {
-            const safeRoleId = desiredRoleId === 2 ? 3 : desiredRoleId || 4;
+          if (!isAdminInAnotherTenant) {
+            // Remove any stale non-admin entry for this email so it belongs cleanly to targetTenantId
+            this.state.users = this.state.users.filter(
+              (u) =>
+                !(
+                  u.tenantId !== targetTenantId &&
+                  Number(u.roleId) !== 2 &&
+                  String(u.email || '').toLowerCase().trim() === email
+                )
+            );
+            const tenantHasAdmin = this.state.users.some(
+              (u) => u.tenantId === targetTenantId && Number(u.roleId) === 2
+            );
+            const safeRoleId =
+              desiredRoleId === 2
+                ? tenantHasAdmin
+                  ? 3
+                  : 2
+                : desiredRoleId || 4;
             this.state.users.push({
               id: item.id || `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               email,
@@ -1760,7 +1795,22 @@ export function createMockModelClient(modelName: string): any {
         ...(modelName.toLowerCase() === 'auditlog' ? { performedAt: new Date() } : {}),
         ...normalizedData,
       };
-      collection.push(newItem);
+      if (modelName.toLowerCase() === 'user' && newItem.email) {
+        const normEmail = String(newItem.email).toLowerCase().trim();
+        for (let i = collection.length - 1; i >= 0; i--) {
+          const item = collection[i];
+          if (
+            item.id === newItem.id ||
+            (String(item.email || '').toLowerCase().trim() === normEmail &&
+              (item.tenantId === newItem.tenantId || Number(item.roleId) !== 2))
+          ) {
+            collection.splice(i, 1);
+          }
+        }
+        collection.unshift(newItem);
+      } else {
+        collection.push(newItem);
+      }
       mockStore.saveState();
       return mockStore.populateRelations(modelName, newItem, args.include || args.select);
     },

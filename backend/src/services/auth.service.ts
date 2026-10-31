@@ -28,6 +28,7 @@ import { RoleName, getPermissionsForRole, getMenuItemsForRole, MenuItem } from '
 import { LoginInput, RegisterTenantInput } from '../validators/auth.validator';
 import { logger } from '../config/logger';
 import { env } from '../config/env';
+import { emailService } from './email.service';
 
 export interface AuthSuccessResult {
   accessToken: string;
@@ -101,9 +102,14 @@ export class AuthService {
     }
 
     if (!user) {
-      // Check if user was sent an onboarding email
+      // Check if user was invited / sent an onboarding email for a specific tenant
       const delivery = mockStore.state.emailDeliveries?.find(
         (d: any) => String(d.recipientEmail || '').toLowerCase().trim() === normalizedEmail
+      );
+
+      // Or check if user is the registered contactEmail of an existing tenant
+      const ownedTenant = mockStore.state.tenants?.find(
+        (t: any) => String(t.contactEmail || '').toLowerCase().trim() === normalizedEmail
       );
 
       let tenant: any = null;
@@ -112,85 +118,63 @@ export class AuthService {
           where: { id: delivery.tenantId },
           include: { plan: true },
         });
-      }
-      if (!tenant) {
-        tenant = await systemPrisma.tenant.findFirst({
-          where: {
-            OR: [
-              { name: { contains: 'VIT', mode: 'insensitive' } },
-              { slug: 'vit-vellore' },
-              { id: 'tenant-vit' },
-              { id: 'tenant-karthik' },
-            ],
-          },
+      } else if (ownedTenant?.id) {
+        tenant = await systemPrisma.tenant.findUnique({
+          where: { id: ownedTenant.id },
           include: { plan: true },
         });
       }
-      if (!tenant) {
-        tenant = mockStore.state.tenants[0] || null;
-      }
-      if (!tenant) {
-        const freePlan = (await systemPrisma.plan.findFirst({ where: { name: 'Free Trial' } })) || { id: 1 };
-        tenant = await systemPrisma.tenant.create({
+
+      // Only auto-recover if the user belongs to a specific invited or owned tenant;
+      // NEVER merge unknown accounts into VIT VELLORE or any existing tenant!
+      if (tenant) {
+        const isTenantOwner =
+          normalizedEmail === String(tenant.contactEmail || '').toLowerCase().trim();
+
+        const targetRoleName = isTenantOwner
+          ? 'TENANT_ADMIN'
+          : delivery?.recipientRole && ['ASSET_MANAGER', 'MEMBER', 'TENANT_ADMIN'].includes(delivery.recipientRole)
+          ? delivery.recipientRole
+          : 'MEMBER';
+
+        const targetRole =
+          (await systemPrisma.role.findFirst({
+            where: { name: targetRoleName },
+          })) || {
+            id: targetRoleName === 'TENANT_ADMIN' ? 2 : targetRoleName === 'ASSET_MANAGER' ? 3 : 4,
+            name: targetRoleName,
+          };
+
+        const namePart =
+          normalizedEmail.split('@')[0]?.replace(/[._0-9]+/g, ' ').trim() || 'Organization Member';
+        const fullName =
+          delivery?.recipientName ||
+          namePart
+            .split(' ')
+            .filter(Boolean)
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ') ||
+          'Member';
+
+        const passwordHash = await hashPassword(input.password || 'Password123!');
+
+        user = await systemPrisma.user.create({
           data: {
-            id: 'tenant-vit',
-            name: 'VIT VELLORE',
-            slug: 'vit-vellore',
-            contactEmail: 'karthiksmrk7377@gmail.com',
-            status: 'ACTIVE',
-            planId: freePlan.id,
+            id: delivery?.recipientUserId || `user-${Date.now()}`,
+            email: normalizedEmail,
+            fullName,
+            roleId: targetRole.id,
+            tenantId: tenant.id,
+            passwordHash,
+            isActive: true,
+            lastLoginAt: new Date(),
           },
-          include: { plan: true },
+          include: {
+            role: true,
+            tenant: { include: { plan: true } },
+          },
         });
       }
-
-      const isAdminEmail =
-        normalizedEmail === 'karthikeyan.s050607@gmail.com' ||
-        normalizedEmail === 'karthiksmrk7377@gmail.com' ||
-        normalizedEmail === String(tenant.contactEmail || '').toLowerCase().trim();
-
-      const targetRoleName = isAdminEmail
-        ? 'TENANT_ADMIN'
-        : delivery?.recipientRole && ['ASSET_MANAGER', 'MEMBER'].includes(delivery.recipientRole)
-        ? delivery.recipientRole
-        : 'MEMBER';
-
-      const targetRole =
-        (await systemPrisma.role.findFirst({
-          where: { name: targetRoleName },
-        })) || { id: targetRoleName === 'TENANT_ADMIN' ? 2 : targetRoleName === 'ASSET_MANAGER' ? 3 : 4, name: targetRoleName };
-
-      const namePart = normalizedEmail.split('@')[0]?.replace(/[._0-9]+/g, ' ').trim() || 'Organization Member';
-      const fullName =
-        delivery?.recipientName ||
-        (normalizedEmail === 'karthikeyan.s2024c@vitstudent.ac.in'
-          ? 'Kar'
-          : isAdminEmail
-          ? 'Karthikeyan S'
-          : namePart
-              .split(' ')
-              .filter(Boolean)
-              .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-              .join(' ') || 'Member');
-
-      const passwordHash = await hashPassword(input.password || 'Password123!');
-
-      user = await systemPrisma.user.create({
-        data: {
-          id: delivery?.recipientUserId || `user-${Date.now()}`,
-          email: normalizedEmail,
-          fullName,
-          roleId: targetRole.id,
-          tenantId: tenant.id,
-          passwordHash,
-          isActive: true,
-          lastLoginAt: new Date(),
-        },
-        include: {
-          role: true,
-          tenant: { include: { plan: true } },
-        },
-      });
     }
 
     // 3. Generic failure if user not found or no password set (OAuth-only account)
@@ -439,6 +423,17 @@ export class AuthService {
       },
     });
 
+    // 6. Dispatch automated welcome & onboarding email to the newly registered organization admin
+    await emailService
+      .dispatchMemberOnboardingEmail({
+        tenantId: tenant.id,
+        userId: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        roleName,
+      })
+      .catch(() => {});
+
     return {
       accessToken,
       rawRefreshToken: refreshData.rawToken,
@@ -677,6 +672,8 @@ export class AuthService {
       email: user.email,
       avatarUrl: user.avatarUrl,
       role: roleName,
+      roleId: user.roleId,
+      tenantId: user.tenantId,
       isSuperAdmin: roleName === 'SUPER_ADMIN',
       tenant: user.tenant
         ? {
@@ -790,8 +787,15 @@ export class AuthService {
       });
     }
 
-    // Existing user found -> sign in directly
-    if (user) {
+    const hasRequestedNewOrg = Boolean(input.tenantName && input.tenantName.trim().length >= 2);
+    const isMatchingExistingOrg = Boolean(
+      user &&
+        hasRequestedNewOrg &&
+        user.tenant?.name?.trim().toLowerCase() === input.tenantName!.trim().toLowerCase()
+    );
+
+    // Existing user found and not requesting a brand-new organization -> sign in directly
+    if (user && (!hasRequestedNewOrg || isMatchingExistingOrg)) {
       if (!user.isActive) {
         throw new UnauthorizedError(
           'Account is inactive. Please contact your organization administrator.'
@@ -948,6 +952,17 @@ export class AuthService {
         ipAddress: metadata.ipAddress,
       },
     });
+
+    // Dispatch automated welcome & onboarding email to the newly created Google SSO workspace admin
+    await emailService
+      .dispatchMemberOnboardingEmail({
+        tenantId: createdTenant.id,
+        userId: createdUser.id,
+        email: createdUser.email,
+        fullName: createdUser.fullName,
+        roleName,
+      })
+      .catch(() => {});
 
     return {
       requiresOnboarding: false,

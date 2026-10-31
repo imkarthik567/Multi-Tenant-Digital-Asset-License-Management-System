@@ -78,6 +78,18 @@ export class UserService {
       throw new ConflictError(`User with email '${normalizedEmail}' already exists in another organization.`);
     }
 
+    // Check if email exists in another tenant in mockStore (since prismaClient is scoped to tenantId)
+    const existingOtherTenant = mockStore.state.users.find(
+      (u) =>
+        u.tenantId !== tenantId &&
+        String(u.email || '').toLowerCase().trim() === normalizedEmail
+    );
+    if (existingOtherTenant && Number(existingOtherTenant.roleId) === 2) {
+      throw new ConflictError(
+        `User with email '${normalizedEmail}' is already the Administrator of another organization.`
+      );
+    }
+
     let targetRoleName = data.roleName || 'MEMBER';
     if (targetRoleName === 'TENANT_ADMIN') {
       const existingAdmin = mockStore.state.users.find(
@@ -129,6 +141,7 @@ export class UserService {
 
     return {
       ...createdUser,
+      generatedPassword: rawPassword,
       autoProvisioned: true,
       welcomeEmailSent: true,
     };

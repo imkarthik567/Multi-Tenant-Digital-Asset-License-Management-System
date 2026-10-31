@@ -190,7 +190,7 @@ export const UserListPage: React.FC = () => {
       hasPrev: boolean;
     };
   }>({
-    queryKey: ['users', page, limit, debouncedSearch, roleFilter, statusFilter],
+    queryKey: ['users', currentUser?.tenantId, page, limit, debouncedSearch, roleFilter, statusFilter],
     queryFn: async () => {
       return api.get<{ data: User[]; meta: any }>('/users', {
         params: {
@@ -260,7 +260,7 @@ export const UserListPage: React.FC = () => {
       const payload = res?.data || res || {};
       const createdCount = payload.createdCount ?? 0;
       if (createdCount > 0) {
-        toast.success(`Provisioned ${createdCount} member(s)`);
+        toast.success(`Provisioned ${createdCount} member(s) and dispatched welcome emails`);
       } else {
         toast.info('All entered email addresses already exist in this workspace');
       }
@@ -268,6 +268,8 @@ export const UserListPage: React.FC = () => {
       setBulkEmailsError('');
       setIsInviteDrawerOpen(false);
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to bulk import members');

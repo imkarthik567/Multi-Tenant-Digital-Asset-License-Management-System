@@ -30,6 +30,7 @@ import {
 import { api } from '../../services/api';
 import { Notification, AutomatedEmailLog } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { NotificationStreamClient } from '../../services/notificationStream';
 import { Badge, Skeleton } from '../ui';
 import { getCachedGmailToken, authorizeGmailSendWithGoogle } from '../../services/gmailAuth';
@@ -160,6 +161,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const toastContext = useToast();
   const toast = (toastContext as any).toast || toastContext;
@@ -171,6 +173,12 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
   // Real-time incoming notifications from SSE
   const [liveNotifications, setLiveNotifications] = useState<Notification[]>([]);
   const [newArrivalIds, setNewArrivalIds] = useState<Set<string>>(new Set());
+
+  // Reset live SSE buffer whenever authenticated user or tenant changes
+  useEffect(() => {
+    setLiveNotifications([]);
+    setNewArrivalIds(new Set());
+  }, [user?.id, user?.tenantId]);
 
   // Mobile pull-to-refresh state
   const [pullDistance, setPullDistance] = useState(0);
@@ -197,7 +205,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
     isLoading,
     refetch,
   } = useQuery<{ data: Notification[] } | Notification[]>({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', user?.tenantId],
     queryFn: async () => {
       const res = await api.get<{ data: Notification[] }>('/notifications', {
         params: { limit: 50 },
@@ -212,7 +220,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
     isLoading: isEmailLogsLoading,
     refetch: refetchEmailLogs,
   } = useQuery<{ data: AutomatedEmailLog[] } | AutomatedEmailLog[]>({
-    queryKey: ['email-logs'],
+    queryKey: ['email-logs', user?.tenantId],
     queryFn: async () => {
       const res = await api.get<{ data: AutomatedEmailLog[] }>('/notifications/email-logs');
       return res;

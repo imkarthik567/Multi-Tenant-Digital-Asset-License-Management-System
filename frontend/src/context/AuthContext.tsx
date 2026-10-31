@@ -5,6 +5,7 @@
 // ==============================================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   api,
   setAccessToken,
@@ -79,6 +80,7 @@ const clearAiChatSessionStorage = () => {
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const initialSession = (getAccessToken() || getStoredRefreshToken()) ? getStoredSession() : null;
 
   const [user, setUser] = useState<User | null>(() => initialSession?.user ?? null);
@@ -143,6 +145,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setStoredRefreshToken(null);
       setStoredSession(null);
       clearAiChatSessionStorage();
+      queryClient.clear();
       setUser(null);
       setTenant(null);
       setPermissions([]);
@@ -151,9 +154,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     window.addEventListener('auth:session_expired', handleSessionExpired);
     return () => window.removeEventListener('auth:session_expired', handleSessionExpired);
-  }, [initAuth]);
+  }, [initAuth, queryClient]);
 
   const login = async (email: string, password: string): Promise<User> => {
+    setAccessToken(null);
+    setStoredRefreshToken(null);
+    setStoredSession(null);
+
     const res = await api.post<{
       data: {
         user: User;
@@ -168,11 +175,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setStoredRefreshToken((res.data as any).refreshToken);
     }
     clearAiChatSessionStorage();
+    queryClient.clear();
     const session = parseAuthProfile(res);
+    setStoredSession(session);
     setUser(session.user);
     setTenant(session.tenant);
     setPermissions(session.permissions);
-    setStoredSession(session);
     return session.user;
   };
 
@@ -217,11 +225,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setStoredRefreshToken(res.data.refreshToken);
     }
     clearAiChatSessionStorage();
+    queryClient.clear();
     const session = parseAuthProfile(res);
+    if (payload.tenantName && payload.tenantName.trim().length >= 2) {
+      try {
+        localStorage.setItem('assetvault_org_just_created', 'true');
+        if (session.user.tenantId) {
+          localStorage.removeItem(`assetvault_gmail_setup_prompted_v2_${session.user.tenantId}`);
+        }
+      } catch {}
+    }
+    setStoredSession(session);
     setUser(session.user);
     setTenant(session.tenant);
     setPermissions(session.permissions);
-    setStoredSession(session);
     return {
       requiresOnboarding: false,
       user: session.user,
@@ -236,6 +253,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     password: string;
     contactEmail?: string;
   }): Promise<User> => {
+    setAccessToken(null);
+    setStoredRefreshToken(null);
+    setStoredSession(null);
+
     const generatedSlug = (payload.tenantSlug || payload.tenantName)
       .toLowerCase()
       .trim()
@@ -263,11 +284,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setStoredRefreshToken((res.data as any).refreshToken);
     }
     clearAiChatSessionStorage();
+    queryClient.clear();
     const session = parseAuthProfile(res);
+    try {
+      localStorage.setItem('assetvault_org_just_created', 'true');
+      if (session.user.tenantId) {
+        localStorage.removeItem(`assetvault_gmail_setup_prompted_v2_${session.user.tenantId}`);
+      }
+    } catch {}
+    setStoredSession(session);
     setUser(session.user);
     setTenant(session.tenant);
     setPermissions(session.permissions);
-    setStoredSession(session);
     return session.user;
   };
 
@@ -281,6 +309,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setStoredRefreshToken(null);
       setStoredSession(null);
       clearAiChatSessionStorage();
+      queryClient.clear();
       try {
         sessionStorage.removeItem('assetvault_last_route');
         localStorage.removeItem('assetvault_last_route');

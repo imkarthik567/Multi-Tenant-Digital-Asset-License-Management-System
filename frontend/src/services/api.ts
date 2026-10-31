@@ -378,8 +378,40 @@ export const api = {
           roleName: rName,
           roleId: created.roleId,
           tenantId: activeTenantId,
+          tenantName: cached?.tenant?.name,
+          tenantSlug: cached?.tenant?.slug,
+          contactEmail: cached?.tenant?.contactEmail,
+          password: created.generatedPassword || (data as any)?.password,
           isActive: created.isActive !== false,
         });
+      }
+      if (
+        cleanEndpoint === '/users/bulk-email' &&
+        Array.isArray((response.data as any)?.data?.createdUsers)
+      ) {
+        const cached = getStoredSession();
+        const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
+        for (const created of (response.data as any).data.createdUsers) {
+          if (created && created.email) {
+            const rName =
+              typeof created.role === 'object' && created.role?.name
+                ? created.role.name
+                : created.role || 'MEMBER';
+            recordRosterSyncEntry({
+              id: created.id,
+              email: created.email,
+              fullName: created.fullName,
+              roleName: rName,
+              roleId: created.roleId,
+              tenantId: created.tenantId || activeTenantId,
+              tenantName: cached?.tenant?.name,
+              tenantSlug: cached?.tenant?.slug,
+              contactEmail: cached?.tenant?.contactEmail,
+              password: created.generatedPassword,
+              isActive: created.isActive !== false,
+            });
+          }
+        }
       }
       return response.data;
     } catch (err) {

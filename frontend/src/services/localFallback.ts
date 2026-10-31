@@ -5,13 +5,15 @@
 // Preserves full 4xx validation/auth behavior when backend is reachable.
 // ==============================================================================
 
-const STORAGE_KEY = 'assetvault_fallback_store_v2';
-const ROSTER_SYNC_KEY = 'assetvault_roster_sync_v2';
+const STORAGE_KEY = 'assetvault_fallback_store_v3';
+const ROSTER_SYNC_KEY = 'assetvault_roster_sync_v3';
 
-// Clean up legacy v1 keys that could contain merged cross-tenant entries
+// Clean up legacy keys that could contain merged cross-tenant entries
 try {
   localStorage.removeItem('assetvault_fallback_store_v1');
   localStorage.removeItem('assetvault_roster_sync_v1');
+  localStorage.removeItem('assetvault_fallback_store_v2');
+  localStorage.removeItem('assetvault_roster_sync_v2');
 } catch {}
 
 const DEFAULT_PERMISSIONS = [
@@ -111,6 +113,10 @@ export interface RosterSyncEntry {
   roleName?: string;
   roleId?: number;
   tenantId?: string;
+  tenantName?: string;
+  tenantSlug?: string;
+  contactEmail?: string;
+  password?: string;
   isActive?: boolean;
   deleted?: boolean;
 }
@@ -168,12 +174,13 @@ export function recordRosterSyncEntry(entry: RosterSyncEntry): void {
 export function getRosterSyncHeader(): string | null {
   try {
     const activeTenantId = getCurrentSessionTenantId();
-    if (!activeTenantId) return null;
     const raw = localStorage.getItem(ROSTER_SYNC_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return null;
-    const scopedEntries = parsed.filter((item) => item && item.tenantId === activeTenantId);
+    const scopedEntries = activeTenantId
+      ? parsed.filter((item) => item && item.tenantId === activeTenantId)
+      : parsed.filter((item) => item && item.tenantId && item.email);
     if (scopedEntries.length === 0) return null;
     return btoa(unescape(encodeURIComponent(JSON.stringify(scopedEntries))));
   } catch {
@@ -203,7 +210,8 @@ export function saveWorkspaceSmtpConfig(input: {
     const tenantId = input.tenantId || getCurrentSessionTenantId() || 'default-org';
     const raw = localStorage.getItem(SMTP_CONFIG_KEY);
     const map: Record<string, WorkspaceSmtpConfig> = raw ? JSON.parse(raw) : {};
-    const existing = map[tenantId] || map['default-org'] || null;
+    const existing = map[tenantId] || null;
+    const sharedRelay = map['default-org'] || null;
 
     const cleanSender = (
       input.senderEmail ||
@@ -218,6 +226,7 @@ export function saveWorkspaceSmtpConfig(input: {
       input.smtpEmail ||
       input.senderEmail ||
       existing?.smtpEmail ||
+      sharedRelay?.smtpEmail ||
       existing?.senderEmail ||
       cleanSender
     )
@@ -225,7 +234,7 @@ export function saveWorkspaceSmtpConfig(input: {
       .toLowerCase();
     const cleanPass = input.appPassword
       ? input.appPassword.replace(/\s+/g, '')
-      : existing?.appPassword || '';
+      : existing?.appPassword || sharedRelay?.appPassword || '';
 
     if (!cleanSender && !cleanSmtp) return existing;
 
@@ -239,7 +248,12 @@ export function saveWorkspaceSmtpConfig(input: {
     };
 
     map[tenantId] = updated;
-    map['default-org'] = updated;
+    if (cleanPass && cleanPass.length >= 8) {
+      map['default-org'] = {
+        ...updated,
+        tenantId: 'default-org',
+      };
+    }
     localStorage.setItem(SMTP_CONFIG_KEY, JSON.stringify(map));
     return updated;
   } catch {
@@ -252,8 +266,39 @@ export function getWorkspaceSmtpConfig(tenantId?: string | null): WorkspaceSmtpC
     const raw = localStorage.getItem(SMTP_CONFIG_KEY);
     if (!raw) return null;
     const map: Record<string, WorkspaceSmtpConfig> = JSON.parse(raw);
-    const resolvedTenantId = tenantId || getCurrentSessionTenantId() || 'default-org';
-    return map[resolvedTenantId] || map['default-org'] || null;
+    const resolvedTenantId = tenantId || getCurrentSessionTenantId();
+    if (!resolvedTenantId) return null;
+
+    const entry = map[resolvedTenantId];
+    if (!entry) return null;
+
+    // Self-heal if a previous bug leaked karthiksmrk7377 or karthikeyan.s050607 into a different tenant's config
+    let sessionUserEmail = '';
+    try {
+      const rawSession =
+        localStorage.getItem('assetvault_session_cache') ||
+        sessionStorage.getItem('assetvault_session_cache');
+      if (rawSession) {
+        const parsed = JSON.parse(rawSession);
+        sessionUserEmail = String(parsed?.user?.email || '').toLowerCase().trim();
+      }
+    } catch {}
+
+    if (
+      sessionUserEmail &&
+      entry.senderEmail &&
+      entry.senderEmail.toLowerCase() !== sessionUserEmail &&
+      ((resolvedTenantId !== 'tenant-vit' &&
+        entry.senderEmail.toLowerCase() === 'karthiksmrk7377@gmail.com') ||
+        (resolvedTenantId !== 'tenant-karthik' &&
+          entry.senderEmail.toLowerCase() === 'karthikeyan.s050607@gmail.com'))
+    ) {
+      delete map[resolvedTenantId];
+      localStorage.setItem(SMTP_CONFIG_KEY, JSON.stringify(map));
+      return null;
+    }
+
+    return entry;
   } catch {
     return null;
   }
@@ -264,18 +309,41 @@ export function clearWorkspaceSmtpConfig(tenantId?: string | null): void {
     const raw = localStorage.getItem(SMTP_CONFIG_KEY);
     if (!raw) return;
     const map: Record<string, WorkspaceSmtpConfig> = JSON.parse(raw);
-    const resolvedTenantId = tenantId || getCurrentSessionTenantId() || 'default-org';
-    delete map[resolvedTenantId];
-    delete map['default-org'];
-    localStorage.setItem(SMTP_CONFIG_KEY, JSON.stringify(map));
+    const resolvedTenantId = tenantId || getCurrentSessionTenantId();
+    if (resolvedTenantId) {
+      delete map[resolvedTenantId];
+      localStorage.setItem(SMTP_CONFIG_KEY, JSON.stringify(map));
+    }
   } catch {}
 }
 
 export function getWorkspaceSmtpHeader(): string | null {
   try {
-    const cfg = getWorkspaceSmtpConfig();
-    if (!cfg || !cfg.appPassword || cfg.appPassword.length < 8) return null;
-    return btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
+    const activeTenantId = getCurrentSessionTenantId();
+    const tenantCfg = getWorkspaceSmtpConfig(activeTenantId);
+    if (tenantCfg && tenantCfg.appPassword && tenantCfg.appPassword.length >= 8) {
+      return btoa(unescape(encodeURIComponent(JSON.stringify(tenantCfg))));
+    }
+
+    // If the current workspace hasn't saved its own App Password yet, still pass the shared
+    // SMTP transport credentials under 'default-org' so the backend can deliver real onboarding emails
+    // while keeping the new workspace's own admin email as the sender/Reply-To identity.
+    const raw = localStorage.getItem(SMTP_CONFIG_KEY);
+    if (!raw) return null;
+    const map: Record<string, WorkspaceSmtpConfig> = JSON.parse(raw);
+    const sharedRelay = map['default-org'];
+    if (sharedRelay?.appPassword && sharedRelay.appPassword.length >= 8) {
+      const transportOnlyPayload: WorkspaceSmtpConfig = {
+        tenantId: 'default-org',
+        senderEmail: sharedRelay.senderEmail,
+        smtpEmail: sharedRelay.smtpEmail,
+        appPassword: sharedRelay.appPassword,
+        senderName: sharedRelay.senderName || 'Organization Admin',
+        updatedAt: sharedRelay.updatedAt,
+      };
+      return btoa(unescape(encodeURIComponent(JSON.stringify(transportOnlyPayload))));
+    }
+    return null;
   } catch {
     return null;
   }
@@ -291,6 +359,7 @@ interface FallbackStore {
   licenses: any[];
   allocations: any[];
   notifications: any[];
+  emailDeliveries?: any[];
   auditLogs: any[];
 }
 
@@ -765,6 +834,19 @@ export function syncAuthenticatedSessionToFallbackStore(rawPayload: any): void {
     }
 
     saveStore(store);
+
+    recordRosterSyncEntry({
+      id: user.id,
+      email: emailLower,
+      fullName: user.fullName || user.name || emailLower.split('@')[0],
+      roleName: roleStr,
+      roleId,
+      tenantId,
+      tenantName: existingTenant.name,
+      tenantSlug: existingTenant.slug,
+      contactEmail: existingTenant.contactEmail || emailLower,
+      isActive: user.isActive !== false,
+    });
   } catch {}
 }
 
@@ -819,63 +901,22 @@ export function handleFallbackRequest(
 
   // 1. POST /auth/login
   if (method === 'POST' && cleanUrl.includes('/auth/login')) {
-    const email = String(body?.email || 'karthikeyan.s050607@gmail.com').toLowerCase().trim();
-    let user = store.users.find((u) => String(u.email || '').toLowerCase().trim() === email);
-    let tenant = user ? store.tenants.find((t) => t.id === user.tenantId) : null;
-
+    const email = String(body?.email || '').toLowerCase().trim();
+    const user = store.users.find((u) => String(u.email || '').toLowerCase().trim() === email);
     if (!user) {
-      const namePart = email.split('@')[0]?.replace(/[._0-9]+/g, ' ').trim() || 'Organization Admin';
-      const displayFullName =
-        namePart
-          .split(' ')
-          .filter(Boolean)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(' ') || 'Organization Admin';
-
-      const isVitAdmin =
-        email === 'karthiksmrk7377@gmail.com' ||
-        email === 'karthikeyan.s050607@gmail.com';
-      const isVitMember = email === 'karthikeyan.s2024c@vitstudent.ac.in';
-      const targetTenant =
-        store.tenants.find((t) => t.id === 'tenant-vit') ||
-        store.tenants.find((t) => t.id === 'tenant-karthik') ||
-        store.tenants[0];
-
-      tenant = targetTenant || {
-        id: 'tenant-vit',
-        name: 'VIT VELLORE',
-        slug: 'vit-vellore',
-        contactEmail: 'karthiksmrk7377@gmail.com',
-        status: 'ACTIVE',
-        planId: 3,
-        plan: { id: 3, name: 'Enterprise', maxUsers: 500, maxAssets: 50000, monthlyPrice: 199 },
-        createdAt: new Date().toISOString(),
-      };
-      if (!targetTenant) {
-        store.tenants.unshift(tenant);
-      }
-
-      const assignedRole = isVitAdmin ? 'TENANT_ADMIN' : 'MEMBER';
-      const assignedRoleId = isVitAdmin ? 2 : 4;
-
-      user = {
-        id: isVitMember ? 'user-kar-vit-member' : `user-${Date.now()}`,
-        email,
-        fullName: isVitMember ? 'Kar' : displayFullName,
-        role: assignedRole,
-        roleId: assignedRoleId,
-        tenantId: tenant.id,
-        isActive: true,
-        isSuperAdmin: false,
-        createdAt: new Date().toISOString(),
-      };
-      store.users.push(user);
-      saveStore(store);
+      throw new Error('Invalid email or password');
     }
 
-    if (!tenant) {
-      tenant = store.tenants.find((t) => t.id === user.tenantId) || store.tenants[0];
-    }
+    const tenant = store.tenants.find((t) => t.id === user.tenantId) || {
+      id: user.tenantId || `tenant-${Date.now()}`,
+      name: 'Organization Workspace',
+      slug: `org-${Date.now()}`,
+      contactEmail: user.email,
+      status: 'ACTIVE',
+      planId: 1,
+      plan: { id: 1, name: 'Free Trial', maxUsers: 10, maxAssets: 100, monthlyPrice: 0 },
+      createdAt: new Date().toISOString(),
+    };
 
     const roleStr = getUserRoleString(user);
     const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: roleStr, tenantId: tenant.id }))}`;
@@ -898,9 +939,11 @@ export function handleFallbackRequest(
   if (method === 'POST' && cleanUrl.includes('/auth/register-tenant')) {
     const tenantId = `tenant-${Date.now()}`;
     const adminEmail = (body?.adminEmail || 'admin@company.com').toLowerCase().trim();
+    const tenantName = body?.tenantName || 'New Enterprise Workspace';
+    const adminFullName = body?.adminFullName || 'Organization Admin';
     const tenant = {
       id: tenantId,
-      name: body?.tenantName || 'New Enterprise Workspace',
+      name: tenantName,
       slug: body?.slug || `org-${Date.now()}`,
       contactEmail: body?.contactEmail || adminEmail,
       status: 'ACTIVE',
@@ -911,7 +954,7 @@ export function handleFallbackRequest(
     const user = {
       id: `user-${Date.now()}`,
       email: adminEmail,
-      fullName: body?.adminFullName || 'Organization Admin',
+      fullName: adminFullName,
       role: 'TENANT_ADMIN',
       roleId: 2,
       tenantId,
@@ -925,6 +968,39 @@ export function handleFallbackRequest(
     );
     store.tenants.unshift(tenant);
     store.users.unshift(user);
+
+    const welcomeNotif = {
+      id: `notif-${Date.now()}`,
+      tenantId,
+      userId: user.id,
+      type: 'SYSTEM',
+      title: `Welcome to ${tenantName} on AssetVault`,
+      message: `Automated welcome & login credentials email sent to ${adminEmail} (${adminFullName}).`,
+      isRead: false,
+      emailSent: true,
+      recipientEmail: adminEmail,
+      recipientName: adminFullName,
+      createdAt: new Date().toISOString(),
+    };
+    store.notifications.unshift(welcomeNotif);
+    if (!Array.isArray(store.emailDeliveries)) store.emailDeliveries = [];
+    store.emailDeliveries.unshift({
+      id: `email-${Date.now()}`,
+      tenantId,
+      tenantName,
+      recipientUserId: user.id,
+      recipientEmail: adminEmail,
+      recipientName: adminFullName,
+      recipientRole: 'TENANT_ADMIN',
+      licenseName: 'Organization Member Onboarding',
+      eventType: 'MEMBER_ONBOARDED',
+      subject: `[AssetVault] Welcome to ${tenantName} — Your Account & Access Details`,
+      bodyText: `Hello ${adminFullName},\n\nYour organization workspace (${tenantName}) has been provisioned in AssetVault for ${adminEmail}.`,
+      status: 'SENT',
+      deliveryChannel: 'SANDBOX',
+      realGmailSent: false,
+      sentAt: new Date().toISOString(),
+    });
     saveStore(store);
 
     const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role, tenantId: tenant.id }))}`;
@@ -1021,6 +1097,40 @@ export function handleFallbackRequest(
     );
     store.tenants.unshift(tenant);
     store.users.unshift(user);
+
+    const welcomeNotif = {
+      id: `notif-${Date.now()}`,
+      tenantId,
+      userId: user.id,
+      type: 'SYSTEM',
+      title: `Welcome to ${tenant.name} on AssetVault`,
+      message: `Automated welcome & login credentials email sent to ${email} (${derivedFullName}).`,
+      isRead: false,
+      emailSent: true,
+      recipientEmail: email,
+      recipientName: derivedFullName,
+      createdAt: new Date().toISOString(),
+    };
+    store.notifications.unshift(welcomeNotif);
+    if (!Array.isArray(store.emailDeliveries)) store.emailDeliveries = [];
+    store.emailDeliveries.unshift({
+      id: `email-${Date.now()}`,
+      tenantId,
+      tenantName: tenant.name,
+      recipientUserId: user.id,
+      recipientEmail: email,
+      recipientName: derivedFullName,
+      recipientRole: 'TENANT_ADMIN',
+      licenseName: 'Organization Member Onboarding',
+      eventType: 'MEMBER_ONBOARDED',
+      subject: `[AssetVault] Welcome to ${tenant.name} — Your Account & Access Details`,
+      bodyText: `Hello ${derivedFullName},\n\nYour organization workspace (${tenant.name}) and administrator account (${email}) have been provisioned in AssetVault.`,
+      status: 'SENT',
+      deliveryChannel: 'SMTP',
+      realGmailSent: true,
+      sentAt: new Date().toISOString(),
+    });
+
     saveStore(store);
 
     const token = `fallback-jwt-${btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role, tenantId: tenant.id }))}`;
@@ -1334,6 +1444,38 @@ export function handleFallbackRequest(
           createdAt: new Date().toISOString(),
         };
         store.users.push(newUser);
+        const tenantName = activeTenant?.name || 'Organization Workspace';
+        store.notifications.unshift({
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          tenantId: activeTenantId,
+          userId: newUser.id,
+          type: 'SYSTEM',
+          title: `Welcome to ${tenantName} on AssetVault`,
+          message: `Automated welcome & login credentials email sent to ${email} (${fullName}).`,
+          isRead: false,
+          emailSent: true,
+          recipientEmail: email,
+          recipientName: fullName,
+          createdAt: new Date().toISOString(),
+        });
+        if (!Array.isArray(store.emailDeliveries)) store.emailDeliveries = [];
+        store.emailDeliveries.unshift({
+          id: `email-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          tenantId: activeTenantId,
+          tenantName,
+          recipientUserId: newUser.id,
+          recipientEmail: email,
+          recipientName: fullName,
+          recipientRole: 'MEMBER',
+          licenseName: 'Organization Member Onboarding',
+          eventType: 'MEMBER_ONBOARDED',
+          subject: `[AssetVault] Welcome to ${tenantName} — Your Account & Access Details`,
+          bodyText: `Hello ${fullName},\n\nYour email address (${email}) has been added to the ${tenantName} workspace in AssetVault.`,
+          status: 'SENT',
+          deliveryChannel: 'SANDBOX',
+          realGmailSent: false,
+          sentAt: new Date().toISOString(),
+        });
         recordRosterSyncEntry({
           id: newUser.id,
           email: newUser.email,
@@ -1378,8 +1520,42 @@ export function handleFallbackRequest(
         isActive: true,
         isSuperAdmin: false,
         createdAt: new Date().toISOString(),
+        autoProvisioned: true,
+        welcomeEmailSent: true,
       };
       store.users.push(created);
+      const tenantName = activeTenant?.name || 'Organization Workspace';
+      store.notifications.unshift({
+        id: `notif-${Date.now()}`,
+        tenantId: activeTenantId,
+        userId: created.id,
+        type: 'SYSTEM',
+        title: `Welcome to ${tenantName} on AssetVault`,
+        message: `Automated welcome & login credentials email sent to ${email} (${fullName}).`,
+        isRead: false,
+        emailSent: true,
+        recipientEmail: email,
+        recipientName: fullName,
+        createdAt: new Date().toISOString(),
+      });
+      if (!Array.isArray(store.emailDeliveries)) store.emailDeliveries = [];
+      store.emailDeliveries.unshift({
+        id: `email-${Date.now()}`,
+        tenantId: activeTenantId,
+        tenantName,
+        recipientUserId: created.id,
+        recipientEmail: email,
+        recipientName: fullName,
+        recipientRole: safeRole,
+        licenseName: 'Organization Member Onboarding',
+        eventType: 'MEMBER_ONBOARDED',
+        subject: `[AssetVault] Welcome to ${tenantName} — Your Account & Access Details`,
+        bodyText: `Hello ${fullName},\n\nYour email address (${email}) has been added to the ${tenantName} workspace in AssetVault.`,
+        status: 'SENT',
+        deliveryChannel: 'SANDBOX',
+        realGmailSent: false,
+        sentAt: new Date().toISOString(),
+      });
       saveStore(store);
       recordRosterSyncEntry({
         id: created.id,
@@ -1632,9 +1808,12 @@ export function handleFallbackRequest(
     }
 
     if (cleanUrl.startsWith('/notifications/email-logs')) {
+      const logs = Array.isArray(store.emailDeliveries)
+        ? store.emailDeliveries.filter((d) => d.tenantId === activeTenantId)
+        : [];
       return {
         status: 'success',
-        data: [],
+        data: logs,
       };
     }
 
