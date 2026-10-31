@@ -67,22 +67,6 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
   const [smtpPassword, setSmtpPassword] = useState('');
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Sync default form fields when logged-in user or tenant changes
-  useEffect(() => {
-    const stored = getWorkspaceSmtpConfig(user?.tenantId);
-    setSavedSmtpConfig(stored);
-    if (stored?.senderEmail) {
-      setCustomSenderEmail(stored.senderEmail);
-    } else {
-      setCustomSenderEmail(user?.email || '');
-    }
-    if (stored?.smtpEmail) {
-      setSmtpEmail(stored.smtpEmail);
-    } else {
-      setSmtpEmail(user?.email || '');
-    }
-  }, [user?.tenantId, user?.email]);
-
   // Determine if the user is an Organization Admin or Super Admin
   const rawRole =
     typeof user?.role === 'string'
@@ -122,6 +106,24 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
     enabled: Boolean(user && isAdmin),
   });
 
+  // Sync default form fields when logged-in user or tenant changes
+  useEffect(() => {
+    const stored = getWorkspaceSmtpConfig(user?.tenantId);
+    setSavedSmtpConfig(stored);
+    if (stored?.senderEmail) {
+      setCustomSenderEmail(stored.senderEmail);
+    } else {
+      setCustomSenderEmail(user?.email || '');
+    }
+    if (stored?.smtpEmail) {
+      setSmtpEmail(stored.smtpEmail);
+    } else if (statusResponse?.relayAccount && String(statusResponse.relayAccount).includes('@')) {
+      setSmtpEmail(statusResponse.relayAccount);
+    } else {
+      setSmtpEmail(user?.email || '');
+    }
+  }, [user?.tenantId, user?.email, statusResponse?.relayAccount]);
+
   const status = statusResponse || {
     connected: false,
     realRelayActive: false,
@@ -157,13 +159,13 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
       const currentSaved = getWorkspaceSmtpConfig(user?.tenantId);
       setSavedSmtpConfig(currentSaved);
       setCustomSenderEmail(currentSaved?.senderEmail || user?.email || activeSender);
-      setSmtpEmail(currentSaved?.smtpEmail || user?.email || activeSender);
+      setSmtpEmail(currentSaved?.smtpEmail || status.relayAccount || user?.email || activeSender);
       setIsFirstTimePrompt(false);
       setIsConfigOpen(true);
     };
     window.addEventListener(OPEN_MODAL_EVENT, handleOpen);
     return () => window.removeEventListener(OPEN_MODAL_EVENT, handleOpen);
-  }, [variant, activeSender, user?.email, user?.tenantId]);
+  }, [variant, activeSender, status.relayAccount, user?.email, user?.tenantId]);
 
   // One-Time Automatic Pop-Up Trigger on Org Creation or First Admin Login
   useEffect(() => {
@@ -174,7 +176,12 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
         localStorage.getItem('assetvault_org_just_created') === 'true';
       const alreadyPrompted = localStorage.getItem(storagePromptKey) === 'true';
 
-      if (currentSaved?.appPassword && currentSaved.appPassword.length >= 8 && !orgJustCreated) {
+      if (
+        ((currentSaved?.appPassword && currentSaved.appPassword.length >= 8) ||
+          status.smtpConfigured ||
+          status.realRelayActive) &&
+        !orgJustCreated
+      ) {
         localStorage.setItem(storagePromptKey, 'true');
         return;
       }
@@ -183,12 +190,12 @@ export const GmailSenderBanner: React.FC<GmailSenderBannerProps> = ({
         localStorage.setItem(storagePromptKey, 'true');
         localStorage.removeItem('assetvault_org_just_created');
         setCustomSenderEmail(currentSaved?.senderEmail || user.email || activeSender);
-        setSmtpEmail(currentSaved?.smtpEmail || user.email || activeSender);
+        setSmtpEmail(currentSaved?.smtpEmail || status.relayAccount || user.email || activeSender);
         setIsFirstTimePrompt(true);
         setIsConfigOpen(true);
       }
     } catch {}
-  }, [variant, user, isAdmin, storagePromptKey, activeSender]);
+  }, [variant, user, isAdmin, storagePromptKey, activeSender, status.smtpConfigured, status.realRelayActive, status.relayAccount]);
 
   const markPromptCompleted = () => {
     try {

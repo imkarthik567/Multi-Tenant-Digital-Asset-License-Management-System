@@ -7,8 +7,11 @@ import { z } from 'zod';
 
 export const allocateSeatSchema = z
   .object({
+    licenseId: z.string().trim().optional(),
     userId: z.string().trim().optional(),
     userEmail: z.string().email('Valid email address is required').toLowerCase().trim().optional(),
+    userFullName: z.string().trim().optional(),
+    fullName: z.string().trim().optional(),
     notes: z.string().max(500).optional(),
   })
   .refine((data) => Boolean(data.userId || data.userEmail), {
@@ -21,3 +24,4 @@ export const releaseSeatSchema = z
     reason: z.string().max(255).optional(),
   })
   .strip();
+

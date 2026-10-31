@@ -15,12 +15,15 @@ import {
   Database,
   Edit3,
   Check,
+  Trash2,
+  ShieldAlert,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { CloseOrgModal } from '../../components/organization/CloseOrgModal';
 
 export const TenantSettingsPage: React.FC = () => {
   const { user, tenant, logout, hasPermission, refreshProfile } = useAuth();
@@ -31,6 +34,13 @@ export const TenantSettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'security'>('profile');
   const [isLogoutAllOpen, setIsLogoutAllOpen] = useState(false);
   const [isExportingTenant, setIsExportingTenant] = useState(false);
+  const [isCloseOrgOpen, setIsCloseOrgOpen] = useState(false);
+  const userRoleStr =
+    typeof user?.role === 'object' && user?.role && 'name' in (user.role as any)
+      ? (user.role as any).name
+      : user?.role;
+  const isTenantAdmin =
+    userRoleStr === 'TENANT_ADMIN' || user?.roleId === 2 || Boolean(user?.isSuperAdmin);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -327,6 +337,28 @@ export const TenantSettingsPage: React.FC = () => {
               </button>
             </div>
           )}
+
+          {/* Danger Zone: Close Organization */}
+          {isTenantAdmin && (
+            <div className="pt-4 border-t border-rose-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-rose-950/20 -mx-6 -mb-6 p-6 rounded-b-xl">
+              <div>
+                <h3 className="text-xs font-semibold text-rose-300 flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                  Danger Zone: Close Organization Workspace
+                </h3>
+                <p className="text-xs text-rose-300/70 mt-0.5 max-w-xl">
+                  Permanently terminate this workspace, purge all assets, licenses, and member accounts, and free your email address ({user?.email}) to join or administer any other organization.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCloseOrgOpen(true)}
+                className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-lg text-rose-200 bg-rose-950/70 border border-rose-500/40 hover:bg-rose-900/80 hover:text-white transition-colors shrink-0 cursor-pointer shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5 text-rose-400" />
+                Close Organization
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -361,6 +393,14 @@ export const TenantSettingsPage: React.FC = () => {
         confirmText="Revoke All Sessions"
         variant="danger"
         isLoading={logoutAllMutation.isPending}
+      />
+
+      {/* CLOSE ORGANIZATION MODAL */}
+      <CloseOrgModal
+        isOpen={isCloseOrgOpen}
+        onClose={() => setIsCloseOrgOpen(false)}
+        tenantName={tenant?.name || 'Organization Workspace'}
+        adminEmail={user?.email || ''}
       />
     </div>
   );

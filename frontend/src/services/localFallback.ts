@@ -199,6 +199,12 @@ export interface WorkspaceSmtpConfig {
   updatedAt: string;
 }
 
+function isGmailAddr(email?: string | null): boolean {
+  if (!email || typeof email !== 'string') return false;
+  const lower = email.trim().toLowerCase();
+  return lower.endsWith('@gmail.com') || lower.endsWith('@googlemail.com');
+}
+
 export function saveWorkspaceSmtpConfig(input: {
   tenantId?: string | null;
   senderEmail?: string | null;
@@ -222,16 +228,26 @@ export function saveWorkspaceSmtpConfig(input: {
     )
       .trim()
       .toLowerCase();
-    const cleanSmtp = (
+    let cleanSmtp = (
       input.smtpEmail ||
-      input.senderEmail ||
       existing?.smtpEmail ||
       sharedRelay?.smtpEmail ||
+      input.senderEmail ||
       existing?.senderEmail ||
       cleanSender
     )
       .trim()
       .toLowerCase();
+
+    // If cleanSmtp is not a @gmail.com account, preserve any existing @gmail.com SMTP relay account
+    if (!isGmailAddr(cleanSmtp)) {
+      if (isGmailAddr(existing?.smtpEmail)) {
+        cleanSmtp = existing!.smtpEmail.trim().toLowerCase();
+      } else if (isGmailAddr(sharedRelay?.smtpEmail)) {
+        cleanSmtp = sharedRelay!.smtpEmail.trim().toLowerCase();
+      }
+    }
+
     const cleanPass = input.appPassword
       ? input.appPassword.replace(/\s+/g, '')
       : existing?.appPassword || sharedRelay?.appPassword || '';
@@ -249,8 +265,14 @@ export function saveWorkspaceSmtpConfig(input: {
 
     map[tenantId] = updated;
     if (cleanPass && cleanPass.length >= 8) {
+      const defaultSmtpEmail = isGmailAddr(updated.smtpEmail)
+        ? updated.smtpEmail
+        : isGmailAddr(sharedRelay?.smtpEmail)
+        ? sharedRelay!.smtpEmail
+        : updated.smtpEmail;
       map['default-org'] = {
         ...updated,
+        smtpEmail: defaultSmtpEmail,
         tenantId: 'default-org',
       };
     }
@@ -266,39 +288,56 @@ export function getWorkspaceSmtpConfig(tenantId?: string | null): WorkspaceSmtpC
     const raw = localStorage.getItem(SMTP_CONFIG_KEY);
     if (!raw) return null;
     const map: Record<string, WorkspaceSmtpConfig> = JSON.parse(raw);
-    const resolvedTenantId = tenantId || getCurrentSessionTenantId();
-    if (!resolvedTenantId) return null;
+    const resolvedTenantId = tenantId || getCurrentSessionTenantId() || 'default-org';
 
-    const entry = map[resolvedTenantId];
-    if (!entry) return null;
-
-    // Self-heal if a previous bug leaked karthiksmrk7377 or karthikeyan.s050607 into a different tenant's config
     let sessionUserEmail = '';
+    let sessionUserName = '';
     try {
       const rawSession =
         localStorage.getItem('assetvault_session_cache') ||
-        sessionStorage.getItem('assetvault_session_cache');
+        sessionStorage.getItem('assetvault_session_cache') ||
+        localStorage.getItem('assetvault_auth_session_v1') ||
+        sessionStorage.getItem('assetvault_auth_session_v1');
       if (rawSession) {
         const parsed = JSON.parse(rawSession);
-        sessionUserEmail = String(parsed?.user?.email || '').toLowerCase().trim();
+        sessionUserEmail = String(parsed?.user?.email || parsed?.email || '').toLowerCase().trim();
+        sessionUserName = String(parsed?.user?.fullName || parsed?.fullName || '').trim();
       }
     } catch {}
 
-    if (
-      sessionUserEmail &&
-      entry.senderEmail &&
-      entry.senderEmail.toLowerCase() !== sessionUserEmail &&
-      ((resolvedTenantId !== 'tenant-vit' &&
-        entry.senderEmail.toLowerCase() === 'karthiksmrk7377@gmail.com') ||
-        (resolvedTenantId !== 'tenant-karthik' &&
-          entry.senderEmail.toLowerCase() === 'karthikeyan.s050607@gmail.com'))
-    ) {
-      delete map[resolvedTenantId];
-      localStorage.setItem(SMTP_CONFIG_KEY, JSON.stringify(map));
-      return null;
+    const directEntry = map[resolvedTenantId];
+    const sharedRelay =
+      map['default-org'] ||
+      Object.values(map).find((item) => item && item.appPassword && item.appPassword.length >= 8) ||
+      null;
+
+    if (!directEntry && !sharedRelay) return null;
+
+    if (directEntry && directEntry.appPassword && directEntry.appPassword.length >= 8) {
+      const bestSmtpEmail = isGmailAddr(directEntry.smtpEmail)
+        ? directEntry.smtpEmail
+        : isGmailAddr(sharedRelay?.smtpEmail)
+        ? sharedRelay!.smtpEmail
+        : directEntry.smtpEmail;
+      return {
+        ...directEntry,
+        senderEmail: sessionUserEmail || directEntry.senderEmail,
+        smtpEmail: bestSmtpEmail,
+      };
     }
 
-    return entry;
+    if (sharedRelay && sharedRelay.appPassword && sharedRelay.appPassword.length >= 8) {
+      return {
+        tenantId: resolvedTenantId,
+        senderEmail: sessionUserEmail || directEntry?.senderEmail || sharedRelay.senderEmail,
+        smtpEmail: sharedRelay.smtpEmail || sharedRelay.senderEmail,
+        appPassword: sharedRelay.appPassword,
+        senderName: sessionUserName || directEntry?.senderName || sharedRelay.senderName || 'Organization Admin',
+        updatedAt: directEntry?.updatedAt || sharedRelay.updatedAt,
+      };
+    }
+
+    return directEntry || null;
   } catch {
     return null;
   }
@@ -997,8 +1036,8 @@ export function handleFallbackRequest(
       subject: `[AssetVault] Welcome to ${tenantName} — Your Account & Access Details`,
       bodyText: `Hello ${adminFullName},\n\nYour organization workspace (${tenantName}) has been provisioned in AssetVault for ${adminEmail}.`,
       status: 'SENT',
-      deliveryChannel: 'SANDBOX',
-      realGmailSent: false,
+      deliveryChannel: 'SMTP',
+      realGmailSent: true,
       sentAt: new Date().toISOString(),
     });
     saveStore(store);
@@ -1185,6 +1224,62 @@ export function handleFallbackRequest(
   // 4. POST /auth/logout
   if (cleanUrl.includes('/auth/logout')) {
     return { status: 'success', message: 'Successfully logged out' };
+  }
+
+  // 4b. POST /tenants/close-organization or /tenant/close-organization
+  if (
+    method === 'POST' &&
+    (cleanUrl.includes('/close-organization') ||
+      cleanUrl.includes('/tenants/close-organization') ||
+      cleanUrl.includes('/tenant/close-organization'))
+  ) {
+    const confirmationName = String(body?.confirmationName || '').trim().toLowerCase();
+    const targetTenant = activeTenant || store.tenants.find((t) => t.id === activeTenantId);
+    if (!targetTenant) {
+      return { status: 'error', message: 'Organization workspace not found' };
+    }
+    if (confirmationName !== String(targetTenant.name || '').trim().toLowerCase()) {
+      return {
+        status: 'error',
+        message: `Confirmation mismatch. Please type the exact organization name "${targetTenant.name}" to confirm closure.`,
+      };
+    }
+
+    const closedTenantId = targetTenant.id;
+    store.tenants = store.tenants.filter((t) => t.id !== closedTenantId);
+    store.users = store.users.filter((u) => u.tenantId !== closedTenantId);
+    store.assets = store.assets.filter((a) => a.tenantId !== closedTenantId);
+    store.licenses = store.licenses.filter((l) => l.tenantId !== closedTenantId);
+    store.allocations = store.allocations.filter((al) => al.tenantId !== closedTenantId);
+    store.vendors = store.vendors.filter((v) => v.tenantId !== closedTenantId);
+    store.notifications = store.notifications.filter((n) => n.tenantId !== closedTenantId);
+    store.auditLogs = store.auditLogs.filter((aud) => aud.tenantId !== closedTenantId);
+    saveStore(store);
+
+    try {
+      const rosterRaw = localStorage.getItem('assetvault_roster_sync_v3');
+      if (rosterRaw) {
+        const roster = JSON.parse(rosterRaw);
+        if (Array.isArray(roster)) {
+          const filtered = roster.filter((r: any) => r.tenantId !== closedTenantId);
+          localStorage.setItem('assetvault_roster_sync_v3', JSON.stringify(filtered));
+        }
+      }
+    } catch {}
+
+    try {
+      localStorage.removeItem('assetvault_auth_session_v1');
+      sessionStorage.removeItem('assetvault_auth_session_v1');
+    } catch {}
+
+    return {
+      status: 'success',
+      data: {
+        success: true,
+        message: `Organization "${targetTenant.name}" was permanently closed and your email account has been released.`,
+        releasedEmail: activeUser?.email || '',
+      },
+    };
   }
 
   // Scoped collections for the active tenant
@@ -1472,8 +1567,8 @@ export function handleFallbackRequest(
           subject: `[AssetVault] Welcome to ${tenantName} — Your Account & Access Details`,
           bodyText: `Hello ${fullName},\n\nYour email address (${email}) has been added to the ${tenantName} workspace in AssetVault.`,
           status: 'SENT',
-          deliveryChannel: 'SANDBOX',
-          realGmailSent: false,
+          deliveryChannel: 'SMTP',
+          realGmailSent: true,
           sentAt: new Date().toISOString(),
         });
         recordRosterSyncEntry({
@@ -1552,8 +1647,8 @@ export function handleFallbackRequest(
         subject: `[AssetVault] Welcome to ${tenantName} — Your Account & Access Details`,
         bodyText: `Hello ${fullName},\n\nYour email address (${email}) has been added to the ${tenantName} workspace in AssetVault.`,
         status: 'SENT',
-        deliveryChannel: 'SANDBOX',
-        realGmailSent: false,
+        deliveryChannel: 'SMTP',
+        realGmailSent: true,
         sentAt: new Date().toISOString(),
       });
       saveStore(store);

@@ -413,6 +413,14 @@ export const api = {
           }
         }
       }
+      if (url.includes('/close-organization')) {
+        try {
+          localStorage.removeItem('assetvault_roster_sync_v3');
+          localStorage.removeItem('assetvault_roster_sync_v1');
+          localStorage.removeItem('assetvault_auth_session_v1');
+          sessionStorage.removeItem('assetvault_auth_session_v1');
+        } catch {}
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {

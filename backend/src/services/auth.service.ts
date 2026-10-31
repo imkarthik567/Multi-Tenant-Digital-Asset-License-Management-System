@@ -431,6 +431,7 @@ export class AuthService {
         email: user.email,
         fullName: user.fullName,
         roleName,
+        generatedPassword: input.password,
       })
       .catch(() => {});
 
@@ -740,8 +741,11 @@ export class AuthService {
       },
     });
 
-    // Auto-provision or recover Karthikeyan workspace account if missing
-    if (!user && normalizedEmail === 'karthikeyan.s050607@gmail.com') {
+    // Auto-provision or recover Karthikeyan workspace account if missing (and not explicitly closed)
+    const isKarthikTenantClosed = Array.isArray((mockStore.state as any).closedTenantIds)
+      ? (mockStore.state as any).closedTenantIds.includes('tenant-karthik')
+      : false;
+    if (!user && normalizedEmail === 'karthikeyan.s050607@gmail.com' && !isKarthikTenantClosed && !input.tenantName) {
       const freePlan =
         (await systemPrisma.plan.findFirst({ where: { name: 'Enterprise' } })) ||
         (await systemPrisma.plan.findFirst({ where: { name: 'Free Trial' } })) || { id: 3 };
@@ -785,6 +789,17 @@ export class AuthService {
           tenant: { include: { plan: true } },
         },
       });
+
+      await emailService
+        .dispatchMemberOnboardingEmail({
+          tenantId: tenant.id,
+          userId: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          roleName: 'TENANT_ADMIN',
+          generatedPassword: 'Password123!',
+        })
+        .catch(() => {});
     }
 
     const hasRequestedNewOrg = Boolean(input.tenantName && input.tenantName.trim().length >= 2);

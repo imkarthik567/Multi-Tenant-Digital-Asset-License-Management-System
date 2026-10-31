@@ -134,6 +134,35 @@ export function getNotificationTypeMeta(type: string) {
         dotClass: 'bg-emerald-400',
         label: 'Auto-Onboarded',
       };
+    case 'PASSWORD_RESET':
+      return {
+        icon: KeyRound,
+        badgeClass: 'text-sky-400 bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-sky-400',
+        label: 'Password Reset',
+      };
+    case 'ROLE_CHANGED':
+      return {
+        icon: Users2,
+        badgeClass: 'text-indigo-400 bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-indigo-400',
+        label: 'Role Updated',
+      };
+    case 'LICENSE_CREATED':
+      return {
+        icon: KeyRound,
+        badgeClass: 'text-emerald-400 bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-emerald-400',
+        label: 'License Created',
+      };
+    case 'MEMBER_OFFBOARDED':
+    case 'WORKSPACE_CLOSED':
+      return {
+        icon: AlertOctagon,
+        badgeClass: 'text-rose-400 bg-zinc-900 border-zinc-700',
+        dotClass: 'bg-rose-400',
+        label: 'Workspace Closed',
+      };
     case 'OVER_ALLOCATION':
     case 'SEAT_LIMIT':
       return {

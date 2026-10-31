@@ -174,7 +174,7 @@ export class UserService {
       const existing = await prismaClient.user.findUnique({
         where: { email },
       });
-      if (existing) {
+      if (existing && existing.tenantId !== tenantId) {
         skippedEmails.push(email);
         continue;
       }
@@ -485,7 +485,7 @@ export class UserService {
   }
 
   public async resetPassword(prismaClient: any, id: string, newPassword: string) {
-    await this.getUserById(prismaClient, id);
+    const existingUser = await this.getUserById(prismaClient, id);
     const passwordHash = await hashPassword(newPassword);
 
     const updated = await userRepository.update(prismaClient, id, { passwordHash });
@@ -495,6 +495,31 @@ export class UserService {
       where: { userId: id, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+
+    const targetEmail = updated?.email || existingUser?.email;
+    if (targetEmail) {
+      const roleName =
+        typeof updated?.role === 'object' && updated?.role?.name
+          ? updated.role.name
+          : typeof existingUser?.role === 'object' && existingUser?.role?.name
+          ? existingUser.role.name
+          : updated?.roleId === 2 || existingUser?.roleId === 2
+          ? 'TENANT_ADMIN'
+          : updated?.roleId === 3 || existingUser?.roleId === 3
+          ? 'ASSET_MANAGER'
+          : 'MEMBER';
+
+      await emailService
+        .dispatchPasswordResetEmail({
+          tenantId: updated?.tenantId || existingUser?.tenantId || 'tenant-acme-corp',
+          userId: id,
+          email: targetEmail,
+          fullName: updated?.fullName || existingUser?.fullName || deriveNameFromEmail(targetEmail),
+          roleName,
+          newPassword,
+        })
+        .catch(() => {});
+    }
 
     return updated;
   }

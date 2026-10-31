@@ -10,7 +10,7 @@ import { getPaginationParams } from '../utils/pagination.util';
 import { sendResponse } from '../utils/response.util';
 import { asyncHandler } from '../utils/asyncHandler';
 import { TenantStatus } from '@prisma/client';
-import { NotFoundError } from '../errors/AppError';
+import { NotFoundError, BadRequestError } from '../errors/AppError';
 
 export class TenantController {
   public listTenants = asyncHandler(async (req: Request, res: Response) => {
@@ -57,6 +57,22 @@ export class TenantController {
   public deleteTenant = asyncHandler(async (req: Request, res: Response) => {
     await tenantService.deleteTenant(req.params.id as string, req.user?.id);
     sendResponse(res, 200, { message: 'Tenant organization removed successfully' });
+  });
+
+  public closeOrganization = asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.id;
+    if (!tenantId || !userId) {
+      throw new BadRequestError('No active organization associated with this account');
+    }
+    const { confirmationName } = req.body;
+    const result = await tenantService.closeOrganization(
+      req.prisma,
+      tenantId,
+      userId,
+      confirmationName
+    );
+    sendResponse(res, 200, result);
   });
 
   public exportTenantData = asyncHandler(async (req: Request, res: Response) => {

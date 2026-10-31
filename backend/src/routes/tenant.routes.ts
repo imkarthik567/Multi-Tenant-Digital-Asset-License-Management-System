@@ -27,6 +27,9 @@ router.get('/', authorize('tenants:read_platform'), tenantContext, tenantControl
 // 1. Export entire tenant archive as JSON (Tenant Admin)
 router.get('/export', authorize('tenants:update_own'), tenantContext, tenantController.exportTenantData);
 
+// 2. Permanently close organization and release admin account (Tenant Admin)
+router.post('/close-organization', authorize('tenants:update_own'), tenantContext, tenantController.closeOrganization);
+
 // 2. Get tenant details (Super Admin or own tenant)
 router.get('/:id', authorize('tenants:read_own'), tenantContext, tenantController.getTenantById);
 

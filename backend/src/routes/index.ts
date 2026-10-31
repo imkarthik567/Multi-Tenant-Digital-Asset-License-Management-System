@@ -111,4 +111,14 @@ router.get(
   tenantController.exportTenantData
 );
 
+// 18. Tenant Organization Closure & Email Release
+router.post(
+  '/tenant/close-organization',
+  authenticate,
+  loadUser,
+  authorize('tenants:update_own'),
+  tenantContext,
+  tenantController.closeOrganization
+);
+
 export default router;

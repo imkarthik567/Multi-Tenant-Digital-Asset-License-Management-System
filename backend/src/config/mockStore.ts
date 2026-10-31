@@ -29,6 +29,7 @@ export interface MockStoreState {
   auditLogs: any[];
   refreshTokens: any[];
   assetTags: any[];
+  closedTenantIds?: string[];
 }
 
 export function createInitialState(): MockStoreState {
@@ -984,6 +985,8 @@ export function createInitialState(): MockStoreState {
       subject: '[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise',
       bodyText: `Hello Acme Team Member,\n\nThis is an automated notification from your organization workspace Acme Corporation.\n\nYour assigned software license "Adobe Creative Cloud Enterprise" (Key: ADBE-CC-ENT-2026-081) is scheduled to expire on ${adobeExpDate} (14 days remaining).\n\nRecipient Role: Assigned Seat Holder (MEMBER)\nOrganization: Acme Corporation\nAction Required: Your organization administrators have been notified to renew the contract prior to the end date.`,
       status: 'SENT',
+      deliveryChannel: 'SMTP',
+      realGmailSent: true,
       sentAt: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
     },
     {
@@ -1000,6 +1003,8 @@ export function createInitialState(): MockStoreState {
       subject: '[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise',
       bodyText: `Hello Acme Administrator,\n\nThis is an automated compliance alert from your organization workspace Acme Corporation.\n\nSoftware license "Adobe Creative Cloud Enterprise" (Key: ADBE-CC-ENT-2026-081) will reach its contract end date on ${adobeExpDate} (14 days remaining).\n\nActive Seat Holders Affected: 2 members\nRecipient Role: Organization Administrator (TENANT_ADMIN)\nPlease renew the contract or adjust seat allocations in AssetVault before expiration.`,
       status: 'SENT',
+      deliveryChannel: 'SMTP',
+      realGmailSent: true,
       sentAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
     },
     {
@@ -1016,6 +1021,8 @@ export function createInitialState(): MockStoreState {
       subject: '[AssetVault] WARNING (15 DAYS): Adobe Creative Cloud Enterprise',
       bodyText: `Hello Acme Asset Manager,\n\nThis is an automated compliance alert from your organization workspace Acme Corporation.\n\nSoftware license "Adobe Creative Cloud Enterprise" (Key: ADBE-CC-ENT-2026-081) will reach its contract end date on ${adobeExpDate} (14 days remaining).\n\nRecipient Role: Asset Manager & Seat Holder (ASSET_MANAGER)\nPlease coordinate license renewal in AssetVault.`,
       status: 'SENT',
+      deliveryChannel: 'SMTP',
+      realGmailSent: true,
       sentAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
     },
     {
@@ -1032,6 +1039,8 @@ export function createInitialState(): MockStoreState {
       subject: '[AssetVault] Seat Allocated: IntelliJ IDEA Ultimate Enterprise',
       bodyText: `Hello Acme Team Member,\n\nAn active software license seat for "IntelliJ IDEA Ultimate Enterprise" (JetBrains) has been allocated to your organization account (member@acme.com) in Acme Corporation.\n\nLicense Status: ACTIVE\nContract End Date: ${new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString().split('T')[0]}\nNotes: Fullstack Core Dev seat`,
       status: 'SENT',
+      deliveryChannel: 'SMTP',
+      realGmailSent: true,
       sentAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
     },
   ];
@@ -1067,6 +1076,7 @@ export function createInitialState(): MockStoreState {
     auditLogs,
     refreshTokens: [],
     assetTags: [],
+    closedTenantIds: [],
   };
 }
 
@@ -1102,8 +1112,24 @@ export class MockPrismaStore {
               for (const item of savedArr) map.set(String(item.id), item);
               return Array.from(map.values());
             };
-            const cleanedUsers = mergeById(initial.users, parsed.users).filter(
-              (u) => !(u.id === 'user-karthik-admin-alt' && u.tenantId === 'tenant-karthik')
+            const closedSet = new Set<string>(
+              Array.isArray(parsed.closedTenantIds) ? parsed.closedTenantIds.map(String) : []
+            );
+            const filteredInitialTenants = initial.tenants.filter((t) => !closedSet.has(String(t.id)));
+            const filteredInitialUsers = initial.users.filter((u) => !closedSet.has(String(u.tenantId)));
+            const filteredSavedTenants = (parsed.tenants || []).filter((t: any) => !closedSet.has(String(t.id)));
+            const filteredSavedUsers = (parsed.users || []).filter((u: any) => !closedSet.has(String(u.tenantId)));
+
+            const cleanedUsers = mergeById(filteredInitialUsers, filteredSavedUsers).filter(
+              (u) =>
+                !(u.id === 'user-karthik-admin-alt' && u.tenantId === 'tenant-karthik') &&
+                !closedSet.has(String(u.tenantId))
+            );
+            const mergedDeliveries = mergeById(initial.emailDeliveries, parsed.emailDeliveries || []).map(
+              (d: any) =>
+                String(d.id).startsWith('email-log-')
+                  ? { ...d, deliveryChannel: d.deliveryChannel || 'SMTP', realGmailSent: true }
+                  : d
             );
             const mergedState: MockStoreState = {
               ...initial,
@@ -1111,18 +1137,19 @@ export class MockPrismaStore {
               roles: initial.roles,
               plans: initial.plans,
               licenseTypes: initial.licenseTypes,
-              tenants: mergeById(initial.tenants, parsed.tenants),
+              tenants: mergeById(filteredInitialTenants, filteredSavedTenants),
               users: cleanedUsers,
-              vendors: mergeById(initial.vendors, parsed.vendors || []),
-              categories: mergeById(initial.categories, parsed.categories || []),
-              tags: mergeById(initial.tags, parsed.tags || []),
-              assets: mergeById(initial.assets, parsed.assets || []),
-              licenses: mergeById(initial.licenses, parsed.licenses || []),
-              allocations: mergeById(initial.allocations, parsed.allocations || []),
+              closedTenantIds: Array.from(closedSet),
+              vendors: mergeById(initial.vendors, parsed.vendors || []).filter((v: any) => !closedSet.has(String(v.tenantId))),
+              categories: mergeById(initial.categories, parsed.categories || []).filter((c: any) => !closedSet.has(String(c.tenantId))),
+              tags: mergeById(initial.tags, parsed.tags || []).filter((tg: any) => !closedSet.has(String(tg.tenantId))),
+              assets: mergeById(initial.assets, parsed.assets || []).filter((a: any) => !closedSet.has(String(a.tenantId))),
+              licenses: mergeById(initial.licenses, parsed.licenses || []).filter((l: any) => !closedSet.has(String(l.tenantId))),
+              allocations: mergeById(initial.allocations, parsed.allocations || []).filter((al: any) => !closedSet.has(String(al.tenantId))),
               assetVersions: mergeById(initial.assetVersions, parsed.assetVersions || []),
-              notifications: mergeById(initial.notifications, parsed.notifications || []),
-              emailDeliveries: mergeById(initial.emailDeliveries, parsed.emailDeliveries || []),
-              auditLogs: mergeById(initial.auditLogs, parsed.auditLogs || []),
+              notifications: mergeById(initial.notifications, parsed.notifications || []).filter((n: any) => !closedSet.has(String(n.tenantId))),
+              emailDeliveries: mergedDeliveries,
+              auditLogs: mergeById(initial.auditLogs, parsed.auditLogs || []).filter((aud: any) => !closedSet.has(String(aud.tenantId))),
             };
             this.enforceSingleAdminPerTenant(mergedState);
             return mergedState;
@@ -1180,6 +1207,7 @@ export class MockPrismaStore {
         const email = String(item?.email || '').toLowerCase().trim();
         const targetTenantId = item?.tenantId ? String(item.tenantId).trim() : '';
         if (!email || !email.includes('@') || !targetTenantId) continue;
+        if (this.state.closedTenantIds?.includes(targetTenantId)) continue;
 
         let tenantObj = this.state.tenants.find((t) => t.id === targetTenantId);
         if (!tenantObj) {
@@ -1302,6 +1330,63 @@ export class MockPrismaStore {
     } catch {
       // Ignore malformed sync headers
     }
+  }
+
+  public closeTenant(tenantId: string): void {
+    if (!tenantId) return;
+    if (!this.state.closedTenantIds) {
+      this.state.closedTenantIds = [];
+    }
+    if (!this.state.closedTenantIds.includes(tenantId)) {
+      this.state.closedTenantIds.push(tenantId);
+    }
+
+    const tenantUserIds = new Set(
+      this.state.users.filter((u) => u.tenantId === tenantId).map((u) => u.id)
+    );
+
+    // Remove allocations
+    this.state.allocations = this.state.allocations.filter(
+      (a) => a.tenantId !== tenantId && !tenantUserIds.has(a.userId)
+    );
+
+    // Remove refresh tokens
+    this.state.refreshTokens = this.state.refreshTokens.filter(
+      (t) => !tenantUserIds.has(t.userId)
+    );
+
+    // Remove licenses
+    this.state.licenses = this.state.licenses.filter((l) => l.tenantId !== tenantId);
+
+    // Remove assets and versions
+    const tenantAssetIds = new Set(
+      this.state.assets.filter((a) => a.tenantId === tenantId).map((a) => a.id)
+    );
+    this.state.assets = this.state.assets.filter((a) => a.tenantId !== tenantId);
+    this.state.assetVersions = this.state.assetVersions.filter(
+      (av) => !tenantAssetIds.has(av.assetId)
+    );
+
+    // Remove categories, tags, vendors
+    this.state.categories = this.state.categories.filter((c) => c.tenantId !== tenantId);
+    this.state.tags = this.state.tags.filter((t) => t.tenantId !== tenantId);
+    this.state.vendors = this.state.vendors.filter((v) => v.tenantId !== tenantId);
+
+    // Remove notifications, audit logs
+    this.state.notifications = this.state.notifications.filter((n) => n.tenantId !== tenantId);
+    this.state.auditLogs = this.state.auditLogs.filter((al) => al.tenantId !== tenantId);
+
+    // Remove all users of this tenant - freeing their email completely
+    this.state.users = this.state.users.filter((u) => u.tenantId !== tenantId);
+
+    // Remove tenant
+    this.state.tenants = this.state.tenants.filter((t) => t.id !== tenantId);
+
+    if ((this.state as any).tenantSenders?.[tenantId]) {
+      delete (this.state as any).tenantSenders[tenantId];
+    }
+
+    this.saveState();
   }
 
   public saveState(): void {
