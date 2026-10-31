@@ -11,6 +11,8 @@ import {
   getRosterSyncHeader,
   getWorkspaceSmtpHeader,
   recordRosterSyncEntry,
+  recordWorkspaceEntitySync,
+  mergeClientWorkspaceEntities,
   recordClosedWorkspaceTombstone,
   clearReleasedEmailTombstone,
   syncServerUsersToFallbackStore,
@@ -313,6 +315,18 @@ const isServerOrGatewayFailure = (err: unknown): boolean => {
 const isHtmlResponse = (data: unknown): boolean =>
   typeof data === 'string' && data.trim().startsWith('<');
 
+const getEntityTypeFromEndpoint = (
+  cleanEndpoint: string
+): 'vendor' | 'license' | 'asset' | 'category' | 'tag' | 'allocation' | null => {
+  if (cleanEndpoint === '/vendors' || cleanEndpoint.startsWith('/vendors/')) return 'vendor';
+  if (cleanEndpoint === '/licenses' || cleanEndpoint.startsWith('/licenses/')) return 'license';
+  if (cleanEndpoint === '/assets' || cleanEndpoint.startsWith('/assets/')) return 'asset';
+  if (cleanEndpoint === '/categories' || cleanEndpoint.startsWith('/categories/')) return 'category';
+  if (cleanEndpoint === '/tags' || cleanEndpoint.startsWith('/tags/')) return 'tag';
+  if (cleanEndpoint === '/allocations' || cleanEndpoint.startsWith('/allocations/')) return 'allocation';
+  return null;
+};
+
 // Typed Convenience API Wrapper
 export const api = {
   async get<T = any>(url: string, configOrParams?: any): Promise<T> {
@@ -332,10 +346,39 @@ export const api = {
       if (url.includes('/auth/me') && (response.data as any)?.data) {
         syncAuthenticatedSessionToFallbackStore((response.data as any).data);
       }
-      if (url.startsWith('/users') && Array.isArray((response.data as any)?.data)) {
-        const cached = getStoredSession();
-        const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
+      const cleanEndpoint = url.replace(/^\/api(\/v1)?/, '').split('?')[0];
+      const cached = getStoredSession();
+      const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
+
+      if (cleanEndpoint.startsWith('/users') && Array.isArray((response.data as any)?.data)) {
         syncServerUsersToFallbackStore((response.data as any).data, activeTenantId);
+      }
+      const entityType = getEntityTypeFromEndpoint(cleanEndpoint);
+      if (
+        entityType &&
+        cleanEndpoint === `/${entityType === 'category' ? 'categories' : `${entityType}s`}` &&
+        Array.isArray((response.data as any)?.data)
+      ) {
+        const srvList = (response.data as any).data;
+        if (entityType === 'vendor' || entityType === 'category' || entityType === 'tag') {
+          for (const item of srvList) {
+            if (item && (item.id || item.vendor_id)) {
+              recordWorkspaceEntitySync(entityType, 'upsert', activeTenantId, item);
+            }
+          }
+        }
+        const merged = mergeClientWorkspaceEntities(
+          entityType,
+          srvList,
+          activeTenantId
+        );
+        (response.data as any).data = merged;
+        if ((response.data as any).meta && typeof (response.data as any).meta.total === 'number') {
+          (response.data as any).meta.total = Math.max(
+            (response.data as any).meta.total,
+            merged.length
+          );
+        }
       }
       return response.data;
     } catch (err) {
@@ -369,12 +412,23 @@ export const api = {
         }
         syncAuthenticatedSessionToFallbackStore(resData);
       }
-      const cleanEndpoint = url.replace(/^\/api(\/v1)?/, '');
+      const cleanEndpoint = url.replace(/^\/api(\/v1)?/, '').split('?')[0];
+      const cached = getStoredSession();
+      const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
+
+      const entityType = getEntityTypeFromEndpoint(cleanEndpoint);
+      if (entityType && (response.data as any)?.data?.id) {
+        recordWorkspaceEntitySync(
+          entityType,
+          'upsert',
+          activeTenantId,
+          (response.data as any).data
+        );
+      }
+
       if (cleanEndpoint === '/users' && (response.data as any)?.data?.email) {
         const created = (response.data as any).data;
         clearReleasedEmailTombstone(created.email);
-        const cached = getStoredSession();
-        const activeTenantId = created.tenantId || cached?.tenant?.id || cached?.user?.tenantId;
         const rName =
           typeof created.role === 'object' && created.role?.name
             ? created.role.name
@@ -385,7 +439,7 @@ export const api = {
           fullName: created.fullName,
           roleName: rName,
           roleId: created.roleId,
-          tenantId: activeTenantId,
+          tenantId: created.tenantId || activeTenantId,
           tenantName: cached?.tenant?.name,
           tenantSlug: cached?.tenant?.slug,
           contactEmail: cached?.tenant?.contactEmail,
@@ -397,8 +451,6 @@ export const api = {
         cleanEndpoint === '/users/bulk-email' &&
         Array.isArray((response.data as any)?.data?.createdUsers)
       ) {
-        const cached = getStoredSession();
-        const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
         for (const created of (response.data as any).data.createdUsers) {
           if (created && created.email) {
             clearReleasedEmailTombstone(created.email);
@@ -424,7 +476,6 @@ export const api = {
       }
       if (url.includes('/close-organization')) {
         try {
-          const cached = getStoredSession();
           const closedTenantId = cached?.tenant?.id || cached?.user?.tenantId || null;
           const releasedEmail =
             (response.data as any)?.data?.releasedEmail || cached?.user?.email || null;
@@ -452,6 +503,13 @@ export const api = {
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('PUT', url, data) as T;
       }
+      const cleanEndpoint = url.replace(/^\/api(\/v1)?/, '').split('?')[0];
+      const entityType = getEntityTypeFromEndpoint(cleanEndpoint);
+      if (entityType && (response.data as any)?.data?.id) {
+        const cached = getStoredSession();
+        const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
+        recordWorkspaceEntitySync(entityType, 'upsert', activeTenantId, (response.data as any).data);
+      }
       return response.data;
     } catch (err) {
       if (isServerOrGatewayFailure(err)) {
@@ -467,7 +525,14 @@ export const api = {
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('PATCH', url, data) as T;
       }
-      if (url.startsWith('/users/')) {
+      const cleanEndpoint = url.replace(/^\/api(\/v1)?/, '').split('?')[0];
+      const cached = getStoredSession();
+      const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
+      const entityType = getEntityTypeFromEndpoint(cleanEndpoint);
+      if (entityType && (response.data as any)?.data?.id) {
+        recordWorkspaceEntitySync(entityType, 'upsert', activeTenantId, (response.data as any).data);
+      }
+      if (cleanEndpoint.startsWith('/users/')) {
         handleFallbackRequest('PATCH', url, data);
         const updated = (response.data as any)?.data;
         if (updated && updated.email) {
@@ -504,7 +569,15 @@ export const api = {
       if (isHtmlResponse(response.data)) {
         return handleFallbackRequest('DELETE', url, undefined, configOrParams?.params ?? configOrParams) as T;
       }
-      if (url.startsWith('/users/')) {
+      const cleanEndpoint = url.replace(/^\/api(\/v1)?/, '').split('?')[0];
+      const cached = getStoredSession();
+      const activeTenantId = cached?.tenant?.id || cached?.user?.tenantId;
+      const entityType = getEntityTypeFromEndpoint(cleanEndpoint);
+      const idMatch = cleanEndpoint.match(/^\/(?:vendors|licenses|assets|categories|tags|allocations)\/([^/]+)$/);
+      if (entityType && idMatch?.[1]) {
+        recordWorkspaceEntitySync(entityType, 'delete', activeTenantId, idMatch[1]);
+      }
+      if (cleanEndpoint.startsWith('/users/')) {
         handleFallbackRequest('DELETE', url);
       }
       return response.data;

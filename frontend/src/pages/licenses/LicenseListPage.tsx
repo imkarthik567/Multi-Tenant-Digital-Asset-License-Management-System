@@ -8,6 +8,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiClient, getAccessToken } from '../../services/api';
+import { mergeClientWorkspaceEntities } from '../../services/localFallback';
 import { License, Vendor, User } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -251,18 +252,54 @@ export const LicenseListPage: React.FC = () => {
       }),
   });
 
-  const { data: vendorsData } = useQuery<{ data: Vendor[] }>({
-    queryKey: ['vendors-dropdown'],
-    queryFn: () => api.get('/vendors'),
+  const { data: vendorsData, refetch: refetchVendors } = useQuery<{ data: Vendor[] }>({
+    queryKey: ['vendors', 'dropdown'],
+    queryFn: () => api.get('/vendors', { params: { limit: 100 } }),
   });
 
   const { data: usersData } = useQuery<{ data: User[] }>({
-    queryKey: ['users-dropdown'],
+    queryKey: ['users', 'dropdown'],
     queryFn: () => api.get('/users', { params: { limit: 100 } }),
   });
 
-  const rawLicenses = licensesData?.data || [];
-  const vendors = vendorsData?.data || [];
+  const rawLicenses = useMemo(() => {
+    const serverList = licensesData?.data || [];
+    if (statusFilter && statusFilter !== 'ALL' && statusFilter !== 'ACTIVE') {
+      return serverList;
+    }
+    const merged = mergeClientWorkspaceEntities<License>('license', serverList);
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      return merged.filter(
+        (l: any) =>
+          String(l.name || l.license_name || '')
+            .toLowerCase()
+            .includes(q) ||
+          String(l.vendorName || l.vendor_name || l.vendor?.name || '')
+            .toLowerCase()
+            .includes(q)
+      );
+    }
+    return merged;
+  }, [licensesData, searchTerm, statusFilter]);
+
+  const vendors = useMemo(() => {
+    const combined: Vendor[] = [...(vendorsData?.data || [])];
+    const cachedVendorQueries = queryClient.getQueriesData<{ data?: Vendor[] }>({
+      queryKey: ['vendors'],
+    });
+    for (const [, cachedData] of cachedVendorQueries) {
+      if (Array.isArray(cachedData?.data)) {
+        for (const v of cachedData.data) {
+          if (v && v.id && !combined.some((existing) => existing.id === v.id)) {
+            combined.push(v);
+          }
+        }
+      }
+    }
+    return mergeClientWorkspaceEntities<Vendor>('vendor', combined);
+  }, [vendorsData, queryClient]);
+
   const members = usersData?.data || [];
 
   // Client-side sorting enhancement for responsiveness & computed percentages
@@ -372,11 +409,20 @@ export const LicenseListPage: React.FC = () => {
 
   // 2. Create License Mutation
   const createLicenseMutation = useMutation({
-    mutationFn: (newLicense: typeof createForm) => api.post('/licenses', newLicense),
+    mutationFn: (newLicense: typeof createForm) => {
+      const selectedVendor = vendors.find((v) => v.id === newLicense.vendorId);
+      return api.post('/licenses', {
+        ...newLicense,
+        vendorName: selectedVendor?.name || undefined,
+      });
+    },
     onSuccess: () => {
       setShowCreateModal(false);
       setCreateStep(1);
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
       toast.success('License contract successfully registered');
       setCreateForm({
         name: '',
@@ -407,6 +453,7 @@ export const LicenseListPage: React.FC = () => {
     onSuccess: () => {
       setShowRenewModal(false);
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
       toast.success('License contract successfully renewed via sp_renew_license');
     },
     onError: (err: any) => {
@@ -419,6 +466,9 @@ export const LicenseListPage: React.FC = () => {
     mutationFn: (id: string) => api.delete(`/licenses/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
       setDeleteTarget(null);
       toast.success('License moved to Trash (soft-deleted)');
     },
@@ -612,6 +662,7 @@ export const LicenseListPage: React.FC = () => {
             size="sm"
             iconLeft={<Plus className="w-4 h-4" />}
             onClick={() => {
+              refetchVendors();
               setShowCreateModal(true);
               setCreateStep(1);
               setCreateErrors({});

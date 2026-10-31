@@ -120,6 +120,11 @@ export interface RosterSyncEntry {
   isActive?: boolean;
   deleted?: boolean;
   closedTenant?: boolean;
+  workspaceEntity?: boolean;
+  entityType?: 'vendor' | 'license' | 'asset' | 'category' | 'tag' | 'allocation';
+  action?: 'upsert' | 'delete';
+  entityId?: string;
+  entityData?: any;
 }
 
 const CLOSED_TENANTS_KEY = 'assetvault_closed_tenants_v1';
@@ -290,8 +295,130 @@ export function recordRosterSyncEntry(entry: RosterSyncEntry): void {
     }
 
     filtered.push({ ...entry, email, tenantId });
-    localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(filtered.slice(-50)));
+    localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(filtered.slice(-80)));
   } catch {}
+}
+
+export function recordWorkspaceEntitySync(
+  entityType: 'vendor' | 'license' | 'asset' | 'category' | 'tag' | 'allocation',
+  action: 'upsert' | 'delete',
+  tenantIdInput?: string | null,
+  entityData?: any
+): void {
+  try {
+    const tenantId = tenantIdInput || entityData?.tenantId || getCurrentSessionTenantId();
+    if (!tenantId) return;
+    const entityId = String(
+      typeof entityData === 'string' ? entityData : entityData?.id || ''
+    ).trim();
+    if (!entityId) return;
+
+    // 1. Update localFallback store
+    const store = loadStore();
+    const colMap: Record<string, keyof FallbackStore> = {
+      vendor: 'vendors',
+      license: 'licenses',
+      asset: 'assets',
+      category: 'categories',
+      tag: 'tags',
+      allocation: 'allocations',
+    };
+    const colKey = colMap[entityType];
+    if (colKey && Array.isArray(store[colKey])) {
+      const col = store[colKey] as any[];
+      if (action === 'delete') {
+        store[colKey] = col.filter((item) => String(item.id) !== entityId) as any;
+      } else if (action === 'upsert' && entityData && typeof entityData === 'object') {
+        const record = { ...entityData, id: entityId, tenantId };
+        const existingIdx = col.findIndex((item) => String(item.id) === entityId);
+        if (existingIdx !== -1) {
+          col[existingIdx] = { ...col[existingIdx], ...record };
+        } else {
+          col.unshift(record);
+        }
+      }
+      saveStore(store);
+    }
+
+    // 2. Record in ROSTER_SYNC_KEY for X-Workspace-Roster-Sync header
+    const raw = localStorage.getItem(ROSTER_SYNC_KEY);
+    const list: RosterSyncEntry[] = raw ? JSON.parse(raw) : [];
+    const filtered = Array.isArray(list)
+      ? list.filter(
+          (item) =>
+            !(
+              item &&
+              item.workspaceEntity &&
+              item.tenantId === tenantId &&
+              item.entityType === entityType &&
+              String(item.entityId) === entityId
+            )
+        )
+      : [];
+
+    filtered.push({
+      email: 'entity@workspace.local',
+      tenantId,
+      workspaceEntity: true,
+      entityType,
+      action,
+      entityId,
+      entityData: action === 'upsert' ? { ...entityData, id: entityId, tenantId } : undefined,
+    });
+    localStorage.setItem(ROSTER_SYNC_KEY, JSON.stringify(filtered.slice(-80)));
+  } catch {}
+}
+
+export function mergeClientWorkspaceEntities<T = any>(
+  entityType: 'vendor' | 'license' | 'asset' | 'category' | 'tag' | 'allocation',
+  serverItems: T[],
+  tenantIdInput?: string | null
+): T[] {
+  try {
+    const tenantId = tenantIdInput || getCurrentSessionTenantId();
+    if (!tenantId) return Array.isArray(serverItems) ? serverItems : [];
+
+    const raw = localStorage.getItem(ROSTER_SYNC_KEY);
+    const parsed: RosterSyncEntry[] = raw ? JSON.parse(raw) : [];
+    const entries = Array.isArray(parsed)
+      ? parsed.filter(
+          (item) =>
+            item &&
+            item.workspaceEntity &&
+            item.tenantId === tenantId &&
+            item.entityType === entityType
+        )
+      : [];
+
+    const deletedIds = new Set<string>(
+      entries
+        .filter((e) => e.action === 'delete' && e.entityId)
+        .map((e) => String(e.entityId))
+    );
+
+    const map = new Map<string, any>();
+    for (const srv of Array.isArray(serverItems) ? serverItems : []) {
+      const s = srv as any;
+      const id = String(s?.id || s?.license_id || s?.asset_id || s?.vendor_id || '');
+      if (id && !deletedIds.has(id)) {
+        map.set(id, srv);
+      }
+    }
+
+    for (const entry of entries) {
+      if (entry.action === 'upsert' && entry.entityId && entry.entityData) {
+        const id = String(entry.entityId);
+        if (!deletedIds.has(id)) {
+          const existing = map.get(id);
+          map.set(id, existing ? { ...entry.entityData, ...existing } : entry.entityData);
+        }
+      }
+    }
+
+    return Array.from(map.values()) as T[];
+  } catch {
+    return Array.isArray(serverItems) ? serverItems : [];
+  }
 }
 
 export function getRosterSyncHeader(): string | null {

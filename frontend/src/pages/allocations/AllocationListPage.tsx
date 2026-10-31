@@ -7,6 +7,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { mergeClientWorkspaceEntities } from '../../services/localFallback';
 import { License, LicenseAllocation, User } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
@@ -67,7 +68,7 @@ export const AllocationListPage: React.FC = () => {
   });
 
   const { data: licensesData } = useQuery<{ data: License[] }>({
-    queryKey: ['licenses-for-allocation'],
+    queryKey: ['licenses', 'for-allocation'],
     queryFn: async () => {
       return api.get<{ data: License[] }>('/licenses', {
         params: { limit: 100 },
@@ -76,7 +77,7 @@ export const AllocationListPage: React.FC = () => {
   });
 
   const { data: usersData } = useQuery<{ data: User[] }>({
-    queryKey: ['users-for-allocation'],
+    queryKey: ['users', 'for-allocation'],
     queryFn: async () => {
       return api.get<{ data: User[] }>('/users', {
         params: { limit: 100 },
@@ -84,9 +85,10 @@ export const AllocationListPage: React.FC = () => {
     },
   });
 
-  const availableLicenses = (licensesData?.data || []).filter(
-    (l) => l.status !== 'CANCELLED' && l.status !== 'EXPIRED'
-  );
+  const availableLicenses = mergeClientWorkspaceEntities<License>(
+    'license',
+    licensesData?.data || []
+  ).filter((l) => l.status !== 'CANCELLED' && l.status !== 'EXPIRED');
   const workspaceUsers = (usersData?.data || []).filter((u) => u.isActive !== false);
 
   const allocateMutation = useMutation({
@@ -111,7 +113,6 @@ export const AllocationListPage: React.FC = () => {
       setAllocationNotes('');
       queryClient.invalidateQueries({ queryKey: ['allocations'] });
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
-      queryClient.invalidateQueries({ queryKey: ['licenses-for-allocation'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err: any) => {
@@ -135,7 +136,6 @@ export const AllocationListPage: React.FC = () => {
       setReleaseAllocationId(null);
       queryClient.invalidateQueries({ queryKey: ['allocations'] });
       queryClient.invalidateQueries({ queryKey: ['licenses'] });
-      queryClient.invalidateQueries({ queryKey: ['licenses-for-allocation'] });
     },
     onError: (err: any) => {
       toast({

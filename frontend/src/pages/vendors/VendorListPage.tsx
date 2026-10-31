@@ -16,6 +16,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { mergeClientWorkspaceEntities } from '../../services/localFallback';
 import { Vendor } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
@@ -84,6 +85,8 @@ export const VendorListPage: React.FC = () => {
       setEditingVendor(null);
       setForm({ name: '', contactEmail: '', website: '', supportPhone: '' });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors-dropdown'] });
+      queryClient.invalidateQueries({ queryKey: ['licenses'] });
     },
     onError: (err: any) => {
       toast({
@@ -100,6 +103,8 @@ export const VendorListPage: React.FC = () => {
       toast({ title: 'Vendor Removed', message: 'Vendor record deleted', type: 'info' });
       setDeleteVendor(null);
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors-dropdown'] });
+      queryClient.invalidateQueries({ queryKey: ['licenses'] });
     },
     onError: (err: any) => {
       toast({
@@ -110,7 +115,14 @@ export const VendorListPage: React.FC = () => {
     },
   });
 
-  const vendors = vendorsData?.data || [];
+  const allVendors = mergeClientWorkspaceEntities<Vendor>('vendor', vendorsData?.data || []);
+  const vendors = search.trim()
+    ? allVendors.filter((v) =>
+        String(v.name || '')
+          .toLowerCase()
+          .includes(search.trim().toLowerCase())
+      )
+    : allVendors;
 
   return (
     <div className="space-y-6 pb-8">

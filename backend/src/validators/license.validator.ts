@@ -18,6 +18,7 @@ export const createLicenseSchema = z
   .object({
     name: z.string().min(2).max(100).trim(),
     vendorId: z.string().min(1, 'Vendor is required').trim(),
+    vendorName: z.string().trim().optional(),
     licenseTypeId: z.number().int().positive(),
     licenseKey: z.string().min(4).max(255).trim(),
     totalSeats: z.number().int().positive('totalSeats must be at least 1'),

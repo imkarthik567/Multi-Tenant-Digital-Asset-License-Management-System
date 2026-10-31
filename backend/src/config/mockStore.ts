@@ -1222,8 +1222,46 @@ export class MockPrismaStore {
       };
 
       for (const item of items) {
-        const email = String(item?.email || '').toLowerCase().trim();
         const targetTenantId = item?.tenantId ? String(item.tenantId).trim() : '';
+        if (item?.workspaceEntity && targetTenantId && item.entityType) {
+          if (this.state.closedTenantIds?.includes(targetTenantId)) continue;
+          const colMap: Record<string, keyof MockStoreState> = {
+            vendor: 'vendors',
+            license: 'licenses',
+            asset: 'assets',
+            category: 'categories',
+            tag: 'tags',
+            allocation: 'allocations',
+          };
+          const colKey = colMap[String(item.entityType)];
+          if (colKey && Array.isArray(this.state[colKey])) {
+            const col = this.state[colKey] as any[];
+            const entityId = String(item.entityId || item.entityData?.id || '').trim();
+            if (item.action === 'delete' && entityId) {
+              const idx = col.findIndex((e) => String(e.id) === entityId);
+              if (idx !== -1) {
+                col.splice(idx, 1);
+                modified = true;
+              }
+            } else if (item.action === 'upsert' && item.entityData && entityId) {
+              const existingIdx = col.findIndex((e) => String(e.id) === entityId);
+              const record = {
+                ...item.entityData,
+                id: entityId,
+                tenantId: item.entityData.tenantId || targetTenantId,
+              };
+              if (existingIdx !== -1) {
+                col[existingIdx] = { ...col[existingIdx], ...record };
+              } else {
+                col.unshift(record);
+              }
+              modified = true;
+            }
+          }
+          continue;
+        }
+
+        const email = String(item?.email || '').toLowerCase().trim();
         if (item?.closedTenant && targetTenantId) {
           const alreadyClosed = this.state.closedTenantIds?.includes(targetTenantId);
           if (!alreadyClosed || this.state.tenants.some((t) => t.id === targetTenantId)) {

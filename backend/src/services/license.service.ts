@@ -72,7 +72,17 @@ export class LicenseService {
   }
 
   public async createLicense(prismaClient: any, tenantId: string, data: any) {
-    const vendor = await prismaClient.vendor.findFirst({ where: { id: data.vendorId } });
+    let vendor = await prismaClient.vendor.findFirst({ where: { id: data.vendorId } });
+    if (!vendor && data.vendorId) {
+      vendor = await prismaClient.vendor.create({
+        data: {
+          id: data.vendorId,
+          tenantId,
+          name: data.vendorName || 'Enterprise Software Vendor',
+          contactEmail: 'support@vendor.com',
+        },
+      });
+    }
     if (!vendor) throw new BadRequestError('Referenced vendor does not exist');
 
     const licenseType = await prismaClient.licenseType.findUnique({ where: { id: data.licenseTypeId } });
