@@ -192,7 +192,7 @@ const CategoryTree: React.FC<CategoryTreeProps> = ({
       {nodes.map((node) => {
         const hasChildren = node.children && node.children.length > 0;
         const isSelected = selectedCategoryId === node.id;
-        const isNodeExpanded = expanded[node.id] ?? false;
+        const isNodeExpanded = expanded[node.id] ?? true;
 
         return (
           <div key={node.id}>
@@ -280,7 +280,7 @@ export const AssetListPage: React.FC = () => {
   const ownerParam = searchParams.get('owner') || '';
   const viewMode = (searchParams.get('view') || 'grid') as 'grid' | 'table';
   const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = parseInt(searchParams.get('limit') || '12', 10);
+  const limit = parseInt(searchParams.get('limit') || '10', 10);
   const sort = searchParams.get('sort') || 'created_at';
   const order = (searchParams.get('order') || 'desc') as 'asc' | 'desc';
 
@@ -371,6 +371,8 @@ export const AssetListPage: React.FC = () => {
   // If exactly 1 type is selected, pass it to the backend. If multiple are selected,
   // we fetch all and filter in memory so the backend's strict single-type check isn't broken.
   const backendAssetType = selectedTypes.length === 1 ? selectedTypes[0] : undefined;
+  const needsClientFilter =
+    selectedTypes.length > 1 || Boolean(ownerParam && !/^[0-9a-f-]{36}$/i.test(ownerParam));
 
   const {
     data: assetsResponse,
@@ -383,7 +385,7 @@ export const AssetListPage: React.FC = () => {
     queryKey: [
       'assets',
       q,
-      backendAssetType,
+      selectedTypes.join(','),
       status,
       complianceStatus,
       categoryId,
@@ -401,8 +403,8 @@ export const AssetListPage: React.FC = () => {
         complianceStatus: complianceStatus === 'ALL' ? undefined : complianceStatus,
         categoryId: categoryId || undefined,
         ownerId: ownerParam && /^[0-9a-f-]{36}$/i.test(ownerParam) ? ownerParam : undefined,
-        page,
-        limit,
+        page: needsClientFilter ? 1 : page,
+        limit: needsClientFilter ? 500 : limit,
         sort,
         order,
       });
@@ -430,29 +432,46 @@ export const AssetListPage: React.FC = () => {
 
   // Flattened & parsed items
   const rawAssets = (assetsResponse?.data || []) as any[];
-  const meta = assetsResponse?.meta;
+  const rawMeta = assetsResponse?.meta;
   const categoryTree = (Array.isArray(categoryTreeResponse) ? categoryTreeResponse : (categoryTreeResponse as any)?.data || []) as CategoryTreeNode[];
   const flatCategories = (flatCategoriesResponse?.data || []) as Category[];
 
-  // Client-side filtering if multiple types are selected
-  const assets = useMemo(() => {
-    let result = rawAssets;
+  // Client-side filtering when multiple types or text owner filter are active
+  const { assets, meta } = useMemo(() => {
+    if (!needsClientFilter) {
+      return { assets: rawAssets, meta: rawMeta };
+    }
+    let filtered = rawAssets;
     if (selectedTypes.length > 1) {
-      result = result.filter((item) => {
+      filtered = filtered.filter((item) => {
         const itemType = (item.asset_type || item.assetType || '').toUpperCase();
         return selectedTypes.includes(itemType);
       });
     }
     if (ownerParam && !/^[0-9a-f-]{36}$/i.test(ownerParam)) {
       const lower = ownerParam.toLowerCase();
-      result = result.filter((item) => {
+      filtered = filtered.filter((item) => {
         const ownerName = (item.owner_name || item.owner?.fullName || '').toLowerCase();
         const ownerEmail = (item.owner_email || item.owner?.email || '').toLowerCase();
         return ownerName.includes(lower) || ownerEmail.includes(lower);
       });
     }
-    return result;
-  }, [rawAssets, selectedTypes, ownerParam]);
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const paged = filtered.slice((safePage - 1) * limit, safePage * limit);
+    return {
+      assets: paged,
+      meta: {
+        total,
+        page: safePage,
+        limit,
+        totalPages,
+        hasNext: safePage < totalPages,
+        hasPrev: safePage > 1,
+      },
+    };
+  }, [rawAssets, rawMeta, needsClientFilter, selectedTypes, ownerParam, page, limit]);
 
   // ============================================================================
   // Mutations

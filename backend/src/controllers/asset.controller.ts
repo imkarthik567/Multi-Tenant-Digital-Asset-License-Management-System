@@ -46,8 +46,8 @@ export class AssetController {
   });
 
   public softDeleteAsset = asyncHandler(async (req: Request, res: Response) => {
-    await assetService.softDeleteAsset(req.prisma, req.params.id as string);
-    sendResponse(res, 200, { message: 'Asset moved to trash (soft deleted)' });
+    const asset = await assetService.softDeleteAsset(req.prisma, req.params.id as string);
+    sendResponse(res, 200, asset);
   });
 
   public restoreAsset = asyncHandler(async (req: Request, res: Response) => {
@@ -56,8 +56,23 @@ export class AssetController {
   });
 
   public attachTags = asyncHandler(async (req: Request, res: Response) => {
-    const tagIds = Array.isArray(req.body.tagIds) ? req.body.tagIds : [req.body.tagId];
-    const results = await assetService.attachTags(req.prisma, req.params.id as string, tagIds);
+    const rawIds = Array.isArray(req.body.tagIds)
+      ? req.body.tagIds
+      : req.body.tagId
+      ? [req.body.tagId]
+      : [];
+    const rawNames = Array.isArray(req.body.tagNames)
+      ? req.body.tagNames
+      : req.body.tag
+      ? [req.body.tag]
+      : [];
+    const results = await assetService.attachTags(
+      req.prisma,
+      req.params.id as string,
+      rawIds,
+      rawNames,
+      req.user!.tenantId as string
+    );
     sendResponse(res, 200, results);
   });
 

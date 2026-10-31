@@ -51,35 +51,40 @@ export class AssetService {
       throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
     }
 
+    const cleanTags = Array.isArray(data.tags)
+      ? data.tags.map((t: any) => String(t || '').trim()).filter(Boolean)
+      : [];
+
     const asset = await assetRepository.create(prismaClient, {
       name: data.name,
       assetCode: data.assetCode,
       assetType: data.assetType,
       description: data.description || null,
       status: (data.status as any) || 'ACTIVE',
+      ...(cleanTags.length > 0 ? { tags: cleanTags } : {}),
       category: data.categoryId ? { connect: { id: data.categoryId } } : undefined,
       owner: { connect: { id: ownerId } },
       tenant: { connect: { id: tenantId } },
+    } as any);
+
+    const defaultFileUrl =
+      data.fileUrl ||
+      `https://storage.assetvault.io/assets/${encodeURIComponent(String(data.assetCode || asset.id).toLowerCase())}-v1.tar.gz`;
+    await prismaClient.assetVersion.create({
+      data: {
+        assetId: asset.id,
+        versionNo: 1,
+        fileUrl: defaultFileUrl,
+        fileSizeBytes: BigInt(data.fileSizeBytes || 2097152),
+        checksumSha256:
+          data.checksumSha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        changeNotes: `Initial v1 release of ${data.name}`,
+        uploadedBy: ownerId,
+      },
     });
 
-    if (data.fileUrl) {
-      await prismaClient.assetVersion.create({
-        data: {
-          assetId: asset.id,
-          versionNo: 1,
-          fileUrl: data.fileUrl,
-          fileSizeBytes: BigInt(data.fileSizeBytes || 1048576),
-          checksumSha256:
-            data.checksumSha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          uploadedBy: ownerId,
-        },
-      });
-    }
-
-    if (Array.isArray(data.tags) && data.tags.length > 0) {
-      for (const tagItem of data.tags) {
-        if (!tagItem || typeof tagItem !== 'string' || !tagItem.trim()) continue;
-        const tagName = tagItem.trim();
+    if (cleanTags.length > 0) {
+      for (const tagName of cleanTags) {
         const tag = await prismaClient.tag.upsert({
           where: { tenantId_name: { tenantId, name: tagName } },
           create: { tenantId, name: tagName },
@@ -89,7 +94,11 @@ export class AssetService {
       }
     }
 
-    return asset;
+    const hydrated = await this.getAssetById(prismaClient, asset.id);
+    return {
+      ...hydrated,
+      tags: cleanTags.length > 0 ? cleanTags : hydrated.tags,
+    };
   }
 
   public async updateAsset(prismaClient: any, id: string, data: any) {
@@ -121,11 +130,30 @@ export class AssetService {
     return assetRepository.restore(prismaClient, id);
   }
 
-  public async attachTags(prismaClient: any, assetId: string, tagIds: string[]) {
-    await this.getAssetById(prismaClient, assetId);
+  public async attachTags(
+    prismaClient: any,
+    assetId: string,
+    tagIds: string[] = [],
+    tagNames: string[] = [],
+    tenantId?: string
+  ) {
+    const asset = await this.getAssetById(prismaClient, assetId);
+    const resolvedTenantId = tenantId || asset.tenantId;
     const results = [];
     for (const tagId of tagIds) {
+      if (!tagId) continue;
       const res = await assetRepository.attachTag(prismaClient, assetId, tagId);
+      results.push(res);
+    }
+    for (const rawName of tagNames) {
+      const name = String(rawName || '').trim();
+      if (!name || !resolvedTenantId) continue;
+      const tag = await prismaClient.tag.upsert({
+        where: { tenantId_name: { tenantId: resolvedTenantId, name } },
+        create: { tenantId: resolvedTenantId, name },
+        update: {},
+      });
+      const res = await assetRepository.attachTag(prismaClient, assetId, tag.id);
       results.push(res);
     }
     return results;
@@ -304,6 +332,17 @@ export class AssetService {
             assetType: rowData.assetType,
             description: rowData.description,
             status: 'ACTIVE',
+          },
+        });
+        await tx.assetVersion.create({
+          data: {
+            assetId: created.id,
+            versionNo: 1,
+            fileUrl: `https://storage.assetvault.io/assets/${encodeURIComponent(rowData.assetCode.toLowerCase())}-v1.tar.gz`,
+            fileSizeBytes: BigInt(2097152),
+            checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+            changeNotes: `Imported via bulk CSV (${rowData.assetCode})`,
+            uploadedBy: userId,
           },
         });
         createdRecords.push(created);

@@ -192,14 +192,14 @@ export class AssetRepository {
   public async softDelete(prisma: PrismaClient | any, id: string): Promise<Asset> {
     return prisma.asset.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: { deletedAt: new Date(), status: 'ARCHIVED' },
     });
   }
 
   public async restore(prisma: PrismaClient | any, id: string): Promise<Asset> {
     return prisma.asset.update({
       where: { id },
-      data: { deletedAt: null },
+      data: { deletedAt: null, status: 'ACTIVE' },
     });
   }
 

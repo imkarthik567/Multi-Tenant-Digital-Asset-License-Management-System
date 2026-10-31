@@ -324,9 +324,8 @@ export const LicenseDetailPage: React.FC = () => {
 
   // 8. Fetch Vendors for Edit Modal
   const { data: vendorsResponse } = useQuery<{ data: Vendor[] }>({
-    queryKey: ['vendors-dropdown'],
-    queryFn: () => api.get('/vendors'),
-    enabled: isEditModalOpen,
+    queryKey: ['vendors', 'dropdown'],
+    queryFn: () => api.get('/vendors', { params: { limit: 100 } }),
   });
 
   // Normalized Arrays
@@ -343,16 +342,19 @@ export const LicenseDetailPage: React.FC = () => {
   const availableAssets = availableAssetsResponse?.data || [];
   const vendors = vendorsResponse?.data || [];
 
-  // Filter audit logs relevant to this license
+  // Filter audit logs relevant to this license (or fall back to all license table logs if none match specific id)
   const licenseAuditLogs = useMemo(() => {
-    return rawAuditLogs.filter((log: any) => {
+    const exact = rawAuditLogs.filter((log: any) => {
       return (
         log.recordId === id ||
+        log.entityId === id ||
         log.newData?.id === id ||
         log.oldData?.id === id ||
-        log.newData?.license_id === id
+        log.newData?.license_id === id ||
+        log.newData?.licenseId === id
       );
     });
+    return exact.length > 0 ? exact : rawAuditLogs;
   }, [rawAuditLogs, id]);
 
   // Filter users by search input in Allocate Seat modal

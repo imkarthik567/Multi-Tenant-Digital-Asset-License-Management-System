@@ -1717,16 +1717,25 @@ export function handleFallbackRequest(
   }
 
   // 7. Collections (/assets, /licenses, /allocations, /vendors, /categories, /tags, /users, /notifications, /audit-logs)
-  const makePaginated = (items: any[]) => ({
-    status: 'success',
-    data: items,
-    meta: {
-      page: Number(params?.page || 1),
-      limit: Number(params?.limit || 20),
-      total: items.length,
-      totalPages: Math.max(1, Math.ceil(items.length / Number(params?.limit || 20))),
-    },
-  });
+  const makePaginated = (items: any[]) => {
+    const page = Math.max(1, Number(params?.page || 1));
+    const limit = Math.max(1, Number(params?.limit || 20));
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const sliced = items.slice((page - 1) * limit, page * limit);
+    return {
+      status: 'success',
+      data: sliced,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
+  };
 
   if (cleanUrl.startsWith('/assets')) {
     if (method === 'POST') {
@@ -1738,6 +1747,7 @@ export function handleFallbackRequest(
         assetType: body?.assetType || 'SOFTWARE',
         status: 'ACTIVE',
         description: body?.description || '',
+        tags: Array.isArray(body?.tags) ? body.tags : [],
         complianceStatus: 'COMPLIANT',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1746,7 +1756,37 @@ export function handleFallbackRequest(
       saveStore(store);
       return { status: 'success', data: created };
     }
-    return makePaginated(tenantAssets);
+    let filteredAssets = [...tenantAssets];
+    if (params?.status) {
+      filteredAssets = filteredAssets.filter(
+        (a) => String(a.status || a.asset_status || 'ACTIVE').toUpperCase() === String(params.status).toUpperCase()
+      );
+    }
+    if (params?.assetType) {
+      filteredAssets = filteredAssets.filter(
+        (a) => String(a.assetType || a.asset_type || 'SOFTWARE').toUpperCase() === String(params.assetType).toUpperCase()
+      );
+    }
+    if (params?.complianceStatus) {
+      filteredAssets = filteredAssets.filter(
+        (a) => String(a.complianceStatus || a.compliance_status || 'COMPLIANT').toUpperCase() === String(params.complianceStatus).toUpperCase()
+      );
+    }
+    if (params?.categoryId) {
+      filteredAssets = filteredAssets.filter(
+        (a) => (a.categoryId || a.category_id) === params.categoryId
+      );
+    }
+    if (params?.q) {
+      const qL = String(params.q).toLowerCase();
+      filteredAssets = filteredAssets.filter(
+        (a) =>
+          String(a.name || a.asset_name || '').toLowerCase().includes(qL) ||
+          String(a.assetCode || a.asset_code || '').toLowerCase().includes(qL) ||
+          String(a.description || '').toLowerCase().includes(qL)
+      );
+    }
+    return makePaginated(filteredAssets);
   }
 
   if (cleanUrl.startsWith('/licenses')) {
@@ -1797,6 +1837,16 @@ export function handleFallbackRequest(
   }
 
   if (cleanUrl.startsWith('/categories')) {
+    if (cleanUrl.includes('/tree')) {
+      return {
+        status: 'success',
+        data: store.categories.map((c: any) => ({
+          ...c,
+          assetCount: tenantAssets.filter((a) => (a.categoryId || a.category_id) === c.id).length,
+          children: [],
+        })),
+      };
+    }
     return makePaginated(store.categories);
   }
 

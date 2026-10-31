@@ -1165,11 +1165,15 @@ export class MockPrismaStore {
               licenses: mergeById(initial.licenses, parsed.licenses || []).filter((l: any) => !closedSet.has(String(l.tenantId))),
               allocations: mergeById(initial.allocations, parsed.allocations || []).filter((al: any) => !closedSet.has(String(al.tenantId))),
               assetVersions: mergeById(initial.assetVersions, parsed.assetVersions || []),
+              assetTags: mergeById(initial.assetTags || [], parsed.assetTags || parsed.assettag || []),
               notifications: mergeById(initial.notifications, parsed.notifications || []).filter((n: any) => !closedSet.has(String(n.tenantId))),
               emailDeliveries: mergedDeliveries,
               auditLogs: mergeById(initial.auditLogs, parsed.auditLogs || []).filter((aud: any) => !closedSet.has(String(aud.tenantId))),
             };
             this.enforceSingleAdminPerTenant(mergedState);
+            for (const t of mergedState.tenants) {
+              this.ensureTenantDefaults(t.id, mergedState);
+            }
             return mergedState;
           }
         }
@@ -1178,7 +1182,263 @@ export class MockPrismaStore {
       // Ignore read errors and fall back to initial state
     }
     this.enforceSingleAdminPerTenant(initial);
+    for (const t of initial.tenants) {
+      this.ensureTenantDefaults(t.id, initial);
+    }
     return initial;
+  }
+
+  public inferAssetType(asset: any): string {
+    const explicit = asset?.assetType || asset?.type;
+    const text = `${asset?.name || ''} ${asset?.description || ''} ${asset?.assetCode || asset?.code || ''}`.toLowerCase();
+    if (explicit && ['FONT', 'IMAGE', 'VIDEO', 'AUDIO', 'SOFTWARE', 'DATASET', 'DOCUMENT', 'OTHER'].includes(String(explicit).toUpperCase())) {
+      const upper = String(explicit).toUpperCase();
+      if (upper !== 'SOFTWARE' && upper !== 'DOCUMENT') return upper;
+      if (text.includes('dataset') || text.includes('records for') || text.includes('analytics dataset')) return 'DATASET';
+      if (text.includes('video') || text.includes('highlights') || text.includes('mp4')) return 'VIDEO';
+      if (text.includes('typography') || text.includes('font') || text.includes('typeface')) return 'FONT';
+      if (text.includes('illustration') || text.includes('campus map') || text.includes('infrastructure design') || text.includes('banner') || text.includes('logo')) return 'IMAGE';
+      if (text.includes('handbook') || text.includes('policy') || text.includes('guidelines') || text.includes('documentation') || text.includes('template')) return 'DOCUMENT';
+      if (text.includes('system') || text.includes('portal') || text.includes('module') || text.includes('application') || text.includes('ide') || text.includes('software')) return 'SOFTWARE';
+      return upper;
+    }
+    if (text.includes('dataset') || text.includes('analytics')) return 'DATASET';
+    if (text.includes('video') || text.includes('highlights')) return 'VIDEO';
+    if (text.includes('typography') || text.includes('font')) return 'FONT';
+    if (text.includes('illustration') || text.includes('design') || text.includes('map') || text.includes('image')) return 'IMAGE';
+    if (text.includes('handbook') || text.includes('policy') || text.includes('guidelines') || text.includes('documentation') || text.includes('template')) return 'DOCUMENT';
+    return 'SOFTWARE';
+  }
+
+  public inferAssetTags(asset: any, resolvedType: string): string[] {
+    if (Array.isArray(asset?.tags) && asset.tags.length > 0) {
+      return asset.tags.map((t: any) => (typeof t === 'string' ? t : t?.name || t?.tag?.name)).filter(Boolean);
+    }
+    const text = `${asset?.name || ''} ${asset?.description || ''}`.toLowerCase();
+    const tags: string[] = [];
+    if (text.includes('vit') || String(asset?.assetCode || asset?.code || '').toUpperCase().startsWith('VIT')) {
+      tags.push('VIT-Campus');
+    }
+    switch (resolvedType) {
+      case 'SOFTWARE':
+        tags.push(text.includes('portal') ? 'Web-Portal' : 'Enterprise-App', 'Production');
+        break;
+      case 'DOCUMENT':
+        tags.push(text.includes('policy') || text.includes('safety') ? 'Compliance' : 'Academic-Docs', 'Official');
+        break;
+      case 'IMAGE':
+        tags.push('Design-System', 'Brand-Media');
+        break;
+      case 'VIDEO':
+        tags.push('Campus-Media', 'HD-Stream');
+        break;
+      case 'DATASET':
+        tags.push('Research-Data', 'Analytics');
+        break;
+      case 'FONT':
+        tags.push('Typography', 'Brand-Kit');
+        break;
+      default:
+        tags.push('Engineering', 'Production');
+    }
+    return tags.slice(0, 3);
+  }
+
+  public ensureTenantDefaults(tenantId?: string | null, targetState?: MockStoreState): void {
+    if (!tenantId) return;
+    const st = targetState || this.state;
+    if (!st) return;
+    if (st.closedTenantIds?.includes(tenantId)) return;
+
+    const tenantCats = st.categories.filter((c) => c.tenantId === tenantId);
+    if (tenantCats.length === 0) {
+      const swCatId = `cat-${tenantId}-software`;
+      const devopsCatId = `cat-${tenantId}-devops`;
+      const designCatId = `cat-${tenantId}-design`;
+      const fontCatId = `cat-${tenantId}-fonts`;
+      const dataCatId = `cat-${tenantId}-dataset`;
+      const docsCatId = `cat-${tenantId}-docs`;
+      st.categories.push(
+        {
+          id: swCatId,
+          tenantId,
+          name: 'Software & Enterprise Apps',
+          slug: 'software-enterprise-apps',
+          parentId: null,
+          description: 'Core campus & enterprise software applications, portals, and modules',
+          createdAt: new Date('2026-01-05T00:00:00Z'),
+        },
+        {
+          id: devopsCatId,
+          tenantId,
+          name: 'Cloud & DevOps Tools',
+          slug: 'cloud-devops-tools',
+          parentId: swCatId,
+          description: 'Developer IDEs, infrastructure automation, and CI/CD toolchains',
+          createdAt: new Date('2026-01-05T00:00:00Z'),
+        },
+        {
+          id: designCatId,
+          tenantId,
+          name: 'Design & Brand Media',
+          slug: 'design-brand-media',
+          parentId: null,
+          description: 'Campus illustrations, infrastructure designs, and orientation videos',
+          createdAt: new Date('2026-01-05T00:00:00Z'),
+        },
+        {
+          id: fontCatId,
+          tenantId,
+          name: 'Typography & Fonts',
+          slug: 'typography-fonts',
+          parentId: designCatId,
+          description: 'Approved brand typography packs and licensed font families',
+          createdAt: new Date('2026-01-05T00:00:00Z'),
+        },
+        {
+          id: dataCatId,
+          tenantId,
+          name: 'Datasets & Analytics',
+          slug: 'datasets-analytics',
+          parentId: null,
+          description: 'Research publication metadata and attendance analytics datasets',
+          createdAt: new Date('2026-01-05T00:00:00Z'),
+        },
+        {
+          id: docsCatId,
+          tenantId,
+          name: 'Documentation & Policies',
+          slug: 'documentation-policies',
+          parentId: null,
+          description: 'Academic handbooks, security policies, lab safety guidelines, and templates',
+          createdAt: new Date('2026-01-05T00:00:00Z'),
+        }
+      );
+    }
+
+    const tenantTags = st.tags.filter((t) => t.tenantId === tenantId);
+    if (tenantTags.length === 0) {
+      const defaultTags = [
+        { name: 'VIT-Campus', color: '#6366f1' },
+        { name: 'Production', color: '#10b981' },
+        { name: 'Enterprise-App', color: '#3b82f6' },
+        { name: 'Compliance', color: '#f59e0b' },
+        { name: 'Academic-Docs', color: '#8b5cf6' },
+        { name: 'Research-Data', color: '#06b6d4' },
+        { name: 'Brand-Media', color: '#ec4899' },
+        { name: 'Typography', color: '#14b8a6' },
+      ];
+      for (const dt of defaultTags) {
+        st.tags.push({
+          id: `tag-${tenantId}-${dt.name.toLowerCase()}`,
+          tenantId,
+          name: dt.name,
+          slug: dt.name.toLowerCase(),
+          color: dt.color,
+          createdAt: new Date('2026-01-05T00:00:00Z'),
+        });
+      }
+    }
+
+    const updatedTenantCats = st.categories.filter((c) => c.tenantId === tenantId);
+    const findCatForType = (type: string) => {
+      switch (type) {
+        case 'FONT':
+          return updatedTenantCats.find((c) => c.name.toLowerCase().includes('font') || c.name.toLowerCase().includes('typo')) || updatedTenantCats[0];
+        case 'IMAGE':
+        case 'VIDEO':
+        case 'AUDIO':
+          return updatedTenantCats.find((c) => c.name.toLowerCase().includes('design') || c.name.toLowerCase().includes('media') || c.name.toLowerCase().includes('creative')) || updatedTenantCats[0];
+        case 'DATASET':
+          return updatedTenantCats.find((c) => c.name.toLowerCase().includes('data') || c.name.toLowerCase().includes('analytic')) || updatedTenantCats[0];
+        case 'DOCUMENT':
+          return updatedTenantCats.find((c) => c.name.toLowerCase().includes('doc') || c.name.toLowerCase().includes('polic')) || updatedTenantCats[0];
+        default:
+          return updatedTenantCats.find((c) => c.name.toLowerCase().includes('software') || c.name.toLowerCase().includes('dev')) || updatedTenantCats[0];
+      }
+    };
+
+    const tenantAssets = st.assets.filter((a) => a.tenantId === tenantId);
+    for (const a of tenantAssets) {
+      const resolvedType = this.inferAssetType(a);
+      a.assetType = resolvedType;
+      a.type = resolvedType;
+      a.assetCode = a.assetCode || a.code || 'AST-100';
+      a.code = a.code || a.assetCode;
+      if (!a.categoryId || !updatedTenantCats.some((c) => c.id === a.categoryId)) {
+        const matchedCat = findCatForType(resolvedType);
+        if (matchedCat) {
+          a.categoryId = matchedCat.id;
+        }
+      }
+      const hasVer = st.assetVersions.some((v) => v.assetId === a.id);
+      if (!hasVer) {
+        const ownerUser = st.users.find((u) => u.id === a.ownerId) || st.users.find((u) => u.tenantId === tenantId);
+        st.assetVersions.push({
+          id: `ver-${a.id}-1`,
+          assetId: a.id,
+          versionNo: 1,
+          versionNumber: '1.0',
+          fileUrl: `https://storage.assetvault.io/assets/${encodeURIComponent(String(a.assetCode || a.id).toLowerCase())}-v1.tar.gz`,
+          storageUrl: `https://storage.assetvault.io/assets/${encodeURIComponent(String(a.assetCode || a.id).toLowerCase())}-v1.tar.gz`,
+          fileSize: 2097152,
+          fileSizeBytes: 2097152,
+          mimeType: 'application/octet-stream',
+          checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          changeNotes: `Initial baseline release of ${a.name}`,
+          changelog: `Initial baseline release of ${a.name}`,
+          uploadedBy: ownerUser?.id || 'user-tenant-admin',
+          createdAt: a.createdAt || new Date(),
+        });
+      }
+    }
+  }
+
+  public recordAuditLog(params: {
+    tenantId?: string | null;
+    userId?: string | null;
+    tableName: string;
+    recordId: string;
+    action: 'INSERT' | 'UPDATE' | 'DELETE';
+    oldData?: any;
+    newData?: any;
+  }): void {
+    try {
+      const resolvedTenantId =
+        params.tenantId ||
+        params.newData?.tenantId ||
+        params.oldData?.tenantId ||
+        'tenant-acme-corp';
+      const tenantAdmin =
+        this.state.users.find((u) => u.tenantId === resolvedTenantId && Number(u.roleId) === 2) ||
+        this.state.users.find((u) => u.tenantId === resolvedTenantId);
+      const resolvedUserId =
+        params.userId ||
+        params.newData?.ownerId ||
+        params.newData?.allocatedBy ||
+        params.newData?.performedBy ||
+        tenantAdmin?.id ||
+        null;
+
+      const entry = {
+        id: String(Date.now() + Math.floor(Math.random() * 100000)),
+        tenantId: resolvedTenantId,
+        userId: resolvedUserId,
+        tableName: params.tableName.toLowerCase(),
+        entityType: params.tableName,
+        recordId: String(params.recordId),
+        entityId: String(params.recordId),
+        action: params.action,
+        oldData: params.oldData || null,
+        newData: params.newData || null,
+        performedAt: new Date(),
+        createdAt: new Date(),
+      };
+      this.state.auditLogs.unshift(entry);
+    } catch {
+      // ignore audit logging failure
+    }
   }
 
   public enforceSingleAdminPerTenant(targetState?: MockStoreState): void {
@@ -1215,6 +1475,7 @@ export class MockPrismaStore {
       if (!Array.isArray(items) || items.length === 0) return;
 
       let modified = false;
+      const touchedTenants = new Set<string>();
       const roleNameToId: Record<string, number> = {
         TENANT_ADMIN: 2,
         ASSET_MANAGER: 3,
@@ -1223,6 +1484,7 @@ export class MockPrismaStore {
 
       for (const item of items) {
         const targetTenantId = item?.tenantId ? String(item.tenantId).trim() : '';
+        if (targetTenantId) touchedTenants.add(targetTenantId);
         if (item?.workspaceEntity && targetTenantId && item.entityType) {
           if (this.state.closedTenantIds?.includes(targetTenantId)) continue;
           const colMap: Record<string, keyof MockStoreState> = {
@@ -1240,7 +1502,16 @@ export class MockPrismaStore {
             if (item.action === 'delete' && entityId) {
               const idx = col.findIndex((e) => String(e.id) === entityId);
               if (idx !== -1) {
-                col.splice(idx, 1);
+                if (item.entityType === 'asset') {
+                  col[idx] = {
+                    ...col[idx],
+                    status: 'ARCHIVED',
+                    deletedAt: col[idx].deletedAt || new Date(),
+                    updatedAt: new Date(),
+                  };
+                } else {
+                  col.splice(idx, 1);
+                }
                 modified = true;
               }
             } else if (item.action === 'upsert' && item.entityData && entityId) {
@@ -1251,7 +1522,14 @@ export class MockPrismaStore {
                 tenantId: item.entityData.tenantId || targetTenantId,
               };
               if (existingIdx !== -1) {
-                col[existingIdx] = { ...col[existingIdx], ...record };
+                const existingItem = col[existingIdx];
+                const serverUpdated = existingItem.updatedAt ? new Date(existingItem.updatedAt).getTime() : 0;
+                const clientUpdated = record.updatedAt ? new Date(record.updatedAt).getTime() : 0;
+                if (serverUpdated > clientUpdated) {
+                  col[existingIdx] = { ...record, ...existingItem };
+                } else {
+                  col[existingIdx] = { ...existingItem, ...record };
+                }
               } else {
                 col.unshift(record);
               }
@@ -1407,6 +1685,9 @@ export class MockPrismaStore {
         }
       }
 
+      for (const tid of touchedTenants) {
+        this.ensureTenantDefaults(tid, this.state);
+      }
       if (modified) {
         this.enforceSingleAdminPerTenant(this.state);
         this.saveState();
@@ -1542,11 +1823,24 @@ export class MockPrismaStore {
   public normalizeWriteData(data: any): any {
     if (!data || typeof data !== 'object') return {};
     const normalized: any = { ...data };
+    const compoundKeys = ['tenantId_name', 'assetId_tagId', 'assetId_licenseId', 'assetId_versionNo'];
+    for (const ck of compoundKeys) {
+      if (normalized[ck] && typeof normalized[ck] === 'object') {
+        for (const [subK, subV] of Object.entries(normalized[ck])) {
+          if (normalized[subK] === undefined) {
+            normalized[subK] = subV;
+          }
+        }
+        delete normalized[ck];
+      }
+    }
     const relationKeys = ['tenant', 'role', 'plan', 'vendor', 'category', 'asset', 'license', 'licenseType', 'user', 'owner'];
     for (const rel of relationKeys) {
       if (normalized[rel] && typeof normalized[rel] === 'object') {
-        if (normalized[rel].connect?.id !== undefined) {
-          const fk = rel === 'owner' ? 'ownerId' : `${rel}Id`;
+        const fk = rel === 'owner' ? 'ownerId' : `${rel}Id`;
+        if (normalized[rel].disconnect) {
+          normalized[fk] = null;
+        } else if (normalized[rel].connect?.id !== undefined) {
           normalized[fk] = normalized[rel].connect.id;
         } else if (normalized[rel].connect?.name !== undefined && rel === 'role') {
           const matchedRole = this.state.roles.find((r) => r.name === normalized[rel].connect.name);
@@ -1581,6 +1875,12 @@ export class MockPrismaStore {
         return this.state.assets;
       case 'assetversion':
         return this.state.assetVersions;
+      case 'assettag':
+      case 'assettags':
+        if (!Array.isArray(this.state.assetTags)) {
+          this.state.assetTags = [];
+        }
+        return this.state.assetTags;
       case 'license':
         return this.state.licenses;
       case 'allocation':
@@ -1639,44 +1939,54 @@ export class MockPrismaStore {
         if (item.assetId !== (value as any).assetId || itemVer !== (value as any).versionNo) return false;
       } else if (value && typeof value === 'object' && !(value instanceof Date)) {
         const valObj = value as any;
+        const rawItemVal =
+          key === 'tableName'
+            ? item.tableName || (item.entityType ? `${String(item.entityType).toLowerCase()}s` : 'system')
+            : key === 'performedAt'
+            ? item.performedAt || item.createdAt
+            : item[key];
         if ('equals' in valObj) {
-          if (item[key] !== valObj.equals) return false;
+          if (valObj.mode === 'insensitive' && typeof rawItemVal === 'string' && typeof valObj.equals === 'string') {
+            if (rawItemVal.toLowerCase() !== valObj.equals.toLowerCase()) return false;
+          } else if (rawItemVal !== valObj.equals) {
+            return false;
+          }
         } else if ('in' in valObj) {
-          if (!Array.isArray(valObj.in) || !valObj.in.includes(item[key])) return false;
+          if (!Array.isArray(valObj.in) || !valObj.in.includes(rawItemVal)) return false;
         } else if ('notIn' in valObj) {
-          if (Array.isArray(valObj.notIn) && valObj.notIn.includes(item[key])) return false;
+          if (Array.isArray(valObj.notIn) && valObj.notIn.includes(rawItemVal)) return false;
         } else if ('contains' in valObj) {
-          const itemVal = String(item[key] || '').toLowerCase();
+          const itemVal = String(rawItemVal || '').toLowerCase();
           const search = String(valObj.contains || '').toLowerCase();
           if (!itemVal.includes(search)) return false;
         } else if ('startsWith' in valObj) {
-          const itemVal = String(item[key] || '').toLowerCase();
+          const itemVal = String(rawItemVal || '').toLowerCase();
           const search = String(valObj.startsWith || '').toLowerCase();
           if (!itemVal.startsWith(search)) return false;
         } else if ('endsWith' in valObj) {
-          const itemVal = String(item[key] || '').toLowerCase();
+          const itemVal = String(rawItemVal || '').toLowerCase();
           const search = String(valObj.endsWith || '').toLowerCase();
           if (!itemVal.endsWith(search)) return false;
         } else if ('gte' in valObj) {
-          const a = item[key] instanceof Date || typeof item[key] === 'string' ? new Date(item[key]).getTime() : item[key];
+          const a = rawItemVal instanceof Date || typeof rawItemVal === 'string' ? new Date(rawItemVal).getTime() : rawItemVal;
           const b = valObj.gte instanceof Date || typeof valObj.gte === 'string' ? new Date(valObj.gte).getTime() : valObj.gte;
           if (a < b) return false;
         } else if ('lte' in valObj) {
-          const a = item[key] instanceof Date || typeof item[key] === 'string' ? new Date(item[key]).getTime() : item[key];
+          const a = rawItemVal instanceof Date || typeof rawItemVal === 'string' ? new Date(rawItemVal).getTime() : rawItemVal;
           const b = valObj.lte instanceof Date || typeof valObj.lte === 'string' ? new Date(valObj.lte).getTime() : valObj.lte;
           if (a > b) return false;
         } else if ('gt' in valObj) {
-          const a = item[key] instanceof Date || typeof item[key] === 'string' ? new Date(item[key]).getTime() : item[key];
+          const a = rawItemVal instanceof Date || typeof rawItemVal === 'string' ? new Date(rawItemVal).getTime() : rawItemVal;
           const b = valObj.gt instanceof Date || typeof valObj.gt === 'string' ? new Date(valObj.gt).getTime() : valObj.gt;
           if (a <= b) return false;
         } else if ('lt' in valObj) {
-          const a = item[key] instanceof Date || typeof item[key] === 'string' ? new Date(item[key]).getTime() : item[key];
+          const a = rawItemVal instanceof Date || typeof rawItemVal === 'string' ? new Date(rawItemVal).getTime() : rawItemVal;
           const b = valObj.lt instanceof Date || typeof valObj.lt === 'string' ? new Date(valObj.lt).getTime() : valObj.lt;
           if (a >= b) return false;
         } else if ('not' in valObj) {
           if (valObj.not === null) {
-            if (item[key] === null || item[key] === undefined) return false;
-          } else if (item[key] === valObj.not) {
+            if (rawItemVal === null || rawItemVal === undefined) return false;
+          } else if (rawItemVal === valObj.not) {
             return false;
           }
         } else {
@@ -1685,6 +1995,8 @@ export class MockPrismaStore {
               if (subKey === 'versionNo') {
                 const itemVer = item.versionNo ?? (parseInt(String(item.versionNumber || '1'), 10) || 1);
                 if (itemVer !== subVal) return false;
+              } else if (subKey === 'name' && typeof item[subKey] === 'string' && typeof subVal === 'string') {
+                if (item[subKey].toLowerCase() !== subVal.toLowerCase()) return false;
               } else if (item[subKey] !== subVal) {
                 return false;
               }
@@ -1696,6 +2008,8 @@ export class MockPrismaStore {
           if (item[key] !== null && item[key] !== undefined) return false;
         } else if (key === 'email' && typeof value === 'string') {
           if (String(item[key] || '').toLowerCase() !== value.toLowerCase()) return false;
+        } else if (key === 'id' && (typeof value === 'bigint' || typeof value === 'number')) {
+          if (String(item[key]) !== String(value)) return false;
         } else {
           if (item[key] !== value) return false;
         }
@@ -2017,9 +2331,33 @@ export function createMockModelClient(modelName: string): any {
           }
         }
         collection.unshift(newItem);
+      } else if (modelName.toLowerCase() === 'tenant') {
+        collection.push(newItem);
+        mockStore.ensureTenantDefaults(newItem.id);
       } else {
         collection.push(newItem);
       }
+
+      const lowerM = modelName.toLowerCase();
+      if (['asset', 'license', 'vendor', 'user', 'allocation', 'licenseallocation'].includes(lowerM)) {
+        const tableMap: Record<string, string> = {
+          asset: 'assets',
+          license: 'licenses',
+          vendor: 'vendors',
+          user: 'users',
+          allocation: 'license_allocations',
+          licenseallocation: 'license_allocations',
+        };
+        mockStore.recordAuditLog({
+          tenantId: newItem.tenantId,
+          userId: newItem.ownerId || newItem.allocatedBy || null,
+          tableName: tableMap[lowerM] || `${lowerM}s`,
+          recordId: newItem.id,
+          action: 'INSERT',
+          newData: newItem,
+        });
+      }
+
       mockStore.saveState();
       return mockStore.populateRelations(modelName, newItem, args.include || args.select);
     },
@@ -2030,12 +2368,33 @@ export function createMockModelClient(modelName: string): any {
       if (idx === -1) {
         throw new Error(`${modelName} not found for update`);
       }
+      const oldCopy = { ...collection[idx] };
       const normalizedData = mockStore.normalizeWriteData(args.data);
       collection[idx] = {
         ...collection[idx],
         ...normalizedData,
         updatedAt: new Date(),
       };
+      const lowerM = modelName.toLowerCase();
+      if (['asset', 'license', 'vendor', 'user', 'allocation', 'licenseallocation'].includes(lowerM)) {
+        const tableMap: Record<string, string> = {
+          asset: 'assets',
+          license: 'licenses',
+          vendor: 'vendors',
+          user: 'users',
+          allocation: 'license_allocations',
+          licenseallocation: 'license_allocations',
+        };
+        mockStore.recordAuditLog({
+          tenantId: collection[idx].tenantId,
+          userId: collection[idx].ownerId || null,
+          tableName: tableMap[lowerM] || `${lowerM}s`,
+          recordId: collection[idx].id,
+          action: normalizedData.deletedAt ? 'DELETE' : 'UPDATE',
+          oldData: oldCopy,
+          newData: collection[idx],
+        });
+      }
       mockStore.saveState();
       return mockStore.populateRelations(modelName, collection[idx], args.include || args.select);
     },
@@ -2043,7 +2402,7 @@ export function createMockModelClient(modelName: string): any {
     async upsert(args: any = {}) {
       const existing = await this.findFirst({ where: args.where });
       if (existing) {
-        return this.update({ where: args.where, data: args.update, include: args.include, select: args.select });
+        return this.update({ where: { id: existing.id }, data: args.update, include: args.include, select: args.select });
       }
       return this.create({
         data: { ...(args.where || {}), ...(args.create || {}) },
@@ -2059,6 +2418,24 @@ export function createMockModelClient(modelName: string): any {
         throw new Error(`${modelName} not found for deletion`);
       }
       const [removed] = collection.splice(idx, 1);
+      const lowerM = modelName.toLowerCase();
+      if (['asset', 'license', 'vendor', 'user', 'allocation', 'licenseallocation'].includes(lowerM)) {
+        const tableMap: Record<string, string> = {
+          asset: 'assets',
+          license: 'licenses',
+          vendor: 'vendors',
+          user: 'users',
+          allocation: 'license_allocations',
+          licenseallocation: 'license_allocations',
+        };
+        mockStore.recordAuditLog({
+          tenantId: removed.tenantId,
+          tableName: tableMap[lowerM] || `${lowerM}s`,
+          recordId: removed.id,
+          action: 'DELETE',
+          oldData: removed,
+        });
+      }
       mockStore.saveState();
       return removed;
     },
@@ -2141,9 +2518,14 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
                 (v.startsWith('tenant-') || mockStore.state.tenants.some((t) => t.id === v))
             );
 
-          const tenantAssets = resolvedTenantId
-            ? mockStore.state.assets.filter((a) => a.tenantId === resolvedTenantId && !a.deletedAt)
-            : mockStore.state.assets.filter((a) => !a.deletedAt);
+          if (resolvedTenantId) {
+            mockStore.ensureTenantDefaults(resolvedTenantId);
+          }
+
+          const allTenantAssets = resolvedTenantId
+            ? mockStore.state.assets.filter((a) => a.tenantId === resolvedTenantId)
+            : mockStore.state.assets;
+          const tenantAssets = allTenantAssets.filter((a) => !a.deletedAt && a.status !== 'ARCHIVED');
           const tenantLicenses = resolvedTenantId
             ? mockStore.state.licenses.filter((l) => l.tenantId === resolvedTenantId && !l.deletedAt)
             : mockStore.state.licenses.filter((l) => !l.deletedAt);
@@ -2153,6 +2535,28 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
           const tenantVendors = resolvedTenantId
             ? mockStore.state.vendors.filter((v) => v.tenantId === resolvedTenantId && !v.deletedAt)
             : mockStore.state.vendors.filter((v) => !v.deletedAt);
+
+          if (sqlText.includes('FROM license_allocations la') && sqlText.includes('JOIN asset_licenses al')) {
+            const [assetIdArg, userIdArg] = values;
+            const userObj = mockStore.state.users.find((u) => u.id === userIdArg);
+            if (userObj && (Number(userObj.roleId) === 2 || Number(userObj.roleId) === 3 || userObj.isSuperAdmin)) {
+              return [{ id: `seat-gov-${userIdArg}` }];
+            }
+            const activeAlloc = mockStore.state.allocations.find(
+              (a) => a.userId === userIdArg && a.status === 'ACTIVE'
+            );
+            if (activeAlloc) {
+              return [{ id: activeAlloc.id }];
+            }
+            const assetObj = mockStore.state.assets.find((a) => a.id === assetIdArg);
+            if (assetObj) {
+              const anyLic = mockStore.state.licenses.find(
+                (l) => l.tenantId === assetObj.tenantId && l.status === 'ACTIVE'
+              );
+              if (anyLic) return [{ id: `seat-lic-${anyLic.id}` }];
+            }
+            return [{ id: `seat-default-${assetIdArg || '1'}` }];
+          }
 
           if (sqlText.includes('fn_tenant_dashboard_stats')) {
             const totalAssets = tenantAssets.length;
@@ -2189,42 +2593,225 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
           }
 
           if (sqlText.includes('v_asset_catalog')) {
+            const tenantOwner = tenantUsers.find((u) => Number(u.roleId) === 2) || tenantUsers[0];
+            const allAssetTags = mockStore.getCollection('assetTag');
+            const explicitAssetLicenses = mockStore.getCollection('assetLicense');
+
+            let rows = allTenantAssets.map((a, idx) => {
+              const resolvedType = mockStore.inferAssetType(a);
+              const resolvedStatus = a.deletedAt || a.status === 'ARCHIVED' ? 'ARCHIVED' : a.status || 'ACTIVE';
+              const categoryObj = mockStore.state.categories.find((c) => c.id === a.categoryId);
+              const ownerObj = mockStore.state.users.find((u) => u.id === a.ownerId) || tenantOwner;
+              const versionsForAsset = mockStore.state.assetVersions.filter((v) => v.assetId === a.id);
+              const latestVer =
+                versionsForAsset.length > 0
+                  ? Math.max(...versionsForAsset.map((v) => Number(v.versionNo || 1)))
+                  : 1;
+
+              const linkedTagIds = allAssetTags
+                .filter((at: any) => at.assetId === a.id)
+                .map((at: any) => at.tagId);
+              const linkedTagNames = mockStore.state.tags
+                .filter((t) => linkedTagIds.includes(t.id))
+                .map((t) => t.name);
+              const combinedTags = Array.from(
+                new Set([
+                  ...linkedTagNames,
+                  ...(Array.isArray(a.tags)
+                    ? a.tags.map((t: any) => (typeof t === 'string' ? t : t?.name)).filter(Boolean)
+                    : []),
+                ])
+              );
+              const finalTags =
+                combinedTags.length > 0 ? combinedTags : mockStore.inferAssetTags(a, resolvedType);
+
+              const linkedLicIds = new Set([
+                ...explicitAssetLicenses
+                  .filter((al: any) => al.assetId === a.id)
+                  .map((al: any) => al.licenseId),
+                ...tenantLicenses.filter((l) => l.assetId === a.id).map((l) => l.id),
+              ]);
+              const coveringLicenses = tenantLicenses.filter((l) => linkedLicIds.has(l.id));
+              let coveringCount = coveringLicenses.length;
+              let complianceStatus = a.complianceStatus || 'COMPLIANT';
+              if (coveringCount > 0) {
+                const hasActive = coveringLicenses.some((l) => {
+                  const exp = l.endDate || l.expiresAt;
+                  return l.status === 'ACTIVE' && (!exp || new Date(exp).getTime() >= Date.now());
+                });
+                complianceStatus = hasActive ? 'COMPLIANT' : 'EXPIRED_LICENSE';
+              } else {
+                coveringCount = 1;
+                complianceStatus = 'COMPLIANT';
+              }
+
+              return {
+                asset_id: a.id,
+                tenant_id: a.tenantId,
+                asset_code: a.assetCode || a.code || `AST-${100 + idx}`,
+                asset_name: a.name,
+                description: a.description || null,
+                asset_type: resolvedType,
+                asset_status: resolvedStatus,
+                category_id: categoryObj?.id || a.categoryId || null,
+                category_name: categoryObj?.name || 'Software & Enterprise Apps',
+                owner_id: ownerObj?.id || a.ownerId || 'user-tenant-admin',
+                owner_name: ownerObj?.fullName || 'Workspace Admin',
+                owner_email: ownerObj?.email || 'admin@workspace.io',
+                latest_version_no: latestVer,
+                total_versions: Math.max(1, versionsForAsset.length),
+                tags: finalTags,
+                covering_licenses_count: coveringCount,
+                compliance_status: complianceStatus,
+                created_at: a.createdAt || new Date(),
+                updated_at: a.updatedAt || a.createdAt || new Date(),
+              };
+            });
+
+            if (sqlText.includes('asset_id =')) {
+              const targetAssetId = values.find(
+                (v) => typeof v === 'string' && rows.some((r) => r.asset_id === v)
+              );
+              if (targetAssetId) {
+                rows = rows.filter((r) => r.asset_id === targetAssetId);
+              }
+            }
+
+            if (sqlText.includes('ILIKE')) {
+              const patternVal = values.find((v) => typeof v === 'string' && v.startsWith('%') && v.endsWith('%'));
+              if (patternVal) {
+                const qLower = patternVal.slice(1, -1).toLowerCase().trim();
+                if (qLower) {
+                  rows = rows.filter(
+                    (r) =>
+                      String(r.asset_name || '').toLowerCase().includes(qLower) ||
+                      String(r.asset_code || '').toLowerCase().includes(qLower) ||
+                      String(r.description || '').toLowerCase().includes(qLower) ||
+                      String(r.category_name || '').toLowerCase().includes(qLower) ||
+                      String(r.owner_name || '').toLowerCase().includes(qLower) ||
+                      r.tags.some((t: string) => String(t).toLowerCase().includes(qLower))
+                  );
+                }
+              }
+            }
+
+            if (sqlText.includes('category_id =')) {
+              const catVal = values.find(
+                (v) => typeof v === 'string' && mockStore.state.categories.some((c) => c.id === v)
+              );
+              if (catVal) {
+                const childCatIds = new Set<string>([
+                  catVal,
+                  ...mockStore.state.categories.filter((c) => c.parentId === catVal).map((c) => c.id),
+                ]);
+                rows = rows.filter((r) => r.category_id && childCatIds.has(r.category_id));
+              } else {
+                const rawCatVal = values.find((v) => typeof v === 'string' && v.startsWith('cat-'));
+                if (rawCatVal) {
+                  rows = rows.filter((r) => r.category_id === rawCatVal);
+                }
+              }
+            }
+
+            if (sqlText.includes('owner_id =')) {
+              const ownerVal = values.find(
+                (v) => typeof v === 'string' && mockStore.state.users.some((u) => u.id === v)
+              );
+              if (ownerVal) {
+                rows = rows.filter((r) => r.owner_id === ownerVal);
+              }
+            }
+
+            if (sqlText.includes('asset_type =')) {
+              const validTypes = ['FONT', 'IMAGE', 'VIDEO', 'AUDIO', 'SOFTWARE', 'DATASET', 'DOCUMENT', 'OTHER'];
+              const typeVal = values.find(
+                (v) => typeof v === 'string' && validTypes.includes(v.toUpperCase())
+              );
+              if (typeVal) {
+                rows = rows.filter((r) => String(r.asset_type).toUpperCase() === typeVal.toUpperCase());
+              }
+            }
+
+            if (sqlText.includes('asset_status =')) {
+              const validStatuses = ['ACTIVE', 'ARCHIVED', 'DRAFT'];
+              const statusVal = values.find(
+                (v) => typeof v === 'string' && validStatuses.includes(v.toUpperCase())
+              );
+              if (statusVal) {
+                rows = rows.filter((r) => String(r.asset_status).toUpperCase() === statusVal.toUpperCase());
+              }
+            }
+
+            if (sqlText.includes('compliance_status =')) {
+              if (sqlText.includes("'UNLICENSED'")) {
+                rows = rows.filter((r) => r.compliance_status === 'UNLICENSED');
+              } else {
+                const validComp = ['COMPLIANT', 'EXPIRED_LICENSE', 'UNLICENSED'];
+                const compVal = values.find(
+                  (v) => typeof v === 'string' && validComp.includes(v.toUpperCase())
+                );
+                if (compVal) {
+                  rows = rows.filter((r) => r.compliance_status === compVal.toUpperCase());
+                }
+              }
+            }
+
+            if (sqlText.includes('ANY(tags)')) {
+              const tagVal = values.find(
+                (v) =>
+                  typeof v === 'string' &&
+                  v !== resolvedTenantId &&
+                  !['ACTIVE', 'ARCHIVED', 'DRAFT', 'COMPLIANT', 'EXPIRED_LICENSE', 'UNLICENSED', 'FONT', 'IMAGE', 'VIDEO', 'AUDIO', 'SOFTWARE', 'DATASET', 'DOCUMENT', 'OTHER'].includes(v) &&
+                  !v.startsWith('%')
+              );
+              if (tagVal) {
+                const tLower = tagVal.toLowerCase();
+                rows = rows.filter((r) => r.tags.some((t: string) => String(t).toLowerCase() === tLower));
+              }
+            }
+
+            const orderMatch = sqlText.match(/ORDER BY\s+([a-z_]+)\s+(ASC|DESC)/i);
+            if (orderMatch && orderMatch[1] && orderMatch[2]) {
+              const col = orderMatch[1].toLowerCase();
+              const dir = orderMatch[2].toUpperCase() === 'ASC' ? 1 : -1;
+              rows.sort((a: any, b: any) => {
+                if (col === 'asset_name' || col === 'asset_code') {
+                  return String(a[col] || '').localeCompare(String(b[col] || ''), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+                }
+                const ta = new Date(a[col] || a.created_at || 0).getTime();
+                const tb = new Date(b[col] || b.created_at || 0).getTime();
+                if (ta !== tb) return (ta - tb) * dir;
+                return String(a.asset_code || '').localeCompare(String(b.asset_code || ''), undefined, { numeric: true }) * dir;
+              });
+            }
+
             if (sqlText.toLowerCase().includes('count(')) {
-              const total = tenantAssets.length;
+              const total = rows.length;
+              const compliant = rows.filter((r) => r.compliance_status === 'COMPLIANT').length;
+              const expired = rows.filter((r) => r.compliance_status === 'EXPIRED_LICENSE').length;
+              const unlicensed = rows.filter((r) => r.compliance_status === 'UNLICENSED').length;
               return [
                 {
                   total,
                   count: total,
                   total_assets: total,
-                  compliant_assets: total,
-                  expired_license_assets: 0,
-                  unlicensed_assets: 0,
+                  compliant_assets: compliant,
+                  expired_license_assets: expired,
+                  unlicensed_assets: unlicensed,
                 },
               ];
             }
-            if (sqlText.includes('UNLICENSED')) {
-              return [];
+
+            if (/LIMIT\s+/i.test(sqlText) && /OFFSET\s+/i.test(sqlText)) {
+              const numVals = values.filter((v): v is number => typeof v === 'number');
+              if (numVals.length >= 2) {
+                const limit = Number(numVals[numVals.length - 2] ?? 10);
+                const offset = Number(numVals[numVals.length - 1] ?? 0);
+                return rows.slice(offset, offset + limit);
+              }
             }
-            const tenantOwner = tenantUsers.find((u) => Number(u.roleId) === 2) || tenantUsers[0];
-            return tenantAssets.map((a, idx) => ({
-              asset_id: a.id,
-              tenant_id: a.tenantId,
-              asset_code: a.code || a.assetCode || `AST-${100 + idx}`,
-              asset_name: a.name,
-              description: a.description,
-              asset_type: a.type,
-              asset_status: a.status,
-              category_name: 'Developer Tools',
-              owner_name: tenantOwner?.fullName || 'Workspace Admin',
-              owner_email: tenantOwner?.email || 'admin@workspace.io',
-              latest_version_no: 1,
-              total_versions: 1,
-              tags: ['Engineering', 'Production'],
-              covering_licenses_count: 1,
-              compliance_status: 'COMPLIANT',
-              created_at: a.createdAt,
-              updated_at: a.updatedAt,
-            }));
+
+            return rows;
           }
 
           if (sqlText.includes('sp_allocate_license_seat')) {
@@ -2261,6 +2848,14 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
             ).length;
             lic.allocatedSeats = Math.max(currentUsed + 1, updatedActiveCount);
             lic.usedSeats = lic.allocatedSeats;
+            mockStore.recordAuditLog({
+              tenantId: newAlloc.tenantId,
+              userId: allocatedBy || userId,
+              tableName: 'license_allocations',
+              recordId: newAlloc.id,
+              action: 'INSERT',
+              newData: newAlloc,
+            });
             mockStore.saveState();
             return [{ p_allocation_id: newAlloc.id }];
           }
@@ -2269,6 +2864,7 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
             const [allocationId, revokedBy, reason] = values;
             const alloc = mockStore.state.allocations.find((a) => a.id === allocationId);
             if (alloc && alloc.status === 'ACTIVE') {
+              const oldAlloc = { ...alloc };
               alloc.status = 'REVOKED';
               alloc.revokedAt = new Date();
               alloc.revokedBy = revokedBy || null;
@@ -2281,6 +2877,15 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
                 lic.allocatedSeats = remainingActive;
                 lic.usedSeats = remainingActive;
               }
+              mockStore.recordAuditLog({
+                tenantId: alloc.tenantId,
+                userId: revokedBy || null,
+                tableName: 'license_allocations',
+                recordId: alloc.id,
+                action: 'UPDATE',
+                oldData: oldAlloc,
+                newData: alloc,
+              });
               mockStore.saveState();
             }
             return [{ success: true }];
@@ -2291,6 +2896,7 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
             const lic = mockStore.state.licenses.find((l) => l.id === licenseId);
             const renewalId = crypto.randomUUID();
             if (lic) {
+              const oldLic = { ...lic };
               const previousEndDate = lic.endDate || lic.expiresAt || new Date();
               lic.endDate = new Date(newEndDate);
               lic.expiresAt = new Date(newEndDate);
@@ -2309,13 +2915,22 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
                 notes: notes || null,
                 renewedAt: new Date(),
               });
+              mockStore.recordAuditLog({
+                tenantId: lic.tenantId,
+                userId: performedBy || null,
+                tableName: 'licenses',
+                recordId: lic.id,
+                action: 'UPDATE',
+                oldData: oldLic,
+                newData: lic,
+              });
               mockStore.saveState();
             }
             return [{ p_renewal_id: renewalId }];
           }
 
           if (sqlText.includes('v_license_utilization')) {
-            const mapped = tenantLicenses.map((l) => {
+            let mapped = tenantLicenses.map((l) => {
               const vendor = mockStore.state.vendors.find((v) => v.id === l.vendorId);
               const licType = mockStore.state.licenseTypes.find((lt) => lt.id === l.licenseTypeId);
               const totalSeats = Number(l.totalSeats || 1);
@@ -2339,7 +2954,7 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
                 license_id: l.id,
                 tenant_id: l.tenantId,
                 vendor_id: l.vendorId,
-                license_type_id: l.licenseTypeId || 3,
+                license_type_id: Number(l.licenseTypeId || 3),
                 license_name: licName,
                 license_key: l.licenseKey ? `••••••••-${String(l.licenseKey).slice(-4)}` : '••••••••-KEY',
                 vendor_name: vendor?.name || 'Enterprise Vendor',
@@ -2352,10 +2967,68 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
                 status: l.status || 'ACTIVE',
                 start_date: l.startDate || l.createdAt,
                 end_date: endDate,
-                cost: l.cost ?? 0,
+                cost: Number(l.cost ?? 0),
                 currency: l.currency || 'USD',
               };
             });
+
+            if (sqlText.includes('ILIKE')) {
+              const patternVal = values.find((v) => typeof v === 'string' && v.startsWith('%') && v.endsWith('%'));
+              if (patternVal) {
+                const qLower = patternVal.slice(1, -1).toLowerCase().trim();
+                if (qLower) {
+                  mapped = mapped.filter(
+                    (m) =>
+                      String(m.license_name || '').toLowerCase().includes(qLower) ||
+                      String(m.vendor_name || '').toLowerCase().includes(qLower)
+                  );
+                }
+              }
+            }
+
+            if (sqlText.includes('vendor_id =')) {
+              const vId = values.find(
+                (v) => typeof v === 'string' && mockStore.state.vendors.some((ven) => ven.id === v)
+              );
+              if (vId) {
+                mapped = mapped.filter((m) => m.vendor_id === vId);
+              }
+            }
+
+            if (sqlText.includes('license_type_id =')) {
+              const ltVal = values.find((v) => typeof v === 'number' && v >= 1 && v <= 5);
+              if (ltVal !== undefined) {
+                mapped = mapped.filter((m) => Number(m.license_type_id) === Number(ltVal));
+              }
+            }
+
+            if (sqlText.includes('status =')) {
+              const validSt = ['ACTIVE', 'EXPIRED', 'SUSPENDED', 'CANCELLED'];
+              const stVal = values.find(
+                (v) => typeof v === 'string' && validSt.includes(v.toUpperCase())
+              );
+              if (stVal) {
+                mapped = mapped.filter((m) => String(m.status).toUpperCase() === stVal.toUpperCase());
+              }
+            }
+
+            if (sqlText.includes('available_seats <= 0') || sqlText.includes('available_seats = 0')) {
+              mapped = mapped.filter((m) => m.available_seats <= 0);
+            } else if (sqlText.includes('available_seats > 0')) {
+              mapped = mapped.filter((m) => m.available_seats > 0);
+            }
+
+            const orderMatch = sqlText.match(/ORDER BY\s+([a-z_]+)\s+(ASC|DESC)/i);
+            if (orderMatch && orderMatch[1] && orderMatch[2]) {
+              const col = orderMatch[1].toLowerCase();
+              const dir = orderMatch[2].toUpperCase() === 'ASC' ? 1 : -1;
+              mapped.sort((a: any, b: any) => {
+                if (col === 'license_name' || col === 'status') {
+                  return String(a[col] || '').localeCompare(String(b[col] || '')) * dir;
+                }
+                return (Number(a[col] || 0) - Number(b[col] || 0)) * dir;
+              });
+            }
 
             if (sqlText.toLowerCase().includes('count(')) {
               const total = mapped.length;
@@ -2371,9 +3044,16 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
                 },
               ];
             }
-            if (sqlText.includes('available_seats <= 0')) {
-              return mapped.filter((m) => m.available_seats <= 0);
+
+            if (/LIMIT\s+/i.test(sqlText) && /OFFSET\s+/i.test(sqlText)) {
+              const numVals = values.filter((v): v is number => typeof v === 'number');
+              if (numVals.length >= 2) {
+                const limit = Number(numVals[numVals.length - 2] ?? 10);
+                const offset = Number(numVals[numVals.length - 1] ?? 0);
+                return mapped.slice(offset, offset + limit);
+              }
             }
+
             return mapped;
           }
 

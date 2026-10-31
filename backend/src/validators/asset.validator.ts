@@ -50,7 +50,9 @@ export const updateAssetSchema = z
 
 export const attachTagsSchema = z
   .object({
-    tagIds: z.array(z.string().min(1)).min(1, 'Must provide at least one tag ID'),
+    tagIds: z.array(z.string().min(1)).optional(),
+    tagNames: z.array(z.string().min(1)).optional(),
+    tag: z.string().min(1).optional(),
   })
   .strip();
 

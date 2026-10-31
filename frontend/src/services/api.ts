@@ -355,29 +355,36 @@ export const api = {
       }
       const entityType = getEntityTypeFromEndpoint(cleanEndpoint);
       if (
-        entityType &&
+        (entityType === 'vendor' || entityType === 'category' || entityType === 'tag') &&
         cleanEndpoint === `/${entityType === 'category' ? 'categories' : `${entityType}s`}` &&
         Array.isArray((response.data as any)?.data)
       ) {
         const srvList = (response.data as any).data;
-        if (entityType === 'vendor' || entityType === 'category' || entityType === 'tag') {
+        const reqParams = config?.params || {};
+        if (!reqParams.q) {
           for (const item of srvList) {
             if (item && (item.id || item.vendor_id)) {
               recordWorkspaceEntitySync(entityType, 'upsert', activeTenantId, item);
             }
           }
-        }
-        const merged = mergeClientWorkspaceEntities(
-          entityType,
-          srvList,
-          activeTenantId
-        );
-        (response.data as any).data = merged;
-        if ((response.data as any).meta && typeof (response.data as any).meta.total === 'number') {
-          (response.data as any).meta.total = Math.max(
-            (response.data as any).meta.total,
-            merged.length
+          let merged = mergeClientWorkspaceEntities(
+            entityType,
+            srvList,
+            activeTenantId
           );
+          if (reqParams.limit && reqParams.page) {
+            const p = Math.max(1, Number(reqParams.page) || 1);
+            const l = Math.max(1, Number(reqParams.limit) || 20);
+            const total = merged.length;
+            merged = merged.slice((p - 1) * l, p * l);
+            if ((response.data as any).meta) {
+              (response.data as any).meta.total = total;
+              (response.data as any).meta.totalPages = Math.max(1, Math.ceil(total / l));
+              (response.data as any).meta.hasNext = p * l < total;
+              (response.data as any).meta.hasPrev = p > 1;
+            }
+          }
+          (response.data as any).data = merged;
         }
       }
       return response.data;
@@ -424,6 +431,27 @@ export const api = {
           activeTenantId,
           (response.data as any).data
         );
+      } else if (
+        cleanEndpoint === '/assets/bulk-import' &&
+        Array.isArray((response.data as any)?.data?.assets)
+      ) {
+        for (const importedAsset of (response.data as any).data.assets) {
+          if (importedAsset && importedAsset.id) {
+            recordWorkspaceEntitySync('asset', 'upsert', activeTenantId, importedAsset);
+          }
+        }
+      } else if (cleanEndpoint.startsWith('/assets/') && cleanEndpoint.endsWith('/restore')) {
+        const restoredId = cleanEndpoint.split('/')[2];
+        const restoredData = (response.data as any)?.data || { id: restoredId };
+        if (restoredId) {
+          recordWorkspaceEntitySync('asset', 'upsert', activeTenantId, {
+            ...restoredData,
+            id: restoredId,
+            status: 'ACTIVE',
+            deletedAt: null,
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
 
       if (cleanEndpoint === '/users' && (response.data as any)?.data?.email) {
@@ -575,7 +603,18 @@ export const api = {
       const entityType = getEntityTypeFromEndpoint(cleanEndpoint);
       const idMatch = cleanEndpoint.match(/^\/(?:vendors|licenses|assets|categories|tags|allocations)\/([^/]+)$/);
       if (entityType && idMatch?.[1]) {
-        recordWorkspaceEntitySync(entityType, 'delete', activeTenantId, idMatch[1]);
+        if (entityType === 'asset') {
+          const softDeletedData = (response.data as any)?.data || {};
+          recordWorkspaceEntitySync('asset', 'upsert', activeTenantId, {
+            ...softDeletedData,
+            id: idMatch[1],
+            status: 'ARCHIVED',
+            deletedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          recordWorkspaceEntitySync(entityType, 'delete', activeTenantId, idMatch[1]);
+        }
       }
       if (cleanEndpoint.startsWith('/users/')) {
         handleFallbackRequest('DELETE', url);
