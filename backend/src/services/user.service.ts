@@ -46,7 +46,36 @@ export class UserService {
       where: { email: normalizedEmail },
     });
     if (existing) {
-      throw new ConflictError(`User with email '${normalizedEmail}' already exists.`);
+      if (existing.tenantId === tenantId) {
+        const updated = await this.updateUser(prismaClient, existing.id, {
+          isActive: true,
+          fullName: data.fullName || existing.fullName,
+          roleName: data.roleName || 'MEMBER',
+        });
+        if (data.password) {
+          const newHash = await hashPassword(data.password);
+          await prismaClient.user.update({
+            where: { id: existing.id },
+            data: { passwordHash: newHash },
+          });
+        }
+        await emailService
+          .dispatchMemberOnboardingEmail({
+            tenantId,
+            userId: existing.id,
+            email: normalizedEmail,
+            fullName: updated.fullName || deriveNameFromEmail(normalizedEmail),
+            roleName: data.roleName || 'MEMBER',
+            generatedPassword: data.password || 'Use your existing organization password',
+          })
+          .catch(() => {});
+        return {
+          ...updated,
+          autoProvisioned: true,
+          welcomeEmailSent: true,
+        };
+      }
+      throw new ConflictError(`User with email '${normalizedEmail}' already exists in another organization.`);
     }
 
     let targetRoleName = data.roleName || 'MEMBER';

@@ -362,7 +362,8 @@ export const api = {
       ) {
         syncAuthenticatedSessionToFallbackStore((response.data as any).data);
       }
-      if (url === '/users' && (response.data as any)?.data?.email) {
+      const cleanEndpoint = url.replace(/^\/api(\/v1)?/, '');
+      if (cleanEndpoint === '/users' && (response.data as any)?.data?.email) {
         const created = (response.data as any).data;
         const cached = getStoredSession();
         const activeTenantId = created.tenantId || cached?.tenant?.id || cached?.user?.tenantId;

@@ -832,32 +832,31 @@ export function handleFallbackRequest(
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
           .join(' ') || 'Organization Admin';
 
+      const isVitAdmin =
+        email === 'karthiksmrk7377@gmail.com' ||
+        email === 'karthikeyan.s050607@gmail.com';
       const isVitMember = email === 'karthikeyan.s2024c@vitstudent.ac.in';
-      const isVitAdmin = email === 'karthiksmrk7377@gmail.com';
-      const targetTenantId =
-        email === 'karthikeyan.s050607@gmail.com'
-          ? 'tenant-karthik'
-          : isVitMember || isVitAdmin
-          ? 'tenant-vit'
-          : store.tenants[0]?.id || `tenant-${Date.now()}`;
+      const targetTenant =
+        store.tenants.find((t) => t.id === 'tenant-vit') ||
+        store.tenants.find((t) => t.id === 'tenant-karthik') ||
+        store.tenants[0];
 
-      tenant = store.tenants.find((t) => t.id === targetTenantId);
-      if (!tenant) {
-        tenant = {
-          id: targetTenantId,
-          name: isVitMember || isVitAdmin ? 'VIT VELLORE' : `${displayFullName} Workspace`,
-          slug: isVitMember || isVitAdmin ? 'vit-vellore' : `org-${Date.now()}`,
-          contactEmail: isVitMember || isVitAdmin ? 'karthiksmrk7377@gmail.com' : email,
-          status: 'ACTIVE',
-          planId: 3,
-          plan: { id: 3, name: 'Enterprise', maxUsers: 500, maxAssets: 50000, monthlyPrice: 199 },
-          createdAt: new Date().toISOString(),
-        };
+      tenant = targetTenant || {
+        id: 'tenant-vit',
+        name: 'VIT VELLORE',
+        slug: 'vit-vellore',
+        contactEmail: 'karthiksmrk7377@gmail.com',
+        status: 'ACTIVE',
+        planId: 3,
+        plan: { id: 3, name: 'Enterprise', maxUsers: 500, maxAssets: 50000, monthlyPrice: 199 },
+        createdAt: new Date().toISOString(),
+      };
+      if (!targetTenant) {
         store.tenants.unshift(tenant);
       }
 
-      const assignedRole = isVitMember ? 'MEMBER' : 'TENANT_ADMIN';
-      const assignedRoleId = isVitMember ? 4 : 2;
+      const assignedRole = isVitAdmin ? 'TENANT_ADMIN' : 'MEMBER';
+      const assignedRoleId = isVitAdmin ? 2 : 4;
 
       user = {
         id: isVitMember ? 'user-kar-vit-member' : `user-${Date.now()}`,
