@@ -109,7 +109,7 @@ function getUtilizationColor(pct: number) {
 // ==============================================================================
 
 export const LicenseListPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -255,11 +255,13 @@ export const LicenseListPage: React.FC = () => {
   const { data: vendorsData, refetch: refetchVendors } = useQuery<{ data: Vendor[] }>({
     queryKey: ['vendors', 'dropdown'],
     queryFn: () => api.get('/vendors', { params: { limit: 100 } }),
+    enabled: hasPermission('vendors:read'),
   });
 
   const { data: usersData } = useQuery<{ data: User[] }>({
     queryKey: ['users', 'dropdown'],
     queryFn: () => api.get('/users', { params: { limit: 100 } }),
+    enabled: hasPermission('users:read'),
   });
 
   const rawLicenses = useMemo(() => {

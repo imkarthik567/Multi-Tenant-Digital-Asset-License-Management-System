@@ -1025,6 +1025,9 @@ class EmailService {
         host: env.SMTP_HOST,
         port: env.SMTP_PORT,
         secure: env.SMTP_SECURE,
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 6000,
         auth: {
           user: env.SMTP_USER,
           pass: env.SMTP_PASS,
@@ -1032,24 +1035,9 @@ class EmailService {
       });
       logger.info({ host: env.SMTP_HOST, port: env.SMTP_PORT }, 'Configured production SMTP transporter');
     } else {
-      try {
-        const testAccount = await nodemailer.createTestAccount();
-        this.transporter = nodemailer.createTransport({
-          host: 'smtp.ethereal.email',
-          port: 587,
-          secure: false,
-          auth: {
-            user: testAccount.user,
-            pass: testAccount.pass,
-          },
-        });
-        logger.info({ user: testAccount.user }, 'Created dynamic Ethereal test account for dev email delivery');
-      } catch (err: any) {
-        logger.warn({ err }, 'Ethereal test account creation failed; using JSON transport fallback');
-        this.transporter = nodemailer.createTransport({
-          jsonTransport: true,
-        });
-      }
+      this.transporter = nodemailer.createTransport({
+        jsonTransport: true,
+      });
     }
 
     this.isInitialized = true;

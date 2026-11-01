@@ -95,8 +95,15 @@ export class LicenseRepository {
     let sortColumn = 'license_name';
     if (params.sort === 'cost') sortColumn = 'cost';
     else if (params.sort === 'status') sortColumn = 'status';
-    else if (params.sort === 'totalSeats') sortColumn = 'total_seats';
-    else if (params.sort === 'usedSeats') sortColumn = 'used_seats';
+    else if (params.sort === 'totalSeats' || params.sort === 'total_seats') sortColumn = 'total_seats';
+    else if (params.sort === 'usedSeats' || params.sort === 'used_seats') sortColumn = 'used_seats';
+    else if (params.sort === 'availableSeats' || params.sort === 'available_seats') sortColumn = 'available_seats';
+    else if (params.sort === 'utilization' || params.sort === 'utilization_pct') sortColumn = 'utilization_pct';
+    else if (params.sort === 'endDate' || params.sort === 'end_date' || params.sort === 'expiryDate') sortColumn = 'end_date';
+    else if (params.sort === 'startDate' || params.sort === 'start_date') sortColumn = 'start_date';
+    else if (params.sort === 'daysToExpiry' || params.sort === 'days_to_expiry') sortColumn = 'days_to_expiry';
+    else if (params.sort === 'vendorName' || params.sort === 'vendor_name') sortColumn = 'vendor_name';
+    else if (params.sort === 'name' || params.sort === 'license_name') sortColumn = 'license_name';
 
     const orderDirection = params.order === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
     const orderClause = Prisma.sql`ORDER BY ${Prisma.raw(sortColumn)} ${orderDirection}`;

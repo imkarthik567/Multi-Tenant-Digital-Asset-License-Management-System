@@ -72,21 +72,73 @@ export class LicenseService {
   }
 
   public async createLicense(prismaClient: any, tenantId: string, data: any) {
-    let vendor = await prismaClient.vendor.findFirst({ where: { id: data.vendorId } });
+    const isUuid = (val: unknown): boolean =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    let vendor = isUuid(data.vendorId)
+      ? await prismaClient.vendor.findFirst({ where: { id: data.vendorId } })
+      : null;
+
+    if (!vendor && data.vendorName) {
+      vendor = await prismaClient.vendor.findFirst({
+        where: { tenantId, name: data.vendorName },
+      });
+    }
+
     if (!vendor && data.vendorId) {
-      vendor = await prismaClient.vendor.create({
-        data: {
-          id: data.vendorId,
+      const targetName = data.vendorName || `Vendor ${String(data.vendorId).slice(0, 8)}`;
+      vendor = await prismaClient.vendor.upsert({
+        where: { tenantId_name: { tenantId, name: targetName } },
+        update: {},
+        create: {
+          ...(isUuid(data.vendorId) ? { id: data.vendorId } : {}),
           tenantId,
-          name: data.vendorName || 'Enterprise Software Vendor',
+          name: targetName,
           contactEmail: 'support@vendor.com',
         },
       });
     }
     if (!vendor) throw new BadRequestError('Referenced vendor does not exist');
 
-    const licenseType = await prismaClient.licenseType.findUnique({ where: { id: data.licenseTypeId } });
+    let licenseType = await prismaClient.licenseType.findUnique({ where: { id: data.licenseTypeId } });
+    if (!licenseType && data.licenseTypeId) {
+      const defaultTypeNames: Record<number, string> = {
+        1: 'Perpetual',
+        2: 'Subscription',
+        3: 'Seat-Based Commercial',
+        4: 'Open Source (MIT/Apache)',
+        5: 'Enterprise Site License',
+      };
+      const typeName = defaultTypeNames[data.licenseTypeId] || `License Type ${data.licenseTypeId}`;
+      licenseType = await prismaClient.licenseType
+        .upsert({
+          where: { name: typeName },
+          update: {},
+          create: {
+            id: data.licenseTypeId,
+            name: typeName,
+            isSeatBased: data.licenseTypeId !== 4,
+            isExpirable: data.licenseTypeId === 2 || data.licenseTypeId === 3,
+          },
+        })
+        .catch(() => null);
+    }
     if (!licenseType) throw new BadRequestError('Referenced licenseType does not exist');
+
+    const existingActiveKey = await prismaClient.license?.findFirst?.({
+      where: { tenantId, licenseKey: data.licenseKey, deletedAt: null },
+    });
+    if (existingActiveKey) {
+      throw new ConflictError(`License with key '${data.licenseKey}' already exists.`);
+    }
+
+    const deletedStubKey = await prismaClient.license?.findFirst?.({
+      where: { tenantId, licenseKey: data.licenseKey, deletedAt: { not: null } },
+    });
+    if (deletedStubKey) {
+      await prismaClient.license.delete({ where: { id: deletedStubKey.id } }).catch(() => null);
+    }
 
     const created = await licenseRepository.create(prismaClient, {
       name: data.name,
@@ -97,9 +149,10 @@ export class LicenseService {
       startDate: data.startDate,
       endDate: data.endDate,
       autoRenew: data.autoRenew,
+      terms: data.terms ?? undefined,
       status: 'ACTIVE',
-      vendor: { connect: { id: data.vendorId } },
-      licenseType: { connect: { id: data.licenseTypeId } },
+      vendor: { connect: { id: vendor.id } },
+      licenseType: { connect: { id: licenseType.id } },
       tenant: { connect: { id: tenantId } },
     });
 
@@ -128,6 +181,7 @@ export class LicenseService {
       endDate: data.endDate,
       status: data.status,
       autoRenew: data.autoRenew,
+      terms: data.terms !== undefined ? data.terms : undefined,
       vendor: data.vendorId ? { connect: { id: data.vendorId } } : undefined,
       licenseType: data.licenseTypeId ? { connect: { id: data.licenseTypeId } } : undefined,
     });

@@ -46,9 +46,16 @@ export class AssetService {
   }
 
   public async createAsset(prismaClient: any, tenantId: string, ownerId: string, data: any) {
-    const existing = await assetRepository.findByCode(prismaClient, data.assetCode);
+    const existing = await assetRepository.findByCode(prismaClient, data.assetCode, tenantId);
     if (existing) {
       throw new ConflictError(`Asset with code '${data.assetCode}' already exists.`);
+    }
+
+    const deletedStub = await prismaClient.asset?.findFirst?.({
+      where: { assetCode: data.assetCode, tenantId, deletedAt: { not: null } },
+    });
+    if (deletedStub) {
+      await prismaClient.asset.delete({ where: { id: deletedStub.id } }).catch(() => null);
     }
 
     const cleanTags = Array.isArray(data.tags)
@@ -290,16 +297,38 @@ export class AssetService {
       return 'SOFTWARE';
     };
 
+    const typeAliases: Record<string, AssetType> = {
+      DOC: 'DOCUMENT',
+      DOCS: 'DOCUMENT',
+      PDF: 'DOCUMENT',
+      APP: 'SOFTWARE',
+      APPLICATION: 'SOFTWARE',
+      PORTAL: 'SOFTWARE',
+      SYSTEM: 'SOFTWARE',
+      IMG: 'IMAGE',
+      PHOTO: 'IMAGE',
+      PICTURE: 'IMAGE',
+      ILLUSTRATION: 'IMAGE',
+      VID: 'VIDEO',
+      MOVIE: 'VIDEO',
+      CLIP: 'VIDEO',
+      DATA: 'DATASET',
+      CSV: 'DATASET',
+      TYPEFACE: 'FONT',
+      TYPOGRAPHY: 'FONT',
+    };
+
     const validTypes: AssetType[] = ['FONT', 'IMAGE', 'VIDEO', 'AUDIO', 'SOFTWARE', 'DATASET', 'DOCUMENT', 'OTHER'];
 
     rows.forEach((row, idx) => {
       const rowNum = idx + 2; // Row 1 is header
       const name = getVal(row, 'name', 'asset_name', 'assetName', 'title', 'AssetName', 'Name');
       const assetCode = getVal(row, 'asset_code', 'assetCode', 'code', 'Code', 'Asset Code', 'AssetCode', 'id');
-      let assetType = getVal(row, 'asset_type', 'assetType', 'type', 'Type', 'Asset Type', 'AssetType').toUpperCase() as AssetType;
+      const rawType = getVal(row, 'asset_type', 'assetType', 'type', 'Type', 'Asset Type', 'AssetType').toUpperCase();
       const description = getVal(row, 'description', 'desc', 'Description', 'Desc', 'details');
 
-      if (!assetType || !validTypes.includes(assetType)) {
+      let assetType: AssetType = (typeAliases[rawType] || rawType) as AssetType;
+      if (!rawType) {
         assetType = inferType(name, assetCode, description);
       }
 
@@ -310,6 +339,13 @@ export class AssetService {
       }
       if (!assetCode || assetCode.trim().length < 2) {
         rowErrors.push({ row: rowNum, field: 'assetCode', error: 'Asset code is required' });
+      }
+      if (!validTypes.includes(assetType)) {
+        rowErrors.push({
+          row: rowNum,
+          field: 'assetType',
+          error: `Invalid asset_type '${rawType}'. Must be one of: ${validTypes.join(', ')}`,
+        });
       }
 
       if (rowErrors.length > 0) {

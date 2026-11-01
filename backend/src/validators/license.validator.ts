@@ -16,7 +16,7 @@ const LicenseStatusEnum = (LicenseStatus || {
 
 export const createLicenseSchema = z
   .object({
-    name: z.string().min(2).max(100).trim(),
+    name: z.string().min(2).max(200).trim(),
     vendorId: z.string().min(1, 'Vendor is required').trim(),
     vendorName: z.string().trim().optional(),
     licenseTypeId: z.number().int().positive(),
@@ -27,6 +27,7 @@ export const createLicenseSchema = z
     startDate: z.string().transform((str) => new Date(str)),
     endDate: z.string().optional().nullable().transform((str) => (str ? new Date(str) : null)),
     autoRenew: z.boolean().default(false),
+    terms: z.string().max(5000).optional().nullable(),
   })
   .strip()
   .refine(
@@ -41,7 +42,7 @@ export const createLicenseSchema = z
 
 export const updateLicenseSchema = z
   .object({
-    name: z.string().min(2).max(100).trim().optional(),
+    name: z.string().min(2).max(200).trim().optional(),
     vendorId: z.string().min(1).trim().optional(),
     licenseTypeId: z.number().int().positive().optional(),
     licenseKey: z.string().min(4).max(255).trim().optional(),
@@ -52,6 +53,7 @@ export const updateLicenseSchema = z
     endDate: z.string().optional().nullable().transform((str) => (str ? new Date(str) : null)),
     status: z.nativeEnum(LicenseStatusEnum).optional(),
     autoRenew: z.boolean().optional(),
+    terms: z.string().max(5000).optional().nullable(),
   })
   .strip()
   .refine(

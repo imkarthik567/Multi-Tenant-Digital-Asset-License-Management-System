@@ -98,8 +98,11 @@ export class AssetRepository {
 
     // Sort order safely mapped
     let sortColumn = 'created_at';
-    if (params.sort === 'name') sortColumn = 'asset_name';
-    else if (params.sort === 'assetCode') sortColumn = 'asset_code';
+    if (params.sort === 'name' || params.sort === 'asset_name') sortColumn = 'asset_name';
+    else if (params.sort === 'assetCode' || params.sort === 'asset_code') sortColumn = 'asset_code';
+    else if (params.sort === 'assetType' || params.sort === 'asset_type') sortColumn = 'asset_type';
+    else if (params.sort === 'status' || params.sort === 'asset_status') sortColumn = 'asset_status';
+    else if (params.sort === 'complianceStatus' || params.sort === 'compliance_status') sortColumn = 'compliance_status';
     else if (params.sort === 'updatedAt' || params.sort === 'updated_at') sortColumn = 'updated_at';
     else if (params.sort === 'createdAt' || params.sort === 'created_at') sortColumn = 'created_at';
 
@@ -167,15 +170,20 @@ export class AssetRepository {
     });
   }
 
-  public async findByCode(prisma: PrismaClient | any, assetCode: string): Promise<Asset | null> {
+  public async findByCode(prisma: PrismaClient | any, assetCode: string, tenantId?: string): Promise<Asset | null> {
     return prisma.asset.findFirst({
-      where: { assetCode, deletedAt: null },
+      where: {
+        assetCode,
+        deletedAt: null,
+        ...(tenantId ? { tenantId } : {}),
+      },
     });
   }
 
   public async create(prisma: PrismaClient | any, data: Prisma.AssetCreateInput): Promise<Asset> {
+    const { tags: _ignoredTags, ...prismaData } = data as any;
     return prisma.asset.create({
-      data,
+      data: prismaData,
       include: {
         category: true,
         owner: { select: { id: true, fullName: true, email: true } },

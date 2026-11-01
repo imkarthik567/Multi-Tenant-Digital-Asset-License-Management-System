@@ -16,11 +16,13 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { SearchInput } from '../../components/common/SearchInput';
 import { Pagination } from '../../components/common/Pagination';
 import { RoleGate } from '../../components/auth/RoleGate';
+import { useAuth } from '../../context/AuthContext';
 import { Select, Button, Input } from '../../components/ui';
 
 export const AllocationListPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { hasPermission } = useAuth();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
@@ -83,6 +85,7 @@ export const AllocationListPage: React.FC = () => {
         params: { limit: 100 },
       });
     },
+    enabled: hasPermission('users:read'),
   });
 
   const availableLicenses = mergeClientWorkspaceEntities<License>(

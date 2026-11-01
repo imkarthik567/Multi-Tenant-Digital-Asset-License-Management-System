@@ -230,12 +230,16 @@ export const AuthAmbientBackground: React.FC = () => {
         ctx.globalAlpha = 1;
       }
 
-      animationFrameId = window.requestAnimationFrame(render);
+      timerId = setTimeout(() => {
+        animationFrameId = window.requestAnimationFrame(render);
+      }, 45);
     };
 
-    render();
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    animationFrameId = window.requestAnimationFrame(render);
 
     return () => {
+      if (timerId) clearTimeout(timerId);
       window.cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);

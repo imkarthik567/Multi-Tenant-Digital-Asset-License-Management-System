@@ -123,7 +123,7 @@ export const LicenseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const toast = useToast();
 
   const roleName =
@@ -305,14 +305,14 @@ export const LicenseDetailPage: React.FC = () => {
         },
       });
     },
-    enabled: Boolean(id) && activeTab === 'audit',
+    enabled: Boolean(id) && activeTab === 'audit' && hasPermission('audit:read'),
   });
 
   // 6. Fetch Assignable Users for Allocation Dialog
   const { data: usersResponse } = useQuery<{ data: User[] }>({
     queryKey: ['users', 'assignable'],
     queryFn: () => api.get('/users', { params: { limit: 100 } }),
-    enabled: isAllocateModalOpen,
+    enabled: isAllocateModalOpen && hasPermission('users:read'),
   });
 
   // 7. Fetch Available Assets for Linking
@@ -326,6 +326,7 @@ export const LicenseDetailPage: React.FC = () => {
   const { data: vendorsResponse } = useQuery<{ data: Vendor[] }>({
     queryKey: ['vendors', 'dropdown'],
     queryFn: () => api.get('/vendors', { params: { limit: 100 } }),
+    enabled: hasPermission('vendors:read'),
   });
 
   // Normalized Arrays

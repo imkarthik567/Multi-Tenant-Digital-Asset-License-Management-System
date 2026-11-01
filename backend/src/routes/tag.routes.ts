@@ -23,6 +23,7 @@ router.get('/:id', authorize('tags:read'), tenantContext, tagController.getTagBy
 // Manage tags
 router.post('/', authorize('tags:manage'), tenantContext, validate(createTagSchema), tagController.createTag);
 router.patch('/:id', authorize('tags:manage'), tenantContext, validate(updateTagSchema), tagController.updateTag);
+router.put('/:id', authorize('tags:manage'), tenantContext, validate(updateTagSchema), tagController.updateTag);
 router.delete('/:id', authorize('tags:manage'), tenantContext, tagController.deleteTag);
 
 export default router;

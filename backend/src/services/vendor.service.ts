@@ -23,7 +23,10 @@ export class VendorService {
 
   public async createVendor(prismaClient: any, data: any) {
     const existing = await prismaClient.vendor.findFirst({
-      where: { name: data.name },
+      where: {
+        name: data.name,
+        ...(data.tenantId ? { tenantId: data.tenantId } : {}),
+      },
     });
     if (existing) {
       throw new ConflictError(`Vendor with name '${data.name}' already exists in your organization.`);
@@ -33,10 +36,14 @@ export class VendorService {
   }
 
   public async updateVendor(prismaClient: any, id: string, data: any) {
-    await this.getVendorById(prismaClient, id);
+    const current = await this.getVendorById(prismaClient, id);
     if (data.name) {
       const existing = await prismaClient.vendor.findFirst({
-        where: { name: data.name, id: { not: id } },
+        where: {
+          name: data.name,
+          id: { not: id },
+          ...(current.tenantId ? { tenantId: current.tenantId } : {}),
+        },
       });
       if (existing) {
         throw new ConflictError(`Vendor with name '${data.name}' already exists.`);
@@ -48,7 +55,24 @@ export class VendorService {
   public async deleteVendor(prismaClient: any, id: string) {
     const vendor = await this.getVendorById(prismaClient, id);
     if (vendor._count?.licenses > 0) {
-      throw new ConflictError('Cannot delete vendor associated with active or past licenses.');
+      let activeLicenseCount = vendor._count.licenses;
+      if (prismaClient.license?.count) {
+        try {
+          activeLicenseCount = await prismaClient.license.count({
+            where: { vendorId: id, deletedAt: null },
+          });
+        } catch {
+          // fallback to _count
+        }
+      }
+      if (activeLicenseCount > 0) {
+        throw new ConflictError('Cannot delete vendor associated with active or past licenses.');
+      }
+      if (prismaClient.license?.deleteMany) {
+        await prismaClient.license
+          .deleteMany({ where: { vendorId: id, deletedAt: { not: null } } })
+          .catch(() => {});
+      }
     }
     return vendorRepository.delete(prismaClient, id);
   }

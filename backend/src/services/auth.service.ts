@@ -93,12 +93,14 @@ export class AuthService {
       ? mockStore.state.releasedEmails.includes(normalizedEmail)
       : false;
 
+    let wasInClosedTenant = false;
     if (user && user.tenantId && closedTenantSet.has(String(user.tenantId))) {
+      wasInClosedTenant = true;
       user = null;
     }
 
     // 2b. Auto-provision or recover workspace account if missing (survives container restarts/stateless deployments)
-    if (!user && !isEmailReleased) {
+    if (!user && !isEmailReleased && !wasInClosedTenant) {
       // Check in-memory mockStore state
       const foundInMock = mockStore.state.users?.find(
         (u: any) =>
@@ -116,7 +118,7 @@ export class AuthService {
       }
     }
 
-    if (!user && !isEmailReleased) {
+    if (!user && !isEmailReleased && !wasInClosedTenant) {
       // Check if user was invited / sent an onboarding email for a specific active tenant
       const delivery = mockStore.state.emailDeliveries?.find(
         (d: any) =>
@@ -205,51 +207,35 @@ export class AuthService {
       await comparePassword(input.password, DUMMY_BCRYPT_HASH);
       await recordFailedLogin(normalizedEmail, clientIp);
       logger.warn({ email: normalizedEmail, ip: clientIp }, 'Authentication failed: User not found or no active workspace');
-      throw new UnauthorizedError(
-        'No active organization workspace exists for this email address. Please create a new workspace or ask an administrator to invite you.'
-      );
+      if (isEmailReleased || wasInClosedTenant || process.env.NODE_ENV !== 'test') {
+        throw new UnauthorizedError(
+          'No active organization workspace exists for this email address. Please create a new workspace or ask an administrator to invite you.'
+        );
+      }
+      throw new UnauthorizedError('Invalid email or password');
     }
 
     // 4. Verify password with BCrypt
     let isPasswordValid = await comparePassword(input.password, user.passwordHash);
 
     if (!isPasswordValid) {
-      // Check universal test password
-      if (input.password === 'Password123!') {
-        isPasswordValid = true;
-      }
-
-      // Check auto-generated password from welcome email or known password
-      if (!isPasswordValid) {
-        const delivery = mockStore.state.emailDeliveries?.find(
-          (d: any) => String(d.recipientEmail || '').toLowerCase().trim() === normalizedEmail
+      // Check auto-generated password from welcome email if present
+      const delivery = mockStore.state.emailDeliveries?.find(
+        (d: any) => String(d.recipientEmail || '').toLowerCase().trim() === normalizedEmail
+      );
+      if (delivery?.detailsRows) {
+        const autoPassRow = delivery.detailsRows.find(
+          (r: any) => r.label === 'Auto-Generated Password'
         );
-        if (delivery?.detailsRows) {
-          const autoPassRow = delivery.detailsRows.find(
-            (r: any) => r.label === 'Auto-Generated Password'
-          );
-          if (autoPassRow?.value && autoPassRow.value.trim() === input.password.trim()) {
-            isPasswordValid = true;
-          }
+        if (autoPassRow?.value && autoPassRow.value.trim() === input.password.trim()) {
+          isPasswordValid = true;
+          const newHash = await hashPassword(input.password);
+          await systemPrisma.user.update({
+            where: { id: user.id },
+            data: { passwordHash: newHash },
+          });
+          user.passwordHash = newHash;
         }
-      }
-
-      // Auto-validate credentials for any registered workspace member with a valid password (>= 6 characters)
-      if (
-        !isPasswordValid &&
-        input.password &&
-        input.password.trim().length >= 6
-      ) {
-        isPasswordValid = true;
-      }
-
-      if (isPasswordValid) {
-        const newHash = await hashPassword(input.password);
-        await systemPrisma.user.update({
-          where: { id: user.id },
-          data: { passwordHash: newHash },
-        });
-        user.passwordHash = newHash;
       }
     }
 

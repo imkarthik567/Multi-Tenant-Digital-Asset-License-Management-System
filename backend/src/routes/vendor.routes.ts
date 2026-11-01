@@ -23,6 +23,7 @@ router.get('/:id', authorize('vendors:read'), tenantContext, vendorController.ge
 // Manage vendors
 router.post('/', authorize('vendors:manage'), tenantContext, validate(createVendorSchema), vendorController.createVendor);
 router.patch('/:id', authorize('vendors:manage'), tenantContext, validate(updateVendorSchema), vendorController.updateVendor);
+router.put('/:id', authorize('vendors:manage'), tenantContext, validate(updateVendorSchema), vendorController.updateVendor);
 router.delete('/:id', authorize('vendors:manage'), tenantContext, vendorController.deleteVendor);
 
 export default router;

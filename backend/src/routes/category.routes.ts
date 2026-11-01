@@ -24,6 +24,7 @@ router.get('/:id', authorize('categories:read'), tenantContext, categoryControll
 // Manage categories
 router.post('/', authorize('categories:manage'), tenantContext, validate(createCategorySchema), categoryController.createCategory);
 router.patch('/:id', authorize('categories:manage'), tenantContext, validate(updateCategorySchema), categoryController.updateCategory);
+router.put('/:id', authorize('categories:manage'), tenantContext, validate(updateCategorySchema), categoryController.updateCategory);
 router.delete('/:id', authorize('categories:manage'), tenantContext, categoryController.deleteCategory);
 
 export default router;
