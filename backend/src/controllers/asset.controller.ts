@@ -15,7 +15,15 @@ export class AssetController {
   public listAssets = asyncHandler(async (req: Request, res: Response) => {
     const params = getPaginationParams(req, 'created_at', [
       'name',
+      'asset_name',
       'assetCode',
+      'asset_code',
+      'assetType',
+      'asset_type',
+      'status',
+      'asset_status',
+      'complianceStatus',
+      'compliance_status',
       'created_at',
       'updated_at',
       'updatedAt',

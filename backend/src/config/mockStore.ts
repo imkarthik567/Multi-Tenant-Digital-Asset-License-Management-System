@@ -1834,10 +1834,31 @@ export class MockPrismaStore {
         delete normalized[ck];
       }
     }
-    const relationKeys = ['tenant', 'role', 'plan', 'vendor', 'category', 'asset', 'license', 'licenseType', 'user', 'owner'];
+    const relationKeys = [
+      'tenant',
+      'role',
+      'plan',
+      'vendor',
+      'category',
+      'parent',
+      'asset',
+      'license',
+      'licenseType',
+      'user',
+      'owner',
+      'uploader',
+      'renewer',
+    ];
     for (const rel of relationKeys) {
       if (normalized[rel] && typeof normalized[rel] === 'object') {
-        const fk = rel === 'owner' ? 'ownerId' : `${rel}Id`;
+        const fk =
+          rel === 'owner'
+            ? 'ownerId'
+            : rel === 'uploader'
+            ? 'uploadedBy'
+            : rel === 'renewer'
+            ? 'performedBy'
+            : `${rel}Id`;
         if (normalized[rel].disconnect) {
           normalized[fk] = null;
         } else if (normalized[rel].connect?.id !== undefined) {
@@ -1917,9 +1938,10 @@ export class MockPrismaStore {
         } else if (!this.matches(item, value)) return false;
       } else if (key === 'NOT') {
         if (this.matches(item, value)) return false;
-      } else if (key === 'role' && value && typeof value === 'object' && 'name' in (value as any)) {
+      } else if (key === 'role' && value && typeof value === 'object') {
         const userRole = this.state.roles.find((r) => r.id === item.roleId);
-        if (!userRole || userRole.name !== (value as any).name) return false;
+        const roleFilter = 'is' in (value as any) ? (value as any).is : value;
+        if (!userRole || !this.matches(userRole, roleFilter)) return false;
       } else if (key === 'license' && value && typeof value === 'object') {
         const relLic = this.state.licenses.find((l) => l.id === item.licenseId);
         if (relLic) {
@@ -1934,6 +1956,24 @@ export class MockPrismaStore {
         } else if ((value as any).tenantId && item.tenantId !== (value as any).tenantId) {
           return false;
         }
+      } else if (key === 'asset' && value && typeof value === 'object') {
+        const relAsset = this.state.assets.find((a) => a.id === item.assetId);
+        if (relAsset) {
+          if (!this.matches(relAsset, value)) return false;
+        } else if ((value as any).tenantId && item.tenantId && item.tenantId !== (value as any).tenantId) {
+          return false;
+        } else if (!relAsset) {
+          return false;
+        }
+      } else if (key === 'vendor' && value && typeof value === 'object') {
+        const relVendor = this.state.vendors.find((v) => v.id === item.vendorId);
+        if (!relVendor || !this.matches(relVendor, value)) return false;
+      } else if (key === 'category' && value && typeof value === 'object') {
+        const relCategory = this.state.categories.find((c) => c.id === item.categoryId);
+        if (!relCategory || !this.matches(relCategory, value)) return false;
+      } else if (key === 'parent' && value && typeof value === 'object') {
+        const relParent = this.state.categories.find((c) => c.id === item.parentId);
+        if (!relParent || !this.matches(relParent, value)) return false;
       } else if (key === 'assetId_versionNo' && value && typeof value === 'object') {
         const itemVer = item.versionNo ?? (parseInt(String(item.versionNumber || '1'), 10) || 1);
         if (item.assetId !== (value as any).assetId || itemVer !== (value as any).versionNo) return false;
@@ -2051,6 +2091,15 @@ export class MockPrismaStore {
       cloned.vendors = this.state.vendors.filter((v) => v.tenantId === item.id);
       cloned.assets = this.state.assets.filter((a) => a.tenantId === item.id);
       cloned.licenses = this.state.licenses.filter((l) => l.tenantId === item.id);
+      cloned._count = {
+        users: cloned.users.length,
+        assets: cloned.assets.filter((a: any) => !a.deletedAt).length,
+        licenses: cloned.licenses.filter((l: any) => !l.deletedAt).length,
+      };
+    } else if (lowerModel === 'plan') {
+      cloned._count = {
+        tenants: this.state.tenants.filter((t) => t.planId === item.id).length,
+      };
     } else if (lowerModel === 'category') {
       cloned.parent = item.parentId ? this.state.categories.find((c) => c.id === item.parentId) || null : null;
       cloned.children = this.state.categories.filter((c) => c.parentId === item.id);
@@ -2061,8 +2110,12 @@ export class MockPrismaStore {
     } else if (lowerModel === 'vendor') {
       cloned.contactEmail = item.contactEmail || item.supportEmail || null;
       cloned.supportEmail = item.supportEmail || item.contactEmail || null;
+      cloned.website = item.website ?? item.websiteUrl ?? null;
+      cloned.websiteUrl = cloned.website;
+      const vendorLicenses = this.state.licenses.filter((l) => l.vendorId === item.id && !l.deletedAt);
+      cloned.licenses = vendorLicenses;
       cloned._count = {
-        licenses: this.state.licenses.filter((l) => l.vendorId === item.id && !l.deletedAt).length,
+        licenses: vendorLicenses.length,
       };
     } else if (lowerModel === 'tag') {
       cloned.color = item.color || '#6366f1';
@@ -2218,6 +2271,11 @@ export class MockPrismaStore {
         cloned.license = null;
       }
       cloned.user = this.state.users.find((u) => u.id === item.userId) || null;
+      cloned.releasedAt = item.releasedAt || item.revokedAt || null;
+    } else if (lowerModel === 'notification') {
+      const lic = item.licenseId ? this.state.licenses.find((l) => l.id === item.licenseId) : null;
+      cloned.license = lic ? { id: lic.id, name: lic.name || lic.licenseKey || 'Enterprise License' } : null;
+      cloned.user = item.userId ? this.state.users.find((u) => u.id === item.userId) || null : null;
     }
 
     return cloned;
@@ -2225,6 +2283,48 @@ export class MockPrismaStore {
 }
 
 export const mockStore = new MockPrismaStore();
+
+function sortMockItems(items: any[], orderBy: any): any[] {
+  if (!orderBy) return items;
+  const orderEntries = Array.isArray(orderBy)
+    ? orderBy.flatMap((o) => Object.entries(o))
+    : Object.entries(orderBy);
+  if (orderEntries.length === 0) return items;
+
+  return [...items].sort((a, b) => {
+    for (const [orderKey, rawDir] of orderEntries) {
+      const dir = String(rawDir).toLowerCase() === 'desc' ? -1 : 1;
+      const va = a[orderKey];
+      const vb = b[orderKey];
+      if (va === vb) continue;
+      if (va === null || va === undefined) return 1;
+      if (vb === null || vb === undefined) return -1;
+
+      if (va instanceof Date || vb instanceof Date) {
+        const ta = new Date(va).getTime();
+        const tb = new Date(vb).getTime();
+        if (ta !== tb) return (ta < tb ? -1 : 1) * dir;
+        continue;
+      }
+
+      if (
+        typeof va === 'string' &&
+        typeof vb === 'string' &&
+        /^\d+$/.test(va) &&
+        /^\d+$/.test(vb)
+      ) {
+        const ba = BigInt(va);
+        const bb = BigInt(vb);
+        if (ba !== bb) return (ba < bb ? -1 : 1) * dir;
+        continue;
+      }
+
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+    }
+    return 0;
+  });
+}
 
 export function createMockModelClient(modelName: string): any {
   return {
@@ -2236,7 +2336,11 @@ export function createMockModelClient(modelName: string): any {
 
     async findFirst(args: any = {}) {
       const collection = mockStore.getCollection(modelName);
-      const item = collection.find((i) => mockStore.matches(i, args.where));
+      let items = collection.filter((i) => mockStore.matches(i, args.where));
+      if (args.orderBy && items.length > 1) {
+        items = sortMockItems(items, args.orderBy);
+      }
+      const item = items[0];
       return item ? mockStore.populateRelations(modelName, item, args.include || args.select) : null;
     },
 
@@ -2257,17 +2361,7 @@ export function createMockModelClient(modelName: string): any {
       let items = collection.filter((i) => mockStore.matches(i, args.where));
 
       if (args.orderBy) {
-        const orderKey = Object.keys(args.orderBy)[0];
-        if (orderKey) {
-          const dir = args.orderBy[orderKey];
-          items.sort((a, b) => {
-            const va = a[orderKey];
-            const vb = b[orderKey];
-            if (va < vb) return dir === 'desc' ? 1 : -1;
-            if (va > vb) return dir === 'desc' ? -1 : 1;
-            return 0;
-          });
-        }
+        items = sortMockItems(items, args.orderBy);
       }
 
       if (typeof args.skip === 'number') {
@@ -2301,16 +2395,18 @@ export function createMockModelClient(modelName: string): any {
     async create(args: any = {}) {
       const collection = mockStore.getCollection(modelName);
       const normalizedData = mockStore.normalizeWriteData(args.data);
+      const lowerMod = modelName.toLowerCase();
       const newItem = {
         id:
           normalizedData?.id ||
-          (modelName.toLowerCase() === 'auditlog'
-            ? String(Date.now() + Math.floor(Math.random() * 100000))
+          (lowerMod === 'auditlog' || lowerMod === 'assetaccesslog'
+            ? String(Date.now() * 1000 + Math.floor(Math.random() * 1000))
             : crypto.randomUUID()),
         createdAt: new Date(),
         updatedAt: new Date(),
-        ...(modelName.toLowerCase() === 'refreshtoken' ? { revokedAt: null } : {}),
-        ...(modelName.toLowerCase() === 'auditlog' ? { performedAt: new Date() } : {}),
+        ...(lowerMod === 'refreshtoken' ? { revokedAt: null } : {}),
+        ...(lowerMod === 'auditlog' ? { performedAt: new Date() } : {}),
+        ...(lowerMod === 'assetaccesslog' ? { accessedAt: new Date() } : {}),
         ...normalizedData,
       };
       if (modelName.toLowerCase() === 'user' && newItem.email) {
@@ -2536,7 +2632,11 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
             ? mockStore.state.vendors.filter((v) => v.tenantId === resolvedTenantId && !v.deletedAt)
             : mockStore.state.vendors.filter((v) => !v.deletedAt);
 
-          if (sqlText.includes('FROM license_allocations la') && sqlText.includes('JOIN asset_licenses al')) {
+          if (
+            sqlText.includes('FROM license_allocations la') &&
+            sqlText.includes('JOIN asset_licenses al') &&
+            !sqlText.includes('MAX(aal.accessed_at)')
+          ) {
             const [assetIdArg, userIdArg] = values;
             const userObj = mockStore.state.users.find((u) => u.id === userIdArg);
             if (userObj && (Number(userObj.roleId) === 2 || Number(userObj.roleId) === 3 || userObj.isSuperAdmin)) {
@@ -2774,14 +2874,32 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
             if (orderMatch && orderMatch[1] && orderMatch[2]) {
               const col = orderMatch[1].toLowerCase();
               const dir = orderMatch[2].toUpperCase() === 'ASC' ? 1 : -1;
+              const stringCols = [
+                'asset_name',
+                'asset_code',
+                'asset_type',
+                'asset_status',
+                'compliance_status',
+                'category_name',
+                'owner_name',
+              ];
               rows.sort((a: any, b: any) => {
-                if (col === 'asset_name' || col === 'asset_code') {
-                  return String(a[col] || '').localeCompare(String(b[col] || ''), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+                if (stringCols.includes(col)) {
+                  return (
+                    String(a[col] || '').localeCompare(String(b[col] || ''), undefined, {
+                      numeric: true,
+                      sensitivity: 'base',
+                    }) * dir
+                  );
                 }
                 const ta = new Date(a[col] || a.created_at || 0).getTime();
                 const tb = new Date(b[col] || b.created_at || 0).getTime();
                 if (ta !== tb) return (ta - tb) * dir;
-                return String(a.asset_code || '').localeCompare(String(b.asset_code || ''), undefined, { numeric: true }) * dir;
+                return (
+                  String(a.asset_code || '').localeCompare(String(b.asset_code || ''), undefined, {
+                    numeric: true,
+                  }) * dir
+                );
               });
             }
 
@@ -3038,10 +3156,15 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
               const col = orderMatch[1].toLowerCase();
               const dir = orderMatch[2].toUpperCase() === 'ASC' ? 1 : -1;
               mapped.sort((a: any, b: any) => {
-                if (col === 'license_name' || col === 'status') {
-                  return String(a[col] || '').localeCompare(String(b[col] || '')) * dir;
+                if (col === 'license_name' || col === 'vendor_name' || col === 'status' || col === 'license_type') {
+                  return String(a[col] || '').localeCompare(String(b[col] || ''), undefined, { numeric: true, sensitivity: 'base' }) * dir;
                 }
-                return (Number(a[col] || 0) - Number(b[col] || 0)) * dir;
+                if (col === 'end_date' || col === 'start_date') {
+                  const ta = a[col] ? new Date(a[col]).getTime() : Number.MAX_SAFE_INTEGER;
+                  const tb = b[col] ? new Date(b[col]).getTime() : Number.MAX_SAFE_INTEGER;
+                  return (ta - tb) * dir;
+                }
+                return (Number(a[col] ?? 0) - Number(b[col] ?? 0)) * dir;
               });
             }
 
@@ -3363,6 +3486,117 @@ export function createMockPrismaClient(scopedTenantId?: string): any {
             const list = ((mockStore.state as any).failedLoginAttempts = (mockStore.state as any).failedLoginAttempts || []);
             const found = list.find((r: any) => r.key === key);
             return found ? [found] : [];
+          }
+
+          if (sqlText.includes('MAX(aal.accessed_at) AS last_accessed_at')) {
+            const accessLogs = mockStore.getCollection('assetAccessLog');
+            const activeAllocs = mockStore.state.allocations.filter(
+              (al) => (!resolvedTenantId || al.tenantId === resolvedTenantId) && al.status === 'ACTIVE'
+            );
+            return activeAllocs.map((al) => {
+              const lic = mockStore.state.licenses.find((l) => l.id === al.licenseId);
+              const vendor = mockStore.state.vendors.find((v) => v.id === lic?.vendorId);
+              const usr = mockStore.state.users.find((u) => u.id === al.userId);
+              const userLogs = accessLogs.filter((log: any) => log.userId === al.userId);
+              const lastAccess =
+                userLogs.length > 0
+                  ? new Date(
+                      Math.max(...userLogs.map((log: any) => new Date(log.accessedAt || log.createdAt || 0).getTime()))
+                    )
+                  : null;
+              return {
+                allocation_id: al.id,
+                license_id: al.licenseId,
+                license_name: lic?.name || lic?.licenseKey || 'Enterprise License',
+                license_cost: Number(lic?.cost ?? 0),
+                cost: Number(lic?.cost ?? 0),
+                total_seats: Math.max(1, Number(lic?.totalSeats ?? 1)),
+                user_id: al.userId,
+                user_name: usr?.fullName || 'Workspace Member',
+                user_email: usr?.email || 'member@workspace.io',
+                vendor_name: vendor?.name || 'Enterprise Vendor',
+                allocated_at: al.allocatedAt || al.createdAt || new Date(),
+                last_accessed_at: lastAccess,
+              };
+            });
+          }
+
+          if (sqlText.includes('FROM assets') && sqlText.includes('ILIKE')) {
+            const patternVal = values.find((v) => typeof v === 'string' && v.startsWith('%') && v.endsWith('%'));
+            const qLower = patternVal ? patternVal.slice(1, -1).toLowerCase().trim() : '';
+            return tenantAssets
+              .filter(
+                (a) =>
+                  !qLower ||
+                  String(a.name || '').toLowerCase().includes(qLower) ||
+                  String(a.assetCode || a.code || '').toLowerCase().includes(qLower) ||
+                  String(a.description || '').toLowerCase().includes(qLower)
+              )
+              .slice(0, 8)
+              .map((a) => ({
+                id: a.id,
+                name: a.name,
+                asset_code: a.assetCode || a.code || 'AST-100',
+                asset_type: a.assetType || a.type || 'SOFTWARE',
+                status: a.status || 'ACTIVE',
+              }));
+          }
+
+          if (sqlText.includes('FROM licenses l') && sqlText.includes('JOIN vendors v') && sqlText.includes('ILIKE')) {
+            const patternVal = values.find((v) => typeof v === 'string' && v.startsWith('%') && v.endsWith('%'));
+            const qLower = patternVal ? patternVal.slice(1, -1).toLowerCase().trim() : '';
+            return tenantLicenses
+              .map((l) => {
+                const v = mockStore.state.vendors.find((ven) => ven.id === l.vendorId);
+                return {
+                  id: l.id,
+                  name: l.name || l.licenseKey || 'Enterprise License',
+                  status: l.status || 'ACTIVE',
+                  vendor_name: v?.name || 'Enterprise Vendor',
+                };
+              })
+              .filter(
+                (row) =>
+                  !qLower ||
+                  String(row.name || '').toLowerCase().includes(qLower) ||
+                  String(row.vendor_name || '').toLowerCase().includes(qLower)
+              )
+              .slice(0, 8);
+          }
+
+          if (sqlText.includes('FROM vendors') && sqlText.includes('ILIKE')) {
+            const patternVal = values.find((v) => typeof v === 'string' && v.startsWith('%') && v.endsWith('%'));
+            const qLower = patternVal ? patternVal.slice(1, -1).toLowerCase().trim() : '';
+            return tenantVendors
+              .filter(
+                (v) =>
+                  !qLower ||
+                  String(v.name || '').toLowerCase().includes(qLower) ||
+                  String(v.contactEmail || v.supportEmail || '').toLowerCase().includes(qLower)
+              )
+              .slice(0, 8)
+              .map((v) => ({
+                id: v.id,
+                name: v.name,
+                contact_email: v.contactEmail || v.supportEmail || null,
+                website: v.website || v.websiteUrl || null,
+              }));
+          }
+
+          if (sqlText.includes('FROM tags') && sqlText.includes('ILIKE')) {
+            const patternVal = values.find((v) => typeof v === 'string' && v.startsWith('%') && v.endsWith('%'));
+            const qLower = patternVal ? patternVal.slice(1, -1).toLowerCase().trim() : '';
+            const tenantTags = resolvedTenantId
+              ? mockStore.state.tags.filter((t) => t.tenantId === resolvedTenantId)
+              : mockStore.state.tags;
+            return tenantTags
+              .filter((t) => !qLower || String(t.name || '').toLowerCase().includes(qLower))
+              .slice(0, 8)
+              .map((t) => ({
+                id: t.id,
+                name: t.name,
+                color: t.color || '#6366f1',
+              }));
           }
 
           if (sqlText.includes('SELECT 1')) {

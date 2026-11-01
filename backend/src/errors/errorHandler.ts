@@ -101,6 +101,8 @@ export const errorHandler = (
     fullMessage.includes('23514') ||
     fullMessage.includes('exceeded for current subscription plan') ||
     fullMessage.includes('No seats available for allocation') ||
+    fullMessage.includes('License seats exhausted') ||
+    fullMessage.includes('already holds an active seat') ||
     fullMessage.includes('Cross-tenant violation') ||
     fullMessage.includes('is append-only') ||
     fullMessage.includes('check_violation')
@@ -109,7 +111,7 @@ export const errorHandler = (
       status: 'error',
       error: {
         code: 'BUSINESS_RULE_VIOLATION',
-        message: friendlyDbMessage || 'The operation violated a database integrity constraint or quota limit.',
+        message: friendlyDbMessage || fullMessage || 'The operation violated a database integrity constraint or quota limit.',
       },
     });
     return;

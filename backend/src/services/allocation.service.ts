@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import { allocationRepository } from '../repositories/allocation.repository';
-import { NotFoundError, ForbiddenError } from '../errors/AppError';
+import { NotFoundError, ForbiddenError, ConflictError, BadRequestError } from '../errors/AppError';
 import { PaginationParams, formatPaginatedResponse } from '../utils/pagination.util';
 import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
@@ -50,6 +50,14 @@ export class AllocationService {
           targetUserFullName
         );
         resolvedUserId = member.id;
+      }
+
+      if (!resolvedUserId && callerRole === 'MEMBER') {
+        resolvedUserId = callerUserId;
+      }
+
+      if (!resolvedUserId) {
+        throw new BadRequestError('Either userId or userEmail is required to allocate a license seat');
       }
 
       // MEMBER role constraint: can only allocate to self
@@ -113,6 +121,19 @@ export class AllocationService {
         ? 'user_inactive'
         : 'unknown_failure';
       licenseAllocationFailuresTotal.inc({ reason });
+      if (!(err instanceof BadRequestError || err instanceof ForbiddenError || err instanceof NotFoundError || err instanceof ConflictError)) {
+        if (msg.includes('License not found')) {
+          throw new NotFoundError('License not found');
+        }
+        if (
+          msg.includes('exhausted') ||
+          msg.includes('No seats available') ||
+          msg.includes('already holds') ||
+          msg.includes('expired')
+        ) {
+          throw new ConflictError(msg);
+        }
+      }
       throw err;
     }
   }

@@ -290,8 +290,13 @@ export const VendorListPage: React.FC = () => {
             if (form.contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail.trim())) {
               errors.contactEmail = 'Please enter a valid email address.';
             }
-            if (form.website.trim() && !/^https?:\/\/.+/.test(form.website.trim())) {
-              errors.website = 'Website must be a valid HTTP/HTTPS URL.';
+            const rawWebsite = form.website.trim();
+            const normalizedWebsite =
+              rawWebsite && !/^https?:\/\//i.test(rawWebsite) && /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(rawWebsite)
+                ? `https://${rawWebsite}`
+                : rawWebsite;
+            if (normalizedWebsite && !/^https?:\/\/.+/.test(normalizedWebsite)) {
+              errors.website = 'Website must be a valid URL (e.g. https://www.vendor.com).';
             }
 
             if (Object.keys(errors).length > 0) {
@@ -299,7 +304,10 @@ export const VendorListPage: React.FC = () => {
               return;
             }
             setVendorErrors({});
-            saveMutation.mutate(form);
+            saveMutation.mutate({
+              ...form,
+              website: normalizedWebsite,
+            });
           }}
           className="space-y-4 text-xs"
         >
@@ -352,7 +360,7 @@ export const VendorListPage: React.FC = () => {
           <div>
             <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Website URL</label>
             <input
-              type="url"
+              type="text"
               placeholder="https://www.vendor.com"
               value={form.website}
               onChange={(e) => {

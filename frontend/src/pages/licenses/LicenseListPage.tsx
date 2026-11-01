@@ -515,6 +515,9 @@ export const LicenseListPage: React.FC = () => {
 
   const openAllocateModalFor = (lic: any) => {
     setSelectedLicense(lic);
+    if (!selectedUserId && members.length > 0) {
+      setSelectedUserId(members[0].id);
+    }
     setShowAllocateModal(true);
     setActiveMenuLicenseId(null);
   };

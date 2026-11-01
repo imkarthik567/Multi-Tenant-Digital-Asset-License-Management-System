@@ -14,11 +14,20 @@ import { LicenseStatus } from '@prisma/client';
 export class LicenseController {
   public listLicenses = asyncHandler(async (req: Request, res: Response) => {
     const params = getPaginationParams(req, 'license_name', [
+      'name',
       'license_name',
       'cost',
       'status',
+      'totalSeats',
       'total_seats',
+      'usedSeats',
       'used_seats',
+      'endDate',
+      'end_date',
+      'startDate',
+      'start_date',
+      'utilization_pct',
+      'utilizationPct',
     ]);
 
     const filter = {

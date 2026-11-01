@@ -7,16 +7,17 @@ import { z } from 'zod';
 
 export const allocateSeatSchema = z
   .object({
-    licenseId: z.string().trim().optional(),
-    userId: z.string().trim().optional(),
-    userEmail: z.string().email('Valid email address is required').toLowerCase().trim().optional(),
-    userFullName: z.string().trim().optional(),
-    fullName: z.string().trim().optional(),
+    licenseId: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().optional()),
+    userId: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().optional()),
+    userEmail: z.preprocess(
+      (v) => (v === '' || v === null ? undefined : v),
+      z.string().email('Valid email address is required').toLowerCase().trim().optional()
+    ),
+    userFullName: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().optional()),
+    fullName: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().optional()),
     notes: z.string().max(500).optional(),
   })
-  .refine((data) => Boolean(data.userId || data.userEmail), {
-    message: 'Either userId or userEmail is required to allocate a license seat',
-  });
+  .strip();
 
 export const releaseSeatSchema = z
   .object({

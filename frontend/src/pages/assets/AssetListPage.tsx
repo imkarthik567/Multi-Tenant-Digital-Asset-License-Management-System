@@ -574,9 +574,10 @@ export const AssetListPage: React.FC = () => {
   // 6. Bulk CSV Import Mutation
   const bulkImportMutation = useMutation({
     mutationFn: (csvText: string) =>
-      api.post('/assets/bulk-import', csvText, { 'Content-Type': 'text/csv' }),
+      api.post('/assets/bulk-import', { csv: csvText }),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       setShowCsvModal(false);
       setCsvContent('');
       setCsvPreviewRows([]);

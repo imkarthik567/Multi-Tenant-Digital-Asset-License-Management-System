@@ -69,7 +69,7 @@ export const queryAssetSchema = z
     tag: z.string().optional(),
     ownerId: z.string().min(1).optional(),
     complianceStatus: z.enum(['COMPLIANT', 'EXPIRED_LICENSE', 'UNLICENSED']).optional(),
-    createdFrom: z.string().datetime().optional(),
-    createdTo: z.string().datetime().optional(),
+    createdFrom: z.string().optional(),
+    createdTo: z.string().optional(),
   })
   .strip();

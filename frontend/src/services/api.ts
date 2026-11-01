@@ -298,12 +298,24 @@ export const handleApiError = (err: unknown): never => {
   throw new ApiError('An unknown error occurred');
 };
 
+const isHtmlResponse = (data: unknown): boolean =>
+  typeof data === 'string' && data.trim().startsWith('<');
+
 const isServerOrGatewayFailure = (err: unknown): boolean => {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status;
     const data = err.response?.data;
     // Network failure or 5xx server error
     if (!status || status >= 500) return true;
+    // If the response body is an HTML page (from an intermediate proxy/gateway/static host rather than JSON from Express)
+    if (isHtmlResponse(data)) {
+      if (status === 400 || status === 431) {
+        try {
+          localStorage.removeItem('assetvault_roster_sync_v3');
+        } catch {}
+      }
+      return true;
+    }
     // Static host (e.g. Vercel static build without backend function) returning 404/405 without structured backend error code
     if ((status === 404 || status === 405) && !(data && typeof data === 'object' && data.error?.code)) {
       return true;
@@ -311,9 +323,6 @@ const isServerOrGatewayFailure = (err: unknown): boolean => {
   }
   return false;
 };
-
-const isHtmlResponse = (data: unknown): boolean =>
-  typeof data === 'string' && data.trim().startsWith('<');
 
 const getEntityTypeFromEndpoint = (
   cleanEndpoint: string

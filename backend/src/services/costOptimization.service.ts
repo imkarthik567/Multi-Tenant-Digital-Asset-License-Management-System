@@ -98,8 +98,11 @@ export class CostOptimizationService {
         totalAnnualSavings += annualSeatCost;
         seatCostSum += annualSeatCost;
 
-        const lastActivityDate = r.last_accessed_at ? new Date(r.last_accessed_at) : null;
-        const allocatedDate = new Date(r.allocated_at);
+        const rawLastActivity = r.last_accessed_at ? new Date(r.last_accessed_at) : null;
+        const lastActivityDate =
+          rawLastActivity && !isNaN(rawLastActivity.getTime()) ? rawLastActivity : null;
+        const rawAllocated = r.allocated_at ? new Date(r.allocated_at) : new Date();
+        const allocatedDate = !isNaN(rawAllocated.getTime()) ? rawAllocated : new Date();
         const referenceDate = lastActivityDate || allocatedDate;
         const inactiveDays = Math.max(0, Math.floor((Date.now() - referenceDate.getTime()) / (1000 * 60 * 60 * 24)));
 
